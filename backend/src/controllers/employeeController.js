@@ -43,6 +43,11 @@ const createEmployee = async (req, res) => {
 
     const tempPassword = generatePassword();
 
+    console.log("=================================");
+    console.log("EMPLOYEE EMAIL:", email);
+    console.log("TEMP PASSWORD:", tempPassword);
+    console.log("=================================");
+
     const hashedPassword = await bcrypt.hash(
       tempPassword,
       10
@@ -57,6 +62,10 @@ const createEmployee = async (req, res) => {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: hashedPassword,
+
+        // Employee must change temporary password after first login
+        isFirstLogin: true,
+
         role: "USER",
         status: status || "ACTIVE",
         phone,
