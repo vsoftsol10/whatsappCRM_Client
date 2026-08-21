@@ -25,9 +25,25 @@ export default function CreateTaskModal({
 
   const [errors, setErrors] = useState({});
 
+  // ============================
+  // SUBMITTING STATE
+  // ============================
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ============================
+  // FETCH EMPLOYEES
+  // ============================
+
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    if (isOpen) {
+      fetchEmployees();
+    }
+  }, [isOpen]);
+
+  // ============================
+  // VALIDATION
+  // ============================
 
   const validateForm = () => {
     const newErrors = {};
@@ -40,7 +56,8 @@ export default function CreateTaskModal({
     }
 
     if (!formData.description.trim()) {
-      newErrors.description = "Description is required";
+      newErrors.description =
+        "Description is required";
     }
 
     if (!formData.priority) {
@@ -52,13 +69,18 @@ export default function CreateTaskModal({
     }
 
     if (!formData.assignedToId) {
-      newErrors.assignedToId = "Please select an employee";
+      newErrors.assignedToId =
+        "Please select an employee";
     }
 
     setErrors(newErrors);
 
     return Object.keys(newErrors).length === 0;
   };
+
+  // ============================
+  // HANDLE CHANGE
+  // ============================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,16 +96,28 @@ export default function CreateTaskModal({
     }));
   };
 
+  // ============================
+  // HANDLE SUBMIT
+  // ============================
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Prevent double submission
+    if (isSubmitting) return;
+
+    // Validate form
     if (!validateForm()) return;
 
     try {
+      // Disable button immediately
+      setIsSubmitting(true);
+
       await addTask(formData);
 
       toast.success("Task created successfully!");
 
+      // Reset form
       setFormData({
         title: "",
         description: "",
@@ -94,41 +128,83 @@ export default function CreateTaskModal({
 
       setErrors({});
 
+      // Automatically close modal
       onClose();
+
     } catch (error) {
-      toast.error("Failed to create task");
+      console.error(
+        "Failed to create task:",
+        error
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to create task"
+      );
+
+    } finally {
+      // Enable button again
+      setIsSubmitting(false);
     }
+  };
+
+  // ============================
+  // CLOSE MODAL
+  // ============================
+
+  const handleClose = () => {
+    // Don't allow closing while creating
+    if (isSubmitting) return;
+
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
+
       <div className="min-h-screen flex items-center justify-center p-4">
+
         <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
+
+          {/* ================= HEADER ================= */}
+
           <div className="bg-[#25D366] px-6 py-5 flex justify-between items-center">
+
             <h2 className="text-2xl font-bold text-gray-800">
               Create Task
             </h2>
 
             <button
               type="button"
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-[#128C7E] transition"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className={`p-2 rounded-full transition ${
+                isSubmitting
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-[#128C7E]"
+              }`}
             >
               <X size={22} />
             </button>
+
           </div>
+
+          {/* ================= FORM ================= */}
 
           <form
             onSubmit={handleSubmit}
             className="p-6 space-y-5 max-h-[75vh] overflow-y-auto"
           >
-            {/* Title */}
+
+            {/* ================= TITLE ================= */}
+
             <div>
+
               <label className="block mb-2 font-medium text-gray-700">
-                Task Title <span className="text-red-500">*</span>
+                Task Title{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <input
@@ -136,10 +212,15 @@ export default function CreateTaskModal({
                 placeholder="Enter task title"
                 value={formData.title}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.title
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
                 }`}
               />
 
@@ -148,12 +229,16 @@ export default function CreateTaskModal({
                   {errors.title}
                 </p>
               )}
+
             </div>
 
-            {/* Description */}
+            {/* ================= DESCRIPTION ================= */}
+
             <div>
+
               <label className="block mb-2 font-medium text-gray-700">
-                Description <span className="text-red-500">*</span>
+                Description{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <textarea
@@ -161,10 +246,15 @@ export default function CreateTaskModal({
                 placeholder="Enter description"
                 value={formData.description}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.description
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
                 }`}
               />
 
@@ -173,27 +263,45 @@ export default function CreateTaskModal({
                   {errors.description}
                 </p>
               )}
+
             </div>
 
-            {/* Priority */}
+            {/* ================= PRIORITY ================= */}
+
             <div>
+
               <label className="block mb-2 font-medium text-gray-700">
-                Priority <span className="text-red-500">*</span>
+                Priority{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="priority"
                 value={formData.priority}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.priority
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
                 }`}
               >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
+                <option value="LOW">
+                  Low
+                </option>
+
+                <option value="MEDIUM">
+                  Medium
+                </option>
+
+                <option value="HIGH">
+                  High
+                </option>
+
               </select>
 
               {errors.priority && (
@@ -201,12 +309,16 @@ export default function CreateTaskModal({
                   {errors.priority}
                 </p>
               )}
+
             </div>
 
-            {/* Due Date */}
+            {/* ================= DUE DATE ================= */}
+
             <div>
+
               <label className="block mb-2 font-medium text-gray-700">
-                Due Date <span className="text-red-500">*</span>
+                Due Date{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <input
@@ -214,10 +326,15 @@ export default function CreateTaskModal({
                 name="dueDate"
                 value={formData.dueDate}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.dueDate
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
                 }`}
               />
 
@@ -226,33 +343,47 @@ export default function CreateTaskModal({
                   {errors.dueDate}
                 </p>
               )}
+
             </div>
 
-            {/* Assigned To */}
+            {/* ================= ASSIGNED TO ================= */}
+
             <div>
+
               <label className="block mb-2 font-medium text-gray-700">
-                Assign Employee <span className="text-red-500">*</span>
+                Assign Employee{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="assignedToId"
                 value={formData.assignedToId}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.assignedToId
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
                 }`}
               >
+
                 <option value="">
                   Select Employee
                 </option>
 
                 {(employees ?? []).map((emp) => (
-                  <option key={emp.id} value={emp.id}>
+                  <option
+                    key={emp.id}
+                    value={emp.id}
+                  >
                     {emp.name}
                   </option>
                 ))}
+
               </select>
 
               {errors.assignedToId && (
@@ -260,25 +391,53 @@ export default function CreateTaskModal({
                   {errors.assignedToId}
                 </p>
               )}
+
             </div>
 
-            {/* Buttons */}
+            {/* ================= BUTTONS ================= */}
+
             <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+
+              {/* CANCEL */}
+
               <button
                 type="button"
-                onClick={onClose}
-                className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                onClick={handleClose}
+                disabled={isSubmitting}
+                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${
+                  isSubmitting
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-100"
+                }`}
               >
                 Cancel
               </button>
 
+              {/* CREATE */}
+
               <button
                 type="submit"
-                className="px-6 py-3 rounded-lg bg-[#25D366] hover:bg-[#128C7E] text-gray-800 font-semibold transition"
+                disabled={isSubmitting}
+                className={`px-6 py-3 rounded-lg text-gray-800 font-semibold transition flex items-center justify-center gap-2 ${
+                  isSubmitting
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-[#25D366] hover:bg-[#128C7E]"
+                }`}
               >
-                Create Task
+
+                {isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin"></span>
+                    Creating...
+                  </>
+                ) : (
+                  "Create Task"
+                )}
+
               </button>
+
             </div>
+
           </form>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import useTemplateStore from "../../store/templateStore";
@@ -20,6 +20,7 @@ export default function EditTemplateModal({
   });
 
   const [errors, setErrors] = useState({});
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (template) {
@@ -36,6 +37,10 @@ export default function EditTemplateModal({
   }, [template]);
 
   if (!isOpen) return null;
+
+  // ==================================================
+  // VALIDATION
+  // ==================================================
 
   const validateForm = () => {
     const newErrors = {};
@@ -71,30 +76,49 @@ export default function EditTemplateModal({
     return Object.keys(newErrors).length === 0;
   };
 
+  // ==================================================
+  // HANDLE CHANGE
+  // ==================================================
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
 
+    // Clear error when user starts correcting the field
     setErrors((prev) => ({
       ...prev,
       [name]: "",
     }));
   };
 
+  // ==================================================
+  // HANDLE SUBMIT
+  // ==================================================
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    // Prevent duplicate submission
+    if (updating) return;
+
+    // Validate only when Update Template is clicked
+    if (!validateForm()) {
+      return;
+    }
 
     try {
+      // Immediately disable button
+      setUpdating(true);
+
       await editTemplate(template.id, formData);
 
       toast.success("Template updated successfully!");
 
+      // Reset form
       setFormData({
         name: "",
         category: "MARKETING",
@@ -105,10 +129,18 @@ export default function EditTemplateModal({
 
       setErrors({});
 
+      // Close modal after successful update
       onClose();
     } catch (error) {
-      toast.error("Failed to update template. Please try again.");
       console.error(error);
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to update template. Please try again."
+      );
+
+      // Allow user to try again if update failed
+      setUpdating(false);
     }
   };
 
@@ -116,8 +148,13 @@ export default function EditTemplateModal({
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-3 sm:p-4">
         <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          {/* Header */}
+
+          {/* ==================================================
+              HEADER
+          ================================================== */}
+
           <div className="flex items-center justify-between gap-4 bg-[#25D366] px-5 py-4 sm:px-6 sm:py-5">
+
             <h2 className="break-words text-xl font-bold text-gray-800 sm:text-2xl">
               Edit Template
             </h2>
@@ -125,20 +162,31 @@ export default function EditTemplateModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-full hover:bg-[#128C7E] transition"
+              disabled={updating}
+              className="rounded-full p-2 transition hover:bg-[#128C7E] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <X size={22} />
             </button>
+
           </div>
+
+          {/* ==================================================
+              FORM
+          ================================================== */}
 
           <form
             onSubmit={handleSubmit}
             className="max-h-[75vh] space-y-5 overflow-y-auto p-5 sm:p-6"
           >
-            {/* Name */}
+
+            {/* ==================================================
+                NAME
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Template Name <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Template Name{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <input
@@ -147,83 +195,123 @@ export default function EditTemplateModal({
                 placeholder="Enter template name"
                 value={formData.name}
                 onChange={handleChange}
+                disabled={updating}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.name
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                } disabled:cursor-not-allowed disabled:bg-gray-100`}
               />
 
               {errors.name && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.name}
                 </p>
               )}
             </div>
 
-            {/* Category */}
+            {/* ==================================================
+                CATEGORY
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Category <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Category{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
+                disabled={updating}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.category
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                } disabled:cursor-not-allowed disabled:bg-gray-100`}
               >
-                <option value="MARKETING">Marketing</option>
-                <option value="SUPPORT">Support</option>
-                <option value="SALES">Sales</option>
-                <option value="UTILITY">Utility</option>
-                <option value="AUTHENTICATION">Authentication</option>
+                <option value="MARKETING">
+                  Marketing
+                </option>
+
+                <option value="SUPPORT">
+                  Support
+                </option>
+
+                <option value="SALES">
+                  Sales
+                </option>
+
+                <option value="UTILITY">
+                  Utility
+                </option>
+
+                <option value="AUTHENTICATION">
+                  Authentication
+                </option>
               </select>
 
               {errors.category && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.category}
                 </p>
               )}
             </div>
 
-            {/* Message Type */}
+            {/* ==================================================
+                MESSAGE TYPE
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Message Type <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Message Type{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="messageType"
                 value={formData.messageType}
                 onChange={handleChange}
+                disabled={updating}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.messageType
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                } disabled:cursor-not-allowed disabled:bg-gray-100`}
               >
-                <option value="TEXT">Text</option>
-                <option value="IMAGE">Image</option>
-                <option value="VIDEO">Video</option>
-                <option value="DOCUMENT">Document</option>
+                <option value="TEXT">
+                  Text
+                </option>
+
+                <option value="IMAGE">
+                  Image
+                </option>
+
+                <option value="VIDEO">
+                  Video
+                </option>
+
+                <option value="DOCUMENT">
+                  Document
+                </option>
               </select>
 
               {errors.messageType && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.messageType}
                 </p>
               )}
             </div>
 
-            {/* Content */}
+            {/* ==================================================
+                CONTENT
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Template Content <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Template Content{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <textarea
@@ -232,65 +320,99 @@ export default function EditTemplateModal({
                 placeholder="Enter template content"
                 value={formData.content}
                 onChange={handleChange}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
+                disabled={updating}
+                className={`w-full resize-none rounded-lg border px-4 py-3 outline-none ${
                   errors.content
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                } disabled:cursor-not-allowed disabled:bg-gray-100`}
               />
 
               {errors.content && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.content}
                 </p>
               )}
             </div>
 
-            {/* Status */}
+            {/* ==================================================
+                STATUS
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Status <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Status{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
+                disabled={updating}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.status
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                } disabled:cursor-not-allowed disabled:bg-gray-100`}
               >
-                <option value="DRAFT">Draft</option>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
+                <option value="DRAFT">
+                  Draft
+                </option>
+
+                <option value="ACTIVE">
+                  Active
+                </option>
+
+                <option value="INACTIVE">
+                  Inactive
+                </option>
               </select>
 
               {errors.status && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.status}
                 </p>
               )}
             </div>
 
-            {/* Actions */}
+            {/* ==================================================
+                ACTION BUTTONS
+            ================================================== */}
+
             <div className="mt-6 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+
+              {/* Cancel */}
               <button
                 type="button"
                 onClick={onClose}
-                className="crm-secondary-button"
+                disabled={updating}
+                className="crm-secondary-button disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
 
+              {/* Update */}
               <button
                 type="submit"
-                className="crm-primary-button"
+                disabled={updating}
+                className="crm-primary-button flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Update Template
+                {updating ? (
+                  <>
+                    <Loader2
+                      size={18}
+                      className="animate-spin"
+                    />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Template"
+                )}
               </button>
+
             </div>
+
           </form>
         </div>
       </div>

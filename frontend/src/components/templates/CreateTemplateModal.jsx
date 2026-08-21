@@ -10,8 +10,9 @@ import {
   Megaphone,
   Gift,
   HeartHandshake,
-  Headset,} 
-  from "lucide-react";
+  Headset,
+} from "lucide-react";
+
 import useTemplateStore from "../../store/templateStore";
 import toast from "react-hot-toast";
 
@@ -33,7 +34,13 @@ export default function CreateTemplateModal({
 
   const [aiTone, setAiTone] = useState("Professional");
 
+  // AI generating state
   const [generating, setGenerating] = useState(false);
+
+  // Template creating state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [errors, setErrors] = useState({});
 
   const quickTemplates = [
     {
@@ -70,9 +77,11 @@ export default function CreateTemplateModal({
     },
   ];
 
-  const [errors, setErrors] = useState({});
-
   if (!isOpen) return null;
+
+  // ==================================================
+  // VALIDATION
+  // ==================================================
 
   const validateForm = () => {
     const newErrors = {};
@@ -108,110 +117,218 @@ export default function CreateTemplateModal({
     return Object.keys(newErrors).length === 0;
   };
 
+  // ==================================================
+  // HANDLE INPUT CHANGE
+  // ==================================================
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+    }));
 
+    // Remove validation error when user changes field
     setErrors((prev) => ({
       ...prev,
       [name]: "",
     }));
   };
 
+  // ==================================================
+  // AI GENERATOR
+  // ==================================================
+
   const handleGenerateAI = async () => {
-      if (!aiPrompt.trim()) {
-        return toast.error(
-          "Please enter a topic."
-        );
-      }
+    if (!aiPrompt.trim()) {
+      return toast.error("Please enter a topic.");
+    }
 
-      try {
-        setGenerating(true);
+    // Don't allow AI generation while template is being created
+    if (isSubmitting) {
+      return;
+    }
 
-        const content =
-          await generateTemplate(
-            aiPrompt,
-            aiTone
-          );
+    try {
+      setGenerating(true);
 
-        setFormData((prev) => ({
-          ...prev,
-          content,
-        }));
+      const content = await generateTemplate(
+        aiPrompt,
+        aiTone
+      );
 
-        toast.success(
-          "Template generated successfully."
-        );
-      } catch (error) {
-        console.error(error);
+      setFormData((prev) => ({
+        ...prev,
+        content,
+      }));
 
-        toast.error(
+      // Remove content validation error
+      setErrors((prev) => ({
+        ...prev,
+        content: "",
+      }));
+
+      toast.success(
+        "Template generated successfully."
+      );
+    } catch (error) {
+      console.error(error);
+
+      toast.error(
+        error?.response?.data?.message ||
           "Failed to generate template."
-        );
-      } finally {
-        setGenerating(false);
-      }
-    };
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ==================================================
+  // RESET FORM
+  // ==================================================
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      category: "SUPPORT",
+      messageType: "TEXT",
+      content: "",
+      status: "DRAFT",
+    });
+
+    setAiPrompt("");
+    setAiTone("Professional");
+
+    setErrors({});
+
+    setGenerating(false);
+    setIsSubmitting(false);
+  };
+
+  // ==================================================
+  // HANDLE SUBMIT
+  // ==================================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    // IMPORTANT:
+    // Prevent duplicate API requests.
+    if (isSubmitting) {
+      return;
+    }
+
+    // Don't submit while AI is generating
+    if (generating) {
+      toast.error(
+        "Please wait until AI generation is complete."
+      );
+      return;
+    }
+
+    // Validate before setting submitting state
+    if (!validateForm()) {
+      return;
+    }
 
     try {
+      // IMPORTANT:
+      // Set immediately before API request.
+      setIsSubmitting(true);
+
       await addTemplate(formData);
 
-      toast.success("Template created successfully!");
+      toast.success(
+        "Template created successfully!"
+      );
 
-      setFormData({
-        name: "",
-        category: "SUPPORT",
-        messageType: "TEXT",
-        content: "",
-        status: "DRAFT",
-      });
+      resetForm();
 
-      setErrors({});
-
+      // Close only after successful creation
       onClose();
     } catch (error) {
-      toast.error("Failed to create template!");
-      console.error(error);
+      console.error(
+        "Failed to create template:",
+        error
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to create template!"
+      );
+
+      // Allow retry if API failed
+      setIsSubmitting(false);
     }
   };
 
+  // ==================================================
+  // CLOSE MODAL
+  // ==================================================
+
+  const handleClose = () => {
+    // Don't close while creating
+    if (isSubmitting) {
+      return;
+    }
+
+    // Don't close while AI is generating
+    if (generating) {
+      return;
+    }
+
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-3 sm:p-4">
+
         <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          {/* Header */}
+
+          {/* ==================================================
+              HEADER
+          ================================================== */}
+
           <div className="flex items-center justify-between gap-4 bg-[#25D366] px-5 py-4 sm:px-6 sm:py-5">
+
             <h2 className="break-words text-xl font-bold text-gray-800 sm:text-2xl">
               Create Template
             </h2>
 
             <button
               type="button"
-              onClick={onClose}
-              className="p-2 rounded-full hover:bg-[#128C7E] transition"
+              onClick={handleClose}
+              disabled={isSubmitting || generating}
+              className={`rounded-full p-2 transition ${
+                isSubmitting || generating
+                  ? "cursor-not-allowed opacity-50"
+                  : "hover:bg-[#128C7E]"
+              }`}
             >
               <X size={22} />
             </button>
+
           </div>
+
+          {/* ==================================================
+              FORM
+          ================================================== */}
 
           <form
             onSubmit={handleSubmit}
             className="max-h-[75vh] space-y-5 overflow-y-auto p-5 sm:p-6"
           >
-            {/* Name */}
+
+            {/* ==================================================
+                NAME
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Template Name <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Template Name{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <input
@@ -220,80 +337,119 @@ export default function CreateTemplateModal({
                 placeholder="Enter template name"
                 value={formData.name}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.name
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "cursor-not-allowed bg-gray-100"
+                    : ""
                 }`}
               />
 
               {errors.name && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.name}
                 </p>
               )}
             </div>
 
-            {/* Category */}
+            {/* ==================================================
+                CATEGORY
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Category <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Category{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.category
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "cursor-not-allowed bg-gray-100"
+                    : ""
                 }`}
               >
-                <option value="MARKETING">Marketing</option>
-                <option value="SUPPORT">Support</option>
+                <option value="MARKETING">
+                  Marketing
+                </option>
+
+                <option value="SUPPORT">
+                  Support
+                </option>
               </select>
 
               {errors.category && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.category}
                 </p>
               )}
             </div>
 
-            {/* Message Type */}
+            {/* ==================================================
+                MESSAGE TYPE
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Message Type <span className="text-red-500">*</span>
+              <label className="mb-2 block font-medium text-gray-700">
+                Message Type{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="messageType"
                 value={formData.messageType}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.messageType
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "cursor-not-allowed bg-gray-100"
+                    : ""
                 }`}
               >
-                <option value="TEXT">Text</option>
-                <option value="IMAGE">Image</option>
-                <option value="MEDIA">Media</option>
+                <option value="TEXT">
+                  Text
+                </option>
+
+                <option value="IMAGE">
+                  Image
+                </option>
+
+                <option value="MEDIA">
+                  Media
+                </option>
               </select>
 
               {errors.messageType && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.messageType}
                 </p>
               )}
             </div>
 
-            {/* AI Generator */}
+            {/* ==================================================
+                AI GENERATOR
+            ================================================== */}
 
             <div className="rounded-xl border bg-green-50 p-4">
 
-              <div className="flex items-center gap-2 mb-3">
+              <div className="mb-3 flex items-center gap-2">
+
                 <Sparkles
                   size={18}
                   className="text-green-600"
@@ -302,12 +458,14 @@ export default function CreateTemplateModal({
                 <h3 className="font-semibold">
                   AI Template Generator
                 </h3>
+
               </div>
 
               {/* Quick Templates */}
+
               <div className="mb-4">
 
-                <label className="block mb-2 font-medium text-gray-700">
+                <label className="mb-2 block font-medium text-gray-700">
                   Quick Templates
                 </label>
 
@@ -320,11 +478,18 @@ export default function CreateTemplateModal({
                       <button
                         key={item.label}
                         type="button"
-                        onClick={() => setAiPrompt(item.label)}
+                        disabled={isSubmitting}
+                        onClick={() =>
+                          setAiPrompt(item.label)
+                        }
                         className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
                           aiPrompt === item.label
                             ? "bg-green-600 text-white"
                             : "border border-gray-300 hover:bg-green-50"
+                        } ${
+                          isSubmitting
+                            ? "cursor-not-allowed opacity-50"
+                            : ""
                         }`}
                       >
                         <Icon size={16} />
@@ -338,6 +503,7 @@ export default function CreateTemplateModal({
               </div>
 
               {/* Custom Prompt */}
+
               <input
                 type="text"
                 placeholder="Or describe your own template..."
@@ -345,30 +511,60 @@ export default function CreateTemplateModal({
                 onChange={(e) =>
                   setAiPrompt(e.target.value)
                 }
-                className="w-full rounded-lg border px-4 py-3 mb-3"
+                disabled={isSubmitting || generating}
+                className={`mb-3 w-full rounded-lg border px-4 py-3 ${
+                  isSubmitting || generating
+                    ? "cursor-not-allowed bg-gray-100"
+                    : ""
+                }`}
               />
 
               {/* Tone + Generate */}
-              <div className="flex gap-3">
+
+              <div className="flex flex-col gap-3 sm:flex-row">
 
                 <select
                   value={aiTone}
                   onChange={(e) =>
                     setAiTone(e.target.value)
                   }
-                  className="rounded-lg border px-4 py-3"
+                  disabled={
+                    isSubmitting || generating
+                  }
+                  className={`rounded-lg border px-4 py-3 ${
+                    isSubmitting || generating
+                      ? "cursor-not-allowed bg-gray-100"
+                      : ""
+                  }`}
                 >
-                  <option>Professional</option>
-                  <option>Friendly</option>
-                  <option>Formal</option>
-                  <option>Promotional</option>
+                  <option>
+                    Professional
+                  </option>
+
+                  <option>
+                    Friendly
+                  </option>
+
+                  <option>
+                    Formal
+                  </option>
+
+                  <option>
+                    Promotional
+                  </option>
                 </select>
 
                 <button
                   type="button"
                   onClick={handleGenerateAI}
-                  disabled={generating}
-                  className="crm-primary-button flex items-center gap-2"
+                  disabled={
+                    generating || isSubmitting
+                  }
+                  className={`crm-primary-button flex items-center justify-center gap-2 ${
+                    generating || isSubmitting
+                      ? "cursor-not-allowed opacity-70"
+                      : ""
+                  }`}
                 >
                   {generating ? (
                     <>
@@ -376,11 +572,13 @@ export default function CreateTemplateModal({
                         size={16}
                         className="animate-spin"
                       />
+
                       Generating...
                     </>
                   ) : (
                     <>
                       <Sparkles size={16} />
+
                       Generate with AI
                     </>
                   )}
@@ -390,10 +588,15 @@ export default function CreateTemplateModal({
 
             </div>
 
-            {/* Content */}
+            {/* ==================================================
+                CONTENT
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Template Content <span className="text-red-500">*</span>
+
+              <label className="mb-2 block font-medium text-gray-700">
+                Template Content{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <textarea
@@ -402,66 +605,125 @@ export default function CreateTemplateModal({
                 placeholder="Enter template content"
                 value={formData.content}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.content
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "cursor-not-allowed bg-gray-100"
+                    : ""
                 }`}
               />
 
               {errors.content && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.content}
                 </p>
               )}
+
             </div>
 
-            {/* Status */}
+            {/* ==================================================
+                STATUS
+            ================================================== */}
+
             <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Status <span className="text-red-500">*</span>
+
+              <label className="mb-2 block font-medium text-gray-700">
+                Status{" "}
+                <span className="text-red-500">*</span>
               </label>
 
               <select
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
+                disabled={isSubmitting}
                 className={`w-full rounded-lg border px-4 py-3 outline-none ${
                   errors.status
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
+                } ${
+                  isSubmitting
+                    ? "cursor-not-allowed bg-gray-100"
+                    : ""
                 }`}
               >
-                <option value="DRAFT">Draft</option>
-                {/* <option value="APPROVED">Approved</option> */}
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
+                <option value="DRAFT">
+                  Draft
+                </option>
+
+                <option value="ACTIVE">
+                  Active
+                </option>
+
+                <option value="INACTIVE">
+                  Inactive
+                </option>
               </select>
 
               {errors.status && (
-                <p className="text-red-500 text-sm mt-1">
+                <p className="mt-1 text-sm text-red-500">
                   {errors.status}
                 </p>
               )}
+
             </div>
 
-            {/* Actions */}
+            {/* ==================================================
+                ACTIONS
+            ================================================== */}
+
             <div className="mt-6 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+
+              {/* CANCEL */}
+
               <button
                 type="button"
-                onClick={onClose}
-                className="crm-secondary-button"
+                onClick={handleClose}
+                disabled={
+                  isSubmitting || generating
+                }
+                className={`crm-secondary-button ${
+                  isSubmitting || generating
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
+                }`}
               >
                 Cancel
               </button>
 
+              {/* CREATE TEMPLATE */}
+
               <button
                 type="submit"
-                className="crm-primary-button"
+                disabled={
+                  isSubmitting || generating
+                }
+                className={`crm-primary-button flex min-w-[160px] items-center justify-center gap-2 ${
+                  isSubmitting || generating
+                    ? "cursor-not-allowed opacity-70"
+                    : ""
+                }`}
               >
-                Create Template
+                {isSubmitting ? (
+                  <>
+                    <Loader2
+                      size={18}
+                      className="animate-spin"
+                    />
+
+                    Creating...
+                  </>
+                ) : (
+                  "Create Template"
+                )}
               </button>
+
             </div>
+
           </form>
         </div>
       </div>
