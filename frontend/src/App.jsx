@@ -9,7 +9,7 @@ import {
 import { useAuthStore } from "./store/authStore";
 
 import AppLayout from "./layouts/AppLayout";
-
+import SaasSupportPage from "./pages/settings/SaasSupportPage";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -29,7 +29,7 @@ import Templates from "./pages/Templates";
 
 
 import AddCustomer from "./pages/AddCustomer";
-import EditCustomer from "./pages/EditCustomer";
+// import EditCustomer from "./pages/EditCustomer";
 
 import AddEmployee from "./pages/AddEmployee";
 import EditEmployee from "./pages/EditEmployee";
@@ -42,19 +42,11 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/settings/ChangePassword";
 
+import ProfileSettings from "./pages/settings/ProfileSettings";
+import SecuritySettings from "./pages/settings/SecuritySettings";
+import BillingSubscription from "./pages/settings/BillingSubscription";
+import Plans from "./pages/settings/Plans";
 
-// Layout Wrapper
-// function Layout() {
-//   return (
-//     <div className="flex">
-//       <Sidebar />
-
-//       <div className="ml-64 w-full min-h-screen bg-gray-100">
-//         <Outlet />
-//       </div>
-//     </div>
-//   );
-// }
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -74,15 +66,15 @@ function App() {
           }
         />
 
-          <Route
-            path="/forgot-password"
-            element={<ForgotPassword />}
-          />
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
 
-          <Route
-            path="/reset-password/:token"
-            element={<ResetPassword />}
-          />
+        <Route
+          path="/reset-password/:token"
+          element={<ResetPassword />}
+        />
 
         {/* PROTECTED ROUTES */}
         <Route element={<ProtectedRoute />}>
@@ -103,11 +95,11 @@ function App() {
               path="/customers/add"
               element={<AddCustomer />}
             />
-
+{/* 
             <Route
               path="/customers/edit/:id"
               element={<EditCustomer />}
-            />
+            /> */}
 
             <Route
               path="/customers/:id"
@@ -133,12 +125,35 @@ function App() {
 
             <Route path="/tickets" element={<TicketsPage />} />
 
-            <Route path="/settings" element={<Settings />} />
+            <Route
+              path="/settings"
+              element={<Navigate to="/settings/profile" replace />}
+            />
 
-             <Route
-            path="/change-password"
-            element={<ChangePassword />}
-          />
+            <Route
+              path="/settings/profile"
+              element={<ProfileSettings />}
+            />
+
+            <Route
+              path="/settings/security"
+              element={<SecuritySettings />}
+            />
+
+            <Route
+              path="/settings/billing"
+              element={<BillingSubscription />}
+            />
+
+            <Route
+              path="/settings/plans"
+              element={<Plans />}
+            />
+
+            <Route
+              path="/change-password"
+              element={<ChangePassword />}
+            />
 
             {/* ADMIN ROUTES */}
             <Route element={<AdminRoute />}>
@@ -158,7 +173,12 @@ function App() {
               />
 
               <Route path="/employees/:id" element={<ViewEmployee />} />
-            
+
+              <Route
+                path="/settings/support"
+                element={<SaasSupportPage />}
+              />
+
             </Route>
           </Route>
         </Route>

@@ -13,6 +13,7 @@
 // import ViewCampaignModal from "../components/campaigns/ViewCampaignModal";
 // import SendCampaignModal from "../components/campaigns/SendCampaignModal";
 // import Pagination from "../components/common/Pagination";
+// import ConfirmModal from "../components/common/ConfirmModal";
 
 // export default function Campaigns() {
 //   const {
@@ -37,6 +38,7 @@
 //   const [selectedCampaign, setSelectedCampaign] = useState(null);
 
 //   const [aiCampaign, setAiCampaign] = useState(null);
+//   const [deleteTargetId, setDeleteTargetId] = useState(null);
 
 //   const [currentPage, setCurrentPage] = useState(1);
 
@@ -113,9 +115,13 @@
 //   // DELETE
 //   // ===============================
 
-//   const handleDelete = async (id) => {
-//     if (!window.confirm("Are you sure you want to delete this campaign?"))
-//       return;
+//   const handleDelete = (id) => {
+//     setDeleteTargetId(id);
+//   };
+
+//   const confirmDelete = async () => {
+//     const id = deleteTargetId;
+//     setDeleteTargetId(null);
 
 //     try {
 //       await removeCampaign(id);
@@ -347,6 +353,17 @@
 //           setSelectedCampaign(null);
 //         }}
 //         campaign={selectedCampaign}
+//       />
+
+//       <ConfirmModal
+//         isOpen={!!deleteTargetId}
+//         title="Delete Campaign"
+//         message="Are you sure you want to delete this campaign? This cannot be undone."
+//         confirmText="Delete"
+//         cancelText="Cancel"
+//         variant="danger"
+//         onConfirm={confirmDelete}
+//         onCancel={() => setDeleteTargetId(null)}
 //       />
 
 //     </div>

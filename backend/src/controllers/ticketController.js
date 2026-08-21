@@ -1,3 +1,5 @@
+
+
 const prisma = require("../config/prisma");
 
 const {
@@ -65,9 +67,10 @@ const createTicket = async (req, res) => {
     }
 
     // Check customer
-    const customer = await prisma.customer.findUnique({
+    const customer = await prisma.customer.findFirst({
       where: {
         id: customerId,
+        companyId: req.user.companyId,
       },
     });
 
@@ -80,13 +83,15 @@ const createTicket = async (req, res) => {
 
     // Check assigned employee (optional)
     if (assignedToId) {
-      const employee = await prisma.user.findUnique({
+      const employee = await prisma.user.findFirst({
         where: {
           id: assignedToId,
+          companyId: req.user.companyId,
+          role: "USER",
         },
       });
 
-      if (!employee || employee.role !== "USER") {
+      if (!employee) {
         return res.status(400).json({
           success: false,
           message: "Invalid employee selected",
@@ -99,10 +104,34 @@ const createTicket = async (req, res) => {
         title,
         description,
         priority,
-        customerId,
-        createdById: req.user.userId,
-        assignedToId: assignedToId || null,
+
+        customer: {
+          connect: {
+            id: customerId,
+          },
+        },
+
+        createdBy: {
+          connect: {
+            id: req.user.userId,
+          },
+        },
+
+        company: {
+          connect: {
+            id: req.user.companyId,
+          },
+        },
+
+        ...(assignedToId && {
+          assignedTo: {
+            connect: {
+              id: assignedToId,
+            },
+          },
+        }),
       },
+
       include: ticketInclude,
     });
 
@@ -110,7 +139,7 @@ const createTicket = async (req, res) => {
     if (assignedToId) {
       try {
         await notifyUser({
-          userId: assignedToId,
+          employeeId: assignedToId,
           title: "New Ticket Assigned",
           message: `You have been assigned a new ticket: "${ticket.title}".`,
           type: NotificationType.TICKET,
@@ -151,6 +180,11 @@ const getTickets = async (req, res) => {
     if (req.user.role === "ADMIN") {
       // Admin can view all tickets
       tickets = await prisma.ticket.findMany({
+        where: {
+          customer: {
+            companyId: req.user.companyId,
+          },
+        },
         include: ticketInclude,
         orderBy: {
           createdAt: "desc",
@@ -161,6 +195,9 @@ const getTickets = async (req, res) => {
       tickets = await prisma.ticket.findMany({
         where: {
           assignedToId: req.user.userId,
+          customer: {
+            companyId: req.user.companyId,
+          },
         },
         include: ticketInclude,
         orderBy: {
@@ -193,9 +230,12 @@ const getTicketById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const ticket = await prisma.ticket.findUnique({
+    const ticket = await prisma.ticket.findFirst({
       where: {
         id,
+        customer: {
+          companyId: req.user.companyId,
+        },
       },
       include: ticketInclude,
     });
@@ -234,9 +274,7 @@ const getTicketById = async (req, res) => {
   }
 };
 
-// ======================================================
-// UPDATE TICKET
-// ======================================================
+
 
 // ======================================================
 // UPDATE TICKET
@@ -262,9 +300,12 @@ const updateTicket = async (req, res) => {
     } = req.body;
 
     // Check ticket exists
-    const existingTicket = await prisma.ticket.findUnique({
+    const existingTicket = await prisma.ticket.findFirst({
       where: {
         id,
+        customer: {
+          companyId: req.user.companyId,
+        },
       },
     });
 
@@ -312,7 +353,7 @@ const updateTicket = async (req, res) => {
     ) {
       try {
         await notifyUser({
-          userId: assignedToId,
+          employeeId: assignedToId,
           title: "Ticket Assigned",
           message: `A ticket has been assigned to you: "${updatedTicket.title}".`,
           type: NotificationType.TICKET,
@@ -357,9 +398,12 @@ const deleteTicket = async (req, res) => {
 
     const { id } = req.params;
 
-    const ticket = await prisma.ticket.findUnique({
+    const ticket = await prisma.ticket.findFirst({
       where: {
         id,
+        customer: {
+          companyId: req.user.companyId,
+        },
       },
     });
 
@@ -401,9 +445,12 @@ const updateTicketStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const ticket = await prisma.ticket.findUnique({
+    const ticket = await prisma.ticket.findFirst({
       where: {
         id,
+        customer: {
+          companyId: req.user.companyId,
+        },
       },
     });
 
@@ -465,4 +512,3 @@ module.exports = {
   deleteTicket,
   updateTicketStatus,
 };
-

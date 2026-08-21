@@ -1,3 +1,4 @@
+
 const prisma = require("../config/prisma");
 const { validateCustomer } = require("../validations/customerValidation");
 const { normalizeIndianPhone } = require("../utils/phoneUtils");
@@ -26,21 +27,23 @@ const createCustomer = async (req, res) => {
       });
     }
 
-    const { userId } = req.user;
+    const { userId, companyId } = req.user;
 
     const customer = await prisma.customer.create({
       data: {
         name,
         phone: normalizedPhone,
         email,
-        company,
+        companyName: company,
         source,
         requirements,
         status,
+
         userId,
+        companyId,
       },
     });
- 
+
     res.status(201).json({
       success: true,
       message: "Customer created successfully",
@@ -61,7 +64,9 @@ const getCustomers = async (req, res) => {
   try {
     const { status, search } = req.query;
 
-    const where = {}
+    const where = {
+      companyId: req.user.companyId
+    }
 
     // Filter by status
     if (status) {
@@ -119,7 +124,8 @@ const getCustomerById = async (req, res) => {
     const customer = await prisma.customer.findFirst({
       where: {
         id,
-      },
+        companyId: req.user.companyId
+      }
     });
 
     if (!customer) {
@@ -159,7 +165,8 @@ const updateCustomer = async (req, res) => {
     const existingCustomer = await prisma.customer.findFirst({
       where: {
         id,
-      },
+        companyId: req.user.companyId
+      }
     });
 
     if (!existingCustomer) {
@@ -179,7 +186,7 @@ const updateCustomer = async (req, res) => {
         name,
         phone,
         email,
-        company,
+        companyName: company,
         source,
         requirements,
         status,
@@ -206,10 +213,11 @@ const deleteCustomer = async (req, res) => {
     const { id } = req.params;
 
     // Check customer exists
-    const existingCustomer = await prisma.customer.findUnique({
+    const existingCustomer = await prisma.customer.findFirst({
       where: {
         id,
-      },
+        companyId: req.user.companyId
+      }
     });
 
     if (!existingCustomer) {

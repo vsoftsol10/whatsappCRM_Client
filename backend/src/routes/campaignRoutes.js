@@ -1,9 +1,15 @@
+
+
 const express = require("express");
 
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 const upload = require("../middleware/uploadMiddleware");
+const {
+  checkCampaignLimit,
+} = require("../middleware/planLimitMiddleware");
 
 const {
   createCampaign,
@@ -16,78 +22,70 @@ const {
   getCampaignRecipients,
 } = require("../controllers/campaignController");
 
-// =====================================
-// CREATE CAMPAIGN
-// =====================================
+// Apply authentication to all routes
+router.use(authMiddleware);
+
+/////////////////////////////////////////////////
+// READ ROUTES (Allowed for everyone)
+/////////////////////////////////////////////////
+
+// Get All Campaigns
+router.get(
+  "/",
+  getCampaigns
+);
+
+// Get Campaign Recipients
+router.get(
+  "/:id/recipients",
+  getCampaignRecipients
+);
+
+// Get Single Campaign
+router.get(
+  "/:id",
+  getCampaignById
+);
+
+/////////////////////////////////////////////////
+// WRITE ROUTES (Only ACTIVE / TRIAL companies)
+/////////////////////////////////////////////////
+
+// Create Campaign
 router.post(
   "/",
-  authMiddleware,
+  allowWriteAccess,
+  checkCampaignLimit,
   upload.single("image"),
   createCampaign
 );
 
-// =====================================
-// GENERATE AI CAMPAIGN
-// =====================================
+// Generate AI Campaign
 router.post(
   "/generate-ai",
-  authMiddleware,
+  allowWriteAccess,
   generateAICampaign
 );
 
-// =====================================
-// SEND CAMPAIGN
-// =====================================
+// Send Campaign
 router.post(
   "/send",
-  authMiddleware,
+  allowWriteAccess,
   sendCampaign
 );
 
-// =====================================
-// GET ALL CAMPAIGNS
-// =====================================
-router.get(
-  "/",
-  authMiddleware,
-  getCampaigns
-);
-
-// =====================================
-// GET CAMPAIGN RECIPIENTS
-// IMPORTANT: Keep this ABOVE "/:id"
-// =====================================
-router.get(
-  "/:id/recipients",
-  authMiddleware,
-  getCampaignRecipients
-);
-
-// =====================================
-// GET SINGLE CAMPAIGN
-// =====================================
-router.get(
-  "/:id",
-  authMiddleware,
-  getCampaignById
-);
-
-// =====================================
-// UPDATE CAMPAIGN
-// =====================================
+// Update Campaign
 router.put(
   "/:id",
-  authMiddleware,
+  allowWriteAccess,
   upload.single("image"),
   updateCampaign
 );
 
-// =====================================
-// DELETE CAMPAIGN
-// =====================================
+// Delete Campaign
 router.delete(
   "/:id",
-  authMiddleware,
+  allowWriteAccess,
   deleteCampaign
 );
 

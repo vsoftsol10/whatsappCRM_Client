@@ -1,4 +1,9 @@
+
+
 const express = require("express");
+const authMiddleware = require("../middleware/authMiddleware");
+const { checkUserLimit } = require("../middleware/planLimitMiddleware");
+
 const {
   createEmployee,
   getEmployees,
@@ -9,10 +14,14 @@ const {
 
 const router = express.Router();
 
-router.post("/", createEmployee);
-router.get("/", getEmployees);
-router.get("/:id", getEmployeeById);
-router.put("/:id", updateEmployee);
-router.delete("/:id", deleteEmployee);
+router.post("/", authMiddleware, checkUserLimit, createEmployee);
+
+router.get("/", authMiddleware, getEmployees);
+
+router.get("/:id", authMiddleware, getEmployeeById);
+
+router.put("/:id", authMiddleware, updateEmployee);
+
+router.delete("/:id", authMiddleware, deleteEmployee);
 
 module.exports = router;

@@ -1,4 +1,5 @@
 // const express = require("express");
+
 // const router = express.Router();
 
 // const {
@@ -10,24 +11,108 @@
 //   updateTaskStatus,
 // } = require("../controllers/taskController");
 
+// const {
+//   getTaskWorkNotes,
+//   createTaskWorkNote,
+//   updateTaskWorkNote,
+//   deleteTaskWorkNote,
+// } = require("../controllers/taskworknoteController");
+
 // const authMiddleware = require("../middleware/authMiddleware");
 
-// router.post("/", authMiddleware, createTask);
 
-// router.get("/", authMiddleware, getTasks);
+// // ================= WORK NOTES =================
 
-// router.get("/:id", authMiddleware, getTaskById);
+// // Get task work notes
+// router.get(
+//   "/:id/work-notes",
+//   authMiddleware,
+//   getTaskWorkNotes
+// );
 
-// router.put("/:id", authMiddleware, updateTask);
 
-// router.delete("/:id", authMiddleware, deleteTask);
+// // Create task work note
+// router.post(
+//   "/:id/work-notes",
+//   authMiddleware,
+//   createTaskWorkNote
+// );
 
-// router.patch("/:id/status", authMiddleware, updateTaskStatus);
+
+// // Update work note
+// router.put(
+//   "/work-notes/:noteId",
+//   authMiddleware,
+//   updateTaskWorkNote
+// );
+
+
+// // Delete work note
+// router.delete(
+//   "/work-notes/:noteId",
+//   authMiddleware,
+//   deleteTaskWorkNote
+// );
+
+
+// // ================= TASK CRUD =================
+
+
+// // Create Task
+// router.post(
+//   "/",
+//   authMiddleware,
+//   createTask
+// );
+
+
+// // Get All Tasks
+// router.get(
+//   "/",
+//   authMiddleware,
+//   getTasks
+// );
+
+
+// // Get Single Task
+// router.get(
+//   "/:id",
+//   authMiddleware,
+//   getTaskById
+// );
+
+
+// // Update Task
+// router.put(
+//   "/:id",
+//   authMiddleware,
+//   updateTask
+// );
+
+
+// // Update Task Status
+// router.patch(
+//   "/:id/status",
+//   authMiddleware,
+//   updateTaskStatus
+// );
+
+
+// // Delete Task
+// router.delete(
+//   "/:id",
+//   authMiddleware,
+//   deleteTask
+// );
+
 
 // module.exports = router;
 
 const express = require("express");
 const router = express.Router();
+
+const authMiddleware = require("../middleware/authMiddleware");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   createTask,
@@ -45,28 +130,73 @@ const {
   deleteTaskWorkNote,
 } = require("../controllers/taskworknoteController");
 
-const authMiddleware = require("../middleware/authMiddleware");
+// Apply authentication to all routes
+router.use(authMiddleware);
 
-router.post("/", authMiddleware, createTask);
+/////////////////////////////////////////////////
+// READ ROUTES (Allowed for everyone)
+/////////////////////////////////////////////////
 
-router.get("/", authMiddleware, getTasks);
+// Get All Tasks
+router.get("/", getTasks);
 
-router.get("/:id", authMiddleware, getTaskById);
+// Get Single Task
+router.get("/:id", getTaskById);
 
-router.put("/:id", authMiddleware, updateTask);
+// Get Task Work Notes
+router.get("/:id/work-notes", getTaskWorkNotes);
 
-router.delete("/:id", authMiddleware, deleteTask);
+/////////////////////////////////////////////////
+// WRITE ROUTES (Only ACTIVE / TRIAL companies)
+/////////////////////////////////////////////////
 
-router.patch("/:id/status", authMiddleware, updateTaskStatus);
+// Create Task
+router.post(
+  "/",
+  allowWriteAccess,
+  createTask
+);
 
-// ================= WORK NOTES =================
+// Update Task
+router.put(
+  "/:id",
+  allowWriteAccess,
+  updateTask
+);
 
-router.get("/:id/work-notes", authMiddleware, getTaskWorkNotes);
+// Update Task Status
+router.patch(
+  "/:id/status",
+  allowWriteAccess,
+  updateTaskStatus
+);
 
-router.post("/:id/work-notes", authMiddleware, createTaskWorkNote);
+// Delete Task
+router.delete(
+  "/:id",
+  allowWriteAccess,
+  deleteTask
+);
 
-router.put("/work-notes/:noteId", authMiddleware, updateTaskWorkNote);
+// Create Task Work Note
+router.post(
+  "/:id/work-notes",
+  allowWriteAccess,
+  createTaskWorkNote
+);
 
-router.delete("/work-notes/:noteId", authMiddleware, deleteTaskWorkNote);
+// Update Task Work Note
+router.put(
+  "/work-notes/:noteId",
+  allowWriteAccess,
+  updateTaskWorkNote
+);
+
+// Delete Task Work Note
+router.delete(
+  "/work-notes/:noteId",
+  allowWriteAccess,
+  deleteTaskWorkNote
+);
 
 module.exports = router;

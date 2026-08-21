@@ -10,6 +10,13 @@
 //   deleteLead,
 // } = require("../controllers/leadController");
 
+// const {
+//   getLeadWorkNotes,
+//   createLeadWorkNote,
+//   updateLeadWorkNote,
+//   deleteLeadWorkNote,
+// } = require("../controllers/leadworknoteController");
+
 // const router = express.Router();
 
 // router.use(authMiddleware);
@@ -29,14 +36,30 @@
 // // Convert Lead to Customer
 // router.post("/:id/convert", convertLeadToCustomer);
 
+// // ================= WORK NOTES =================
+
+// // Get Work Notes for a Lead
+// router.get("/:id/work-notes", getLeadWorkNotes);
+
+// // Add Work Note to a Lead
+// router.post("/:id/work-notes", createLeadWorkNote);
+
+// // Update a Work Note
+// router.put("/work-notes/:noteId", updateLeadWorkNote);
+
+// // Delete a Work Note
+// router.delete("/work-notes/:noteId", deleteLeadWorkNote);
+
 // // Delete Lead
 // router.delete("/:id", deleteLead);
 
 // module.exports = router;
 
+const express = require("express");
+const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
-const express = require("express");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   createLead,
@@ -54,40 +77,77 @@ const {
   deleteLeadWorkNote,
 } = require("../controllers/leadworknoteController");
 
-const router = express.Router();
-
+// Apply authentication to all routes
 router.use(authMiddleware);
 
-// Create Lead
-router.post("/", createLead);
+/////////////////////////////////////////////////
+// READ ROUTES (Allowed for everyone)
+/////////////////////////////////////////////////
 
 // Get All Leads
 router.get("/", getLeads);
 
-// Update Lead
-router.put("/:id", updateLead);
-
-// Update Lead Status
-router.patch("/:id/status", updateLeadStatus);
-
-// Convert Lead to Customer
-router.post("/:id/convert", convertLeadToCustomer);
-
-// ================= WORK NOTES =================
-
-// Get Work Notes for a Lead
+// Get Work Notes
 router.get("/:id/work-notes", getLeadWorkNotes);
 
-// Add Work Note to a Lead
-router.post("/:id/work-notes", createLeadWorkNote);
+/////////////////////////////////////////////////
+// WRITE ROUTES (Only ACTIVE / TRIAL companies)
+/////////////////////////////////////////////////
 
-// Update a Work Note
-router.put("/work-notes/:noteId", updateLeadWorkNote);
+// Create Lead
+router.post(
+  "/",
+  allowWriteAccess,
+  createLead
+);
 
-// Delete a Work Note
-router.delete("/work-notes/:noteId", deleteLeadWorkNote);
+// Update Lead
+router.put(
+  "/:id",
+  allowWriteAccess,
+  updateLead
+);
+
+// Update Lead Status
+router.patch(
+  "/:id/status",
+  allowWriteAccess,
+  updateLeadStatus
+);
+
+// Convert Lead to Customer
+router.post(
+  "/:id/convert",
+  allowWriteAccess,
+  convertLeadToCustomer
+);
+
+// Add Work Note
+router.post(
+  "/:id/work-notes",
+  allowWriteAccess,
+  createLeadWorkNote
+);
+
+// Update Work Note
+router.put(
+  "/work-notes/:noteId",
+  allowWriteAccess,
+  updateLeadWorkNote
+);
+
+// Delete Work Note
+router.delete(
+  "/work-notes/:noteId",
+  allowWriteAccess,
+  deleteLeadWorkNote
+);
 
 // Delete Lead
-router.delete("/:id", deleteLead);
+router.delete(
+  "/:id",
+  allowWriteAccess,
+  deleteLead
+);
 
 module.exports = router;

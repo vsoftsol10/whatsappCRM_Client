@@ -1,3 +1,4 @@
+
 const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
@@ -17,9 +18,20 @@ const authMiddleware = (req, res, next) => {
     }
 
     // 3. Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET
+    );
 
-    // 4. Attach user to request
+
+    if (!decoded.userId || !decoded.companyId) {
+      return res.status(401).json({
+        message: "Invalid user token"
+      });
+    }
+
+
+    // Attach user to request
     req.user = decoded;
 
     next();
@@ -30,7 +42,7 @@ const authMiddleware = (req, res, next) => {
     return res.status(401).json({
       message: error.message,
     });
-}
+  }
 };
 
 module.exports = authMiddleware;

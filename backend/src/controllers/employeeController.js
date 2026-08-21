@@ -1,64 +1,146 @@
+
 const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const generatePassword = require("../utils/generatePassword");
 const sendEmployeeCredentials = require("../services/emailService");
 
 // CREATE EMPLOYEE
+// CREATE EMPLOYEE
 const createEmployee = async (req, res) => {
   try {
-    const { 
-      name, 
-      email, 
-      phone, 
-      department, 
-      designation, 
+    const {
+      name,
+      email,
+      phone,
+      department,
+      designation,
       address,
       role,
       status,
-     } = req.body;
+    } = req.body;
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    // ==========================================
+    // CHECK DUPLICATE EMAIL
+    // ==========================================
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        companyId: req.user.companyId,
+        email: email.trim().toLowerCase(),
+      },
     });
 
     if (existingUser) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: "Employee already exists",
+        message: "Employee with this email already exists",
       });
     }
 
+    // ==========================================
+    // GENERATE PASSWORD
+    // ==========================================
+
     const tempPassword = generatePassword();
 
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const hashedPassword = await bcrypt.hash(
+      tempPassword,
+      10
+    );
+
+    // ==========================================
+    // CREATE EMPLOYEE
+    // ==========================================
 
     const employee = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
         password: hashedPassword,
-        role: role || "USER",
+        role: "USER",
         status: status || "ACTIVE",
         phone,
         department,
         designation,
-        address
+        address,
+        companyId: req.user.companyId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        department: true,
+        designation: true,
+        address: true,
+        role: true,
+        status: true,
       },
     });
 
-    await sendEmployeeCredentials(name, email, tempPassword);
+    console.log(
+      "Employee created successfully:",
+      employee.id
+    );
 
-    res.status(201).json({
+    // ==========================================
+    // SEND EMAIL
+    // ==========================================
+
+    let emailSent = false;
+
+    try {
+      await sendEmployeeCredentials(
+        employee.name,
+        employee.email,
+        tempPassword
+      );
+
+      emailSent = true;
+
+      console.log(
+        "Employee credentials email sent successfully"
+      );
+
+    } catch (emailError) {
+
+      console.error(
+        "Employee created, but email sending failed:",
+        emailError
+      );
+
+      // IMPORTANT:
+      // Do NOT return 500 here.
+      // Employee has already been created.
+      emailSent = false;
+    }
+
+    // ==========================================
+    // SUCCESS RESPONSE
+    // ==========================================
+
+    return res.status(201).json({
       success: true,
-      message: "Employee created successfully",
-      employee,
-    });
-  } catch (error) {
-    console.error(error);
 
-    res.status(500).json({
+      message: emailSent
+        ? "Employee created successfully"
+        : "Employee created successfully, but email could not be sent",
+
+      employee,
+
+      emailSent,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "Create Employee Error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Failed to create employee",
     });
   }
 };
@@ -70,6 +152,7 @@ const getEmployees = async (req, res) => {
       where: {
         role: "USER",
         status: "ACTIVE",
+        companyId: req.user.companyId
       },
       select: {
         id: true,
@@ -99,11 +182,14 @@ const getEmployees = async (req, res) => {
 };
 
 // GET EMPLOYEE BY ID
+// GET EMPLOYEE BY ID
 const getEmployeeById = async (req, res) => {
   try {
-    const employee = await prisma.user.findUnique({
+    const employee = await prisma.user.findFirst({
       where: {
         id: req.params.id,
+        companyId: req.user.companyId,
+        role: "USER",
       },
       select: {
         id: true,
@@ -125,38 +211,81 @@ const getEmployeeById = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       employee,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get Employee By ID Error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
   }
 };
 
+
 // UPDATE EMPLOYEE
 const updateEmployee = async (req, res) => {
   try {
-    const { 
-      name, 
-      email, 
-      phone, 
-      department, 
-      designation, 
-      address, 
-      role, 
+
+    const {
+      name,
+      email,
+      phone,
+      department,
+      designation,
+      address,
+      role,
       status,
     } = req.body;
 
-    const employee = await prisma.user.update({
+
+
+    // Check employee belongs to logged-in company
+    const existingEmployee = await prisma.user.findFirst({
       where: {
         id: req.params.id,
+        companyId: req.user.companyId,
+        role: "USER",
+      }
+    });
+
+
+    if (!existingEmployee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found"
+      });
+    }
+
+    // Check whether another employee already uses this email
+    const duplicateEmail = await prisma.user.findFirst({
+      where: {
+        companyId: req.user.companyId,
+        email,
+        NOT: {
+          id: req.params.id,
+        },
       },
+    });
+
+    if (duplicateEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already exists",
+      });
+    }
+
+
+    // Update employee
+    const employee = await prisma.user.update({
+
+      where: {
+        id: req.params.id
+      },
+
       data: {
         name,
         email,
@@ -167,27 +296,65 @@ const updateEmployee = async (req, res) => {
         role,
         status,
       },
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        department: true,
+        designation: true,
+        address: true,
+        role: true,
+        status: true,
+      }
+
     });
 
-    res.status(200).json({
+
+    return res.status(200).json({
+
       success: true,
       message: "Employee updated successfully",
-      employee,
-    });
-  } catch (error) {
-    console.error(error);
+      employee
 
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
     });
+
+
+  } catch (error) {
+
+    console.error("Update Employee Error:", error);
+
+    return res.status(500).json({
+
+      success: false,
+      message: "Internal Server Error"
+
+    });
+
   }
+
 };
 
 // DELETE EMPLOYEE
 const deleteEmployee = async (req, res) => {
   try {
     const employeeId = req.params.id;
+
+    const employee = await prisma.user.findFirst({
+      where: {
+        id: employeeId,
+        companyId: req.user.companyId,
+        role: "USER",
+      },
+    });
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
+    }
 
     // Check assigned tasks
     const taskCount = await prisma.task.count({

@@ -8,315 +8,124 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id               String         @id @default(uuid())
-  name             String
-  email            String         @unique
-  password         String
-  role             Role           @default(USER)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  isFirstLogin     Boolean        @default(true)
+//////////////////////////////////////////////////////
+// SUPER ADMIN
+//////////////////////////////////////////////////////
+
+model SuperAdmin {
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+
   resetToken       String?
   resetTokenExpiry DateTime?
-  address          String?
-  department       String?
-  designation      String?
-  phone            String?
-  profileImage     String?
-  status           UserStatus     @default(ACTIVE)
-  campaigns        Campaign[]
-  customers        Customer[]
-  assignedLeads Lead[] @relation("AssignedLeads")
-  leadWorkNotes LeadWorkNote[] @relation("LeadWorkNotes")
-  assignedDeals    Deal[]         @relation("AssignedDeals")
-  createdDeals     Deal[]         @relation("CreatedDeals")
-  dealActivities   DealActivity[] @relation("CreatedDealActivities")
-  notifications    Notification[]
-  assignedTasks    Task[]         @relation("AssignedTasks")
-  createdTasks     Task[]         @relation("CreatedTasks")
-  taskWorkNotes    TaskWorkNote[] @relation("TaskWorkNotes")
-  templates        Template[]
-  assignedTickets  Ticket[]       @relation("AssignedTickets")
-  createdTickets   Ticket[]       @relation("CreatedTickets")
-  ticketWorkNotes  TicketWorkNote[] @relation("TicketWorkNotes")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
 }
 
-model Customer {
-  id                 String              @id @default(uuid())
-  name               String
-  phone              String              @unique
-  email              String?
-  company            String?
-  status             String              @default("ACTIVE")
-  userId             String
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  requirements       String?
-  source             String?
-  campaignRecipients CampaignRecipient[]
-  conversations      Conversation?
-  user               User                @relation(fields: [userId], references: [id])
-  deals              Deal[]
-  templateRecipients TemplateRecipient[]
-  tickets            Ticket[]
+//////////////////////////////////////////////////////
+// COMPANY
+//////////////////////////////////////////////////////
+
+model Company {
+  id            Int      @id @default(autoincrement())
+  companyId     String   @unique
+
+  companyName   String
+  ownerName     String
+
+  email         String   @unique
+  phone         String
+  address       String
+
+  plan          String
+  status CompanyStatus @default(ACTIVE)
+  expiryDate    DateTime
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // SaaS
+  subscriptions Subscription[]
+  supportTickets SupportTicket[]
+  payments Payment[]
+
+  // CRM (add these)
+  users User[]
+  customers Customer[]
+  conversations Conversation[]
+  campaigns Campaign[]
+  templates Template[]
+  leads Lead[]
+  deals Deal[]
+  tasks Task[]
+  tickets Ticket[]
+  employees Employee[]
+  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
 }
 
-model Conversation {
-  id          String    @id @default(uuid())
-  customerId  String?   @unique
-  status      String    @default("OPEN")
-  channel     String    @default("WHATSAPP")
-  lastMessage String?
-  unreadCount Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  phone       String?   @unique
-  welcomeSent Boolean   @default(false)
-  customer    Customer? @relation(fields: [customerId], references: [id])
-  messages    Message[]
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
 }
 
-model Message {
-  id             String       @id @default(uuid())
-  conversationId String
-  content        String
-  sender         String
-  messageType    String       @default("TEXT")
-  status         String       @default("SENT")
-  isEdited       Boolean      @default(false)
-  metaMessageId  String?      @unique
-  failureReason  String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  imageUrl       String?
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
+//////////////////////////////////////////////////////
+// SUBSCRIPTION ENUM
+//////////////////////////////////////////////////////
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }
 
-model Lead {
-  id           Int        @id @default(autoincrement())
-  name         String
-  phone        String?
-  email        String?
-  status       LeadStatus
-  source       String?
-  requirements String?
-  isConverted  Boolean    @default(false)
-  company      String?
+//////////////////////////////////////////////////////
+// PAYMENT ENUM
+//////////////////////////////////////////////////////
 
-  assignedToId String?
-  assignedTo User? @relation("AssignedLeads", fields: [assignedToId], references: [id])
-
-  workNotes LeadWorkNote[]
-
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  @@index([assignedToId])
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
 }
 
-model LeadWorkNote {
-  id           String   @id @default(uuid())
-  leadId       Int
-  employeeId   String
-  note         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  employee     User     @relation("LeadWorkNotes", fields: [employeeId], references: [id])
-
-  @@index([leadId])
-  @@index([employeeId])
+enum PaymentMethod {
+  RAZORPAY
+  STRIPE
+  CASH
+  BANK_TRANSFER
+  UPI
 }
 
-model Campaign {
-  id             String              @id @default(uuid())
-  name           String
-  type           CampaignType
-  messageContent String
-  status         CampaignStatus      @default(DRAFT)
-  scheduledAt    DateTime?
-  audienceCount  Int                 @default(0)
-  createdById    String
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  imageUrl       String?
-  createdBy      User                @relation(fields: [createdById], references: [id])
-  recipients     CampaignRecipient[]
+//////////////////////////////////////////////////////
+// TICKET ENUM
+//////////////////////////////////////////////////////
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }
 
-model CampaignRecipient {
-  id          String          @id @default(uuid())
-  campaignId  String
-  customerId  String
-  status      RecipientStatus @default(PENDING)
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  readAt      DateTime?
-  createdAt   DateTime        @default(now())
-  campaign    Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  customer    Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@unique([campaignId, customerId])
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
-model TemplateRecipient {
-  id            String          @id @default(uuid())
-  templateId    String
-  customerId    String
-  status        RecipientStatus @default(PENDING)
-  sentAt        DateTime?
-  deliveredAt   DateTime?
-  readAt        DateTime?
-  metaMessageId String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  customer      Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  template      Template        @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  @@unique([templateId, customerId])
-  @@index([templateId])
-  @@index([customerId])
-}
-
-model Template {
-  id          String              @id @default(uuid())
-  name        String
-  category    TemplateCategory
-  messageType MessageType         @default(TEXT)
-  content     String
-  status      TemplateStatus      @default(DRAFT)
-  createdById String
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  autoSend    Boolean             @default(false)
-  purpose     TemplatePurpose     @default(CUSTOM)
-  createdBy   User                @relation(fields: [createdById], references: [id])
-  recipients  TemplateRecipient[]
-}
-
-model Task {
-  id           String       @id @default(uuid())
-  title        String
-  description  String?
-  status       TaskStatus   @default(TODO)
-  priority     TaskPriority @default(MEDIUM)
-  dueDate      DateTime?
-  createdById  String
-  assignedToId String
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  assignedTo   User         @relation("AssignedTasks", fields: [assignedToId], references: [id])
-  createdBy    User         @relation("CreatedTasks", fields: [createdById], references: [id])
-  workNotes    TaskWorkNote[]
-
-  @@index([status])
-  @@index([priority])
-  @@index([assignedToId])
-  @@index([createdById])
-}
-
-model TaskWorkNote {
-  id         String   @id @default(uuid())
-  taskId     String
-  employeeId String
-  note       String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  employee   User     @relation("TaskWorkNotes", fields: [employeeId], references: [id])
-
-  @@index([taskId])
-  @@index([employeeId])
-}
-
-model Ticket {
-  id           String         @id @default(uuid())
-  title        String
-  description  String?
-  status       TicketStatus   @default(OPEN)
-  priority     TicketPriority @default(MEDIUM)
-  customerId   String
-  createdById  String
-  assignedToId String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  assignedTo   User?          @relation("AssignedTickets", fields: [assignedToId], references: [id])
-  createdBy    User           @relation("CreatedTickets", fields: [createdById], references: [id])
-  customer     Customer       @relation(fields: [customerId], references: [id])
-  workNotes    TicketWorkNote[]
-
-  @@index([status])
-  @@index([priority])
-  @@index([customerId])
-  @@index([createdById])
-  @@index([assignedToId])
-}
-
-model TicketWorkNote {
-  id         String   @id @default(uuid())
-  ticketId   String
-  employeeId String
-  note       String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  employee   User     @relation("TicketWorkNotes", fields: [employeeId], references: [id])
-
-  @@index([ticketId])
-  @@index([employeeId])
-}
-
-model Deal {
-  id           String         @id @default(uuid())
-  title        String
-  description  String?
-  value        Float          @default(0)
-  stage        DealStage      @default(LEAD)
-  customerId   String
-  createdById  String
-  assignedToId String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  assignedTo   User?          @relation("AssignedDeals", fields: [assignedToId], references: [id])
-  createdBy    User           @relation("CreatedDeals", fields: [createdById], references: [id])
-  customer     Customer       @relation(fields: [customerId], references: [id])
-  activities   DealActivity[]
-
-  @@index([stage])
-  @@index([customerId])
-  @@index([createdById])
-  @@index([assignedToId])
-}
-
-model DealActivity {
-  id          String   @id @default(uuid())
-  dealId      String
-  type        String
-  note        String
-  createdAt   DateTime @default(now())
-  createdById String
-  createdBy   User     @relation("CreatedDealActivities", fields: [createdById], references: [id])
-  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-}
-
-model Notification {
-  id        Int              @id @default(autoincrement())
-  title     String
-  message   String
-  type      NotificationType
-  isRead    Boolean          @default(false)
-  userId    String
-  createdAt DateTime         @default(now())
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([isRead])
-  @@index([createdAt])
-}
+//////////////////////////////////////////////////////
+// USER ENUM
+//////////////////////////////////////////////////////
 
 enum Role {
   USER
@@ -328,12 +137,993 @@ enum UserStatus {
   INACTIVE
 }
 
+//////////////////////////////////////////////////////
+// SUBSCRIPTION PLAN
+//////////////////////////////////////////////////////
+
+model SubscriptionPlan {
+  id Int @id @default(autoincrement())
+
+  planName String @unique
+
+  price Float
+
+  durationDays Int
+
+  maxUsers Int
+  maxCustomers Int @default(100)
+  maxCampaigns Int
+  maxTemplates Int @default(20)
+
+  features Json
+
+  isTrial Boolean @default(false)
+
+  status String @default("ACTIVE")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////////
+
+  subscriptions Subscription[]
+
+  payments Payment[]
+
+ currentPlanUpgradeRequests   SubscriptionUpgradeRequest[] @relation("CurrentPlan")
+  requestedPlanUpgradeRequests SubscriptionUpgradeRequest[] @relation("RequestedPlan")
+}
+
+//////////////////////////////////////////////////////
+// SUBSCRIPTION
+//////////////////////////////////////////////////////
+
+model Subscription {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+
+  planId Int
+
+  startDate DateTime
+
+  expiryDate DateTime
+
+   usersAtSubscriptionStart Int @default(0)
+
+  status SubscriptionStatus @default(ACTIVE)
+
+  paymentStatus PaymentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  reminders SubscriptionReminder[]
+
+  payments Payment[]
+
+  @@index([companyId])
+  @@index([planId])
+}
+
+model SubscriptionUpgradeRequest {
+  id              Int                  @id @default(autoincrement())
+  companyId       Int
+  currentPlanId   Int
+  requestedPlanId Int
+
+  status          UpgradeRequestStatus @default(PENDING)
+
+  requestedBy     String
+  approvedBy      String?
+
+  remarks         String?
+  rejectionReason String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  currentPlan     SubscriptionPlan @relation("CurrentPlan", fields: [currentPlanId], references: [id])
+
+  requestedPlan   SubscriptionPlan @relation("RequestedPlan", fields: [requestedPlanId], references: [id])
+
+  @@index([companyId])
+  @@index([status])
+  @@index([requestedPlanId])
+}
+
+enum UpgradeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+//////////////////////////////////////////////////////
+// SUBSCRIPTION REMINDER
+//////////////////////////////////////////////////////
+
+model SubscriptionReminder {
+  id Int @id @default(autoincrement())
+
+  subscriptionId Int
+
+  channel String @default("EMAIL")
+
+  recipientEmail String
+
+  subject String
+
+  content String
+
+  status String @default("SENT")
+
+  sentAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////////
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+}
+
+//////////////////////////////////////////////////////
+// EMPLOYEE
+//////////////////////////////////////////////////////
+
+model Employee {
+  id String @id @default(uuid())
+
+  companyId Int?
+
+  employeeId String @unique
+
+  name String
+
+  email String @unique
+
+  password String
+
+  phone String?
+
+  address String?
+
+  role String @default("EMPLOYEE")
+
+  status String @default("ACTIVE")
+
+  mustChangePassword Boolean @default(true)
+
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////////
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  notifications Notification[]
+
+  assignedTickets SupportTicket[]
+
+  @@index([companyId])
+}
+
+//////////////////////////////////////////////////////
+// SUPER ADMIN NOTIFICATION
+//////////////////////////////////////////////////////
+
+model Notification {
+  id Int @id @default(autoincrement())
+
+  employeeId String?
+  superAdminId String?
+
+  title String
+  message String
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  employee Employee? @relation( fields: [employeeId], references: [id], onDelete: Cascade )
+
+  superAdmin SuperAdmin? @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([superAdminId])
+}
+//////////////////////////////////////////////////////
+// SUPPORT TICKET
+//////////////////////////////////////////////////////
+
+model SupportTicket {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+
+  employeeId String?
+
+  title String
+
+  description String
+
+  priority TicketPriority @default(MEDIUM)
+
+  status TicketStatus @default(OPEN)
+  notes SupportTicketNote[]
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  assignedTo Employee? @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId])
+  @@index([employeeId])
+}
+
+//////////////////////////////////////////////////////
+// PAYMENT
+//////////////////////////////////////////////////////
+
+model Payment {
+  id String @id @default(uuid())
+
+  paymentId String @unique
+
+  companyId Int?
+
+  subscriptionId Int?
+
+  planId Int?
+
+  companyName String
+
+  ownerName String
+
+  email String
+
+  phone String
+
+  amount Float
+
+  tax Float @default(0)
+
+  discount Float @default(0)
+
+  totalAmount Float
+
+  paymentMethod PaymentMethod
+
+  paymentStatus PaymentStatus
+
+  gateway String?
+
+  transactionId String?
+
+  invoiceNumber String?
+
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////////
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  plan SubscriptionPlan? @relation(fields: [planId], references: [id])
+
+  @@index([companyId])
+  @@index([subscriptionId])
+  @@index([planId])
+}
+
+//////////////////////////////////////////////////////
+// USER
+//////////////////////////////////////////////////////
+
+model User {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  name String
+
+  email String
+
+  password String
+
+  role Role @default(USER)
+
+  isFirstLogin Boolean @default(true)
+
+  resetToken String?
+
+  resetTokenExpiry DateTime?
+
+  address String?
+
+  department String?
+
+  designation String?
+
+  phone String?
+
+  profileImage String?
+
+  status UserStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  campaigns Campaign[]
+
+  customers Customer[]
+
+  assignedLeads Lead[] @relation("AssignedLeads")
+
+  leadWorkNotes LeadWorkNote[] @relation("LeadWorkNotes")
+
+  assignedDeals Deal[] @relation("AssignedDeals")
+
+  createdDeals Deal[] @relation("CreatedDeals")
+
+  dealActivities DealActivity[] @relation("CreatedDealActivities")
+
+  notifications UserNotification[]
+
+  assignedTasks Task[] @relation("AssignedTasks")
+
+  createdTasks Task[] @relation("CreatedTasks")
+
+  taskWorkNotes TaskWorkNote[] @relation("TaskWorkNotes")
+
+  templates Template[]
+
+  assignedTickets Ticket[] @relation("AssignedTickets")
+
+  createdTickets Ticket[] @relation("CreatedTickets")
+
+  ticketWorkNotes TicketWorkNote[] @relation("TicketWorkNotes")
+
+  ///////////////////////////////////////
+
+  @@unique([companyId, email])
+  @@index([companyId])
+}
+
+//////////////////////////////////////////////////////
+// CUSTOMER
+//////////////////////////////////////////////////////
+
+model Customer {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  name String
+
+  phone String
+
+  email String?
+
+  companyName String?
+
+  status String @default("ACTIVE")
+
+  userId String
+
+  requirements String?
+
+  source String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id])
+
+  conversations Conversation?
+
+  campaignRecipients CampaignRecipient[]
+
+  templateRecipients TemplateRecipient[]
+
+  deals Deal[]
+
+  tickets Ticket[]
+
+  ///////////////////////////////////////
+
+  @@unique([companyId, phone])
+  @@index([companyId])
+  @@index([userId])
+}
+
+//////////////////////////////////////////////////////
+// CONVERSATION
+//////////////////////////////////////////////////////
+
+model Conversation {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  customerId String? @unique
+
+  phone String?
+
+  status String @default("OPEN")
+
+  channel String @default("WHATSAPP")
+
+  lastMessage String?
+
+  unreadCount Int @default(0)
+
+  welcomeSent Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  messages Message[]
+
+  ///////////////////////////////////////
+
+  @@index([companyId])
+}
+
+//////////////////////////////////////////////////////
+// MESSAGE
+//////////////////////////////////////////////////////
+
+model Message {
+  id String @id @default(uuid())
+
+  conversationId String
+
+  content String
+
+  sender String
+
+  messageType String @default("TEXT")
+
+  status String @default("SENT")
+
+  imageUrl String?
+
+  metaMessageId String? @unique
+
+  failureReason String?
+
+  isEdited Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+//////////////////////////////////////////////////////
+// USER NOTIFICATION (CRM)
+//////////////////////////////////////////////////////
+
+model UserNotification {
+  id Int @id @default(autoincrement())
+
+  userId String
+
+  title String
+
+  message String
+
+  type NotificationType
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  ///////////////////////////////////////
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+//////////////////////////////////////////////////////
+// LEAD
+//////////////////////////////////////////////////////
+
+model Lead {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+
+  name String
+
+  phone String?
+
+  email String?
+
+  companyName String?
+
+  source String?
+
+  requirements String?
+
+  status LeadStatus
+
+  isConverted Boolean @default(false)
+
+  assignedToId String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  assignedTo User? @relation("AssignedLeads", fields: [assignedToId], references: [id])
+
+  workNotes LeadWorkNote[]
+
+  @@index([companyId])
+  @@index([assignedToId])
+}
+
+//////////////////////////////////////////////////////
+// LEAD WORK NOTE
+//////////////////////////////////////////////////////
+
+model LeadWorkNote {
+  id String @id @default(uuid())
+
+  leadId Int
+
+  employeeId String
+
+  note String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  employee User @relation("LeadWorkNotes", fields: [employeeId], references: [id])
+
+  @@index([leadId])
+  @@index([employeeId])
+}
+
+//////////////////////////////////////////////////////
+// CAMPAIGN
+//////////////////////////////////////////////////////
+
+model Campaign {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  name String
+
+  type CampaignType
+
+  messageContent String
+
+  status CampaignStatus @default(DRAFT)
+
+  scheduledAt DateTime?
+
+  audienceCount Int @default(0)
+
+  imageUrl String?
+
+  createdById String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  recipients CampaignRecipient[]
+
+  @@index([companyId])
+  @@index([createdById])
+}
+
+//////////////////////////////////////////////////////
+// CAMPAIGN RECIPIENT
+//////////////////////////////////////////////////////
+
+model CampaignRecipient {
+  id String @id @default(uuid())
+
+  campaignId String
+
+  customerId String
+
+  status RecipientStatus @default(PENDING)
+
+  sentAt DateTime?
+
+  deliveredAt DateTime?
+
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  ///////////////////////////////////////
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([customerId])
+}
+
+//////////////////////////////////////////////////////
+// TEMPLATE
+//////////////////////////////////////////////////////
+
+model Template {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  name String
+
+  category TemplateCategory
+
+  messageType MessageType @default(TEXT)
+
+  content String
+
+  status TemplateStatus @default(DRAFT)
+
+  autoSend Boolean @default(false)
+
+  purpose TemplatePurpose @default(CUSTOM)
+
+  createdById String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  recipients TemplateRecipient[]
+
+  @@index([companyId])
+  @@index([createdById])
+}
+
+//////////////////////////////////////////////////////
+// TEMPLATE RECIPIENT
+//////////////////////////////////////////////////////
+
+model TemplateRecipient {
+  id String @id @default(uuid())
+
+  templateId String
+
+  customerId String
+
+  status RecipientStatus @default(PENDING)
+
+  sentAt DateTime?
+
+  deliveredAt DateTime?
+
+  readAt DateTime?
+
+  metaMessageId String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, customerId])
+  @@index([templateId])
+  @@index([customerId])
+}
+
+//////////////////////////////////////////////////////
+// DEAL
+//////////////////////////////////////////////////////
+
+model Deal {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  title String
+
+  description String?
+
+  value Float @default(0)
+
+  stage DealStage @default(LEAD)
+
+  customerId String
+
+  createdById String
+
+  assignedToId String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  createdBy User @relation("CreatedDeals", fields: [createdById], references: [id])
+
+  assignedTo User? @relation("AssignedDeals", fields: [assignedToId], references: [id])
+
+  activities DealActivity[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([createdById])
+  @@index([assignedToId])
+}
+
+//////////////////////////////////////////////////////
+// DEAL ACTIVITY
+//////////////////////////////////////////////////////
+
+model DealActivity {
+  id String @id @default(uuid())
+
+  dealId String
+
+  type String
+
+  note String
+
+  createdById String
+
+  createdAt DateTime @default(now())
+
+  ///////////////////////////////////////
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation("CreatedDealActivities", fields: [createdById], references: [id])
+
+  @@index([dealId])
+  @@index([createdById])
+}
+
+//////////////////////////////////////////////////////
+// TASK
+//////////////////////////////////////////////////////
+
+model Task {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  title String
+
+  description String?
+
+  status TaskStatus @default(TODO)
+
+  priority TaskPriority @default(MEDIUM)
+
+  dueDate DateTime?
+
+  createdById String
+
+  assignedToId String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  assignedTo User @relation("AssignedTasks", fields: [assignedToId], references: [id])
+
+  workNotes TaskWorkNote[]
+
+  @@index([companyId])
+  @@index([createdById])
+  @@index([assignedToId])
+}
+
+//////////////////////////////////////////////////////
+// TASK WORK NOTE
+//////////////////////////////////////////////////////
+
+model TaskWorkNote {
+  id String @id @default(uuid())
+
+  taskId String
+
+  employeeId String
+
+  note String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  employee User @relation("TaskWorkNotes", fields: [employeeId], references: [id])
+
+  @@index([taskId])
+  @@index([employeeId])
+}
+
+//////////////////////////////////////////////////////
+// CRM TICKET
+//////////////////////////////////////////////////////
+
+model Ticket {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  title String
+
+  description String?
+
+  status TicketStatus @default(OPEN)
+
+  priority TicketPriority @default(MEDIUM)
+
+  customerId String
+
+  createdById String
+
+  assignedToId String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  createdBy User @relation("CreatedTickets", fields: [createdById], references: [id])
+
+  assignedTo User? @relation("AssignedTickets", fields: [assignedToId], references: [id])
+
+  workNotes TicketWorkNote[]
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([createdById])
+  @@index([assignedToId])
+}
+
+//////////////////////////////////////////////////////
+// TICKET WORK NOTE
+//////////////////////////////////////////////////////
+
+model TicketWorkNote {
+  id String @id @default(uuid())
+
+  ticketId String
+
+  employeeId String
+
+  note String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  ////////////////////////////////////////////
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  employee User @relation("TicketWorkNotes", fields: [employeeId], references: [id])
+
+  @@index([ticketId])
+  @@index([employeeId])
+}
+
+//////////////////////////////////////////////////////
+// LEAD
+//////////////////////////////////////////////////////
+
 enum LeadStatus {
   NEW
   CONTACTED
   QUALIFIED
   WON
 }
+
+//////////////////////////////////////////////////////
+// CAMPAIGN
+//////////////////////////////////////////////////////
 
 enum CampaignType {
   PROMOTIONAL
@@ -357,6 +1147,10 @@ enum RecipientStatus {
   READ
   FAILED
 }
+
+//////////////////////////////////////////////////////
+// TEMPLATE
+//////////////////////////////////////////////////////
 
 enum TemplateCategory {
   MARKETING
@@ -384,6 +1178,10 @@ enum TemplateStatus {
   INACTIVE
 }
 
+//////////////////////////////////////////////////////
+// TASK
+//////////////////////////////////////////////////////
+
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -397,18 +1195,9 @@ enum TaskPriority {
   HIGH
 }
 
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
-
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-}
+//////////////////////////////////////////////////////
+// DEAL
+//////////////////////////////////////////////////////
 
 enum DealStage {
   LEAD
@@ -418,6 +1207,10 @@ enum DealStage {
   LOST
 }
 
+//////////////////////////////////////////////////////
+// CRM NOTIFICATION
+//////////////////////////////////////////////////////
+
 enum NotificationType {
   LEAD
   TASK
@@ -425,5 +1218,26 @@ enum NotificationType {
   CUSTOMER
   DEAL
   CAMPAIGN
+  SUBSCRIPTION
   SYSTEM
+}
+//////////////////////////////////////////////////////
+// SUPPORT TICKET NOTE
+//////////////////////////////////////////////////////
+
+model SupportTicketNote {
+
+  id String @id @default(uuid())
+  supportTicketId Int
+  note String
+  createdById String
+  createdByName String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+
+  supportTicket SupportTicket @relation( fields:[supportTicketId],references:[id],onDelete:Cascade)
+  
+  @@index([supportTicketId])
 }

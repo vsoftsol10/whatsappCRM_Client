@@ -1,20 +1,6 @@
 import { FiAlertTriangle } from "react-icons/fi";
 
-/**
- * Reusable confirmation modal — replaces native window.confirm() popups.
- *
- * Usage:
- * <ConfirmModal
- *   isOpen={showConfirm}
- *   title="Delete Customer"
- *   message="Are you sure you want to delete this customer? This cannot be undone."
- *   confirmText="Delete"
- *   cancelText="Cancel"
- *   variant="danger"
- *   onConfirm={handleConfirmedDelete}
- *   onCancel={() => setShowConfirm(false)}
- * />
- */
+
 function ConfirmModal({
   isOpen,
   title = "Are you sure?",

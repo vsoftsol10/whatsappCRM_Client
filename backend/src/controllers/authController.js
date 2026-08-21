@@ -1,3 +1,4 @@
+
 const prisma = require("../config/prisma");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -10,9 +11,10 @@ const sendPasswordResetEmail = require("../services/passwordResetEmail");
 const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email,
+      },
     });
 
     if (existingUser) {
@@ -55,11 +57,21 @@ const registerUser = async (req, res) => {
 // ========================
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    console.log("LOGIN API CALLED");
+    console.log(req.body);
+
+    const { email, password } = req.body;
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+      },
+      include: {
+        company: true,
+      },
     });
+
+    console.log("USER:", user);
 
     if (!user) {
       return res.status(400).json({
@@ -72,6 +84,8 @@ const loginUser = async (req, res) => {
       user.password
     );
 
+    console.log("PASSWORD MATCH:", isPasswordValid);
+
     if (!isPasswordValid) {
       return res.status(400).json({
         message: "Invalid password",
@@ -81,6 +95,7 @@ const loginUser = async (req, res) => {
     const token = jwt.sign(
       {
         userId: user.id,
+        companyId: user.companyId,
         role: user.role,
       },
       process.env.JWT_SECRET,
@@ -95,11 +110,15 @@ const loginUser = async (req, res) => {
         message: "First login detected",
         forcePasswordChange: true,
         token,
+        companyStatus: user.company.status,
         user: {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
+          companyId: user.companyId,
+          companyStatus: user.company?.status,
+          expiryDate: user.company?.expiryDate,
         },
       });
     }
@@ -108,14 +127,23 @@ const loginUser = async (req, res) => {
       message: "Login successful",
       forcePasswordChange: false,
       token,
+      companyStatus: user.company.status,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        companyId: user.companyId,
+        companyStatus: user.company?.status,
+        expiryDate: user.company?.expiryDate,
       },
     });
   } catch (error) {
+
+    console.error("LOGIN ERROR:");
+    console.error(error);
+    console.error(error.stack);
+
     return res.status(500).json({
       message: error.message,
     });
@@ -127,22 +155,37 @@ const loginUser = async (req, res) => {
 // ========================
 const getMe = async (req, res) => {
   try {
+    const users = await prisma.user.findMany();
+
+    console.log("========== ALL USERS ==========");
+    console.table(
+      users.map((u) => ({
+        email: u.email,
+        role: u.role,
+      }))
+    );
+
     const user = await prisma.user.findUnique({
       where: {
         id: req.user.userId,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
     });
+
+    console.log("FOUND USER:", user);
+    console.log("FOUND USER:", user);
+
 
     if (!user) {
       return res.status(404).json({
         message: "User not found",
+      });
+    }
+
+
+
+    if (!company) {
+      return res.status(404).json({
+        message: "Company not found",
       });
     }
 
@@ -161,6 +204,26 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
+    console.log("========== CHANGE PASSWORD ==========");
+    console.log("User ID:", req.user.userId);
+    console.log("Current password received:", !!currentPassword);
+    console.log("New password received:", !!newPassword);
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      });
+    }
+
+    // Optional but recommended
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        message: "New password must be at least 6 characters",
+      });
+    }
+
+    // Get logged-in user
     const user = await prisma.user.findUnique({
       where: {
         id: req.user.userId,
@@ -173,10 +236,13 @@ const changePassword = async (req, res) => {
       });
     }
 
+    // Check current password
     const isPasswordValid = await bcrypt.compare(
       currentPassword,
       user.password
     );
+
+    console.log("Password Match:", isPasswordValid);
 
     if (!isPasswordValid) {
       return res.status(400).json({
@@ -184,11 +250,13 @@ const changePassword = async (req, res) => {
       });
     }
 
+    // Hash new password
     const hashedPassword = await bcrypt.hash(
       newPassword,
       10
     );
 
+    // Update password
     await prisma.user.update({
       where: {
         id: user.id,
@@ -199,12 +267,19 @@ const changePassword = async (req, res) => {
       },
     });
 
+    console.log("Password updated successfully");
+
     return res.status(200).json({
       message: "Password changed successfully",
     });
+
   } catch (error) {
+    console.error("CHANGE PASSWORD ERROR:");
+    console.error(error);
+    console.error(error.stack);
+
     return res.status(500).json({
-      message: error.message,
+      message: "Failed to change password",
     });
   }
 };
@@ -213,8 +288,13 @@ const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+      },
+      include: {
+        company: true,
+      },
     });
 
     if (!user) {

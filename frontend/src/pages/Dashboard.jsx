@@ -60,7 +60,7 @@ export default function Dashboard() {
       <DashboardHeader />
 
       {/* SEARCH */}
-      <DashboardSearch />
+  
 
       {/* KPI CARDS */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:gap-5 xl:grid-cols-5">

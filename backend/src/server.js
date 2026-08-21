@@ -24,7 +24,11 @@ const ticketRoutes = require("./routes/ticketRoutes");
 const dealRoutes = require("./routes/dealRoutes");
 const dealActivityRoutes = require("./routes/dealActivityRoutes");
 const webhookRoutes = require("./routes/webhook");
-const notificationRoutes = require("./routes/notificationRoutes");
+const userNotificationRoutes = require("./routes/userNotificationRoutes");
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const planRoutes = require("./routes/planRoutes");
+const upgradeRequestRoutes = require("./routes/upgradeRequestRoutes");
+const supportTicketRoutes = require("./routes/supportTicketRoutes");
 
 const app = express();
 
@@ -48,12 +52,20 @@ app.use("/api/tickets", ticketRoutes);
 app.use("/api/deals", dealRoutes);
 app.use("/api/deals", dealActivityRoutes);
 app.use("/api/webhook", webhookRoutes);
-app.use("/api/notifications", notificationRoutes);
+app.use("/api/notifications", userNotificationRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/subscriptions", planRoutes);
+app.use("/api/upgrade-requests", upgradeRequestRoutes);
 
 // Test route
 app.get("/", (req, res) => {
   res.send("Backend is running...");
 });
+
+app.use(
+  "/api/support-tickets",
+  supportTicketRoutes
+);
 
 const PORT = process.env.PORT || 5000;
 

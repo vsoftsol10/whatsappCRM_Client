@@ -1,5 +1,13 @@
+
+
 const express = require("express");
 const router = express.Router();
+
+const authMiddleware = require("../middleware/authMiddleware");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
+const {
+  checkTemplateLimit,
+} = require("../middleware/planLimitMiddleware");
 
 const {
   createTemplate,
@@ -12,24 +20,60 @@ const {
   generateTemplateWithAI,
 } = require("../controllers/templateController");
 
-const authMiddleware = require("../middleware/authMiddleware");
+// Apply authentication to all routes
+router.use(authMiddleware);
 
-// ================= TEMPLATE ROUTES =================
+/////////////////////////////////////////////////
+// READ ROUTES (Allowed for everyone)
+/////////////////////////////////////////////////
 
-router.post("/", authMiddleware, createTemplate);
+// Get All Templates
+router.get("/", getTemplates);
 
-router.post("/generate", authMiddleware, generateTemplateWithAI);
+// Get Template Recipients
+router.get("/:id/recipients", getTemplateRecipients);
 
-router.get("/", authMiddleware, getTemplates);
+// Get Single Template
+router.get("/:id", getTemplateById);
 
-router.get("/:id/recipients", authMiddleware, getTemplateRecipients);
+/////////////////////////////////////////////////
+// WRITE ROUTES (Only ACTIVE / TRIAL companies)
+/////////////////////////////////////////////////
 
-router.get("/:id", authMiddleware, getTemplateById);
+// Create Template
+router.post(
+  "/",
+  allowWriteAccess,
+  checkTemplateLimit,
+  createTemplate
+);
 
-router.put("/:id", authMiddleware, updateTemplate);
+// Generate Template with AI
+router.post(
+  "/generate",
+  allowWriteAccess,
+  generateTemplateWithAI
+);
 
-router.delete("/:id", authMiddleware, deleteTemplate);
+// Update Template
+router.put(
+  "/:id",
+  allowWriteAccess,
+  updateTemplate
+);
 
-router.post("/send", authMiddleware, sendTemplate);
+// Delete Template
+router.delete(
+  "/:id",
+  allowWriteAccess,
+  deleteTemplate
+);
+
+// Send Template
+router.post(
+  "/send",
+  allowWriteAccess,
+  sendTemplate
+);
 
 module.exports = router;

@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getCustomerById } from "../api/customerApi";
@@ -105,7 +106,7 @@ function CustomerProfile() {
                 Company
               </p>
               <p className="font-semibold text-gray-900">
-                {customer.company || "-"}
+                {customer.companyName || "-"}
               </p>
             </div>
 

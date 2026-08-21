@@ -1,4 +1,24 @@
+
 // const prisma = require("../config/prisma");
+
+// const {
+//   notifyUser,
+//   NotificationType,
+// } = require("../services/notificationService");
+
+// // ======================================================
+// // COMMON INCLUDE
+// // ======================================================
+
+// const leadInclude = {
+//   assignedTo: {
+//     select: {
+//       id: true,
+//       name: true,
+//       email: true,
+//     },
+//   },
+// };
 
 // // ================= CREATE LEAD =================
 // const createLead = async (req, res) => {
@@ -11,6 +31,7 @@
 //       source,
 //       requirements,
 //       status,
+//       assignedToId,
 //     } = req.body;
 
 //     if (!name || !name.trim()) {
@@ -33,17 +54,55 @@
 //       ? status.toUpperCase()
 //       : "NEW";
 
+//     // Validate assigned employee (optional)
+//     if (assignedToId) {
+//       const employee = await prisma.user.findUnique({
+//         where: {
+//           id: assignedToId,
+//         },
+//       });
+
+//       if (!employee || employee.role !== "USER") {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid employee selected",
+//         });
+//       }
+//     }
+
 //     const lead = await prisma.lead.create({
 //       data: {
 //         name: name.trim(),
 //         phone: phone?.trim() || null,
 //         email: email?.trim() || null,
-//         company: company?.trim() || null,
+//         companyName: company?.trim() || null,
 //         source: source?.trim() || null,
 //         requirements: requirements?.trim() || null,
 //         status: leadStatus,
+
+//         companyId: req.user.companyId,
+
+//         assignedToId: assignedToId || null,
 //       },
+//       include: leadInclude,
 //     });
+
+//     // ================= CREATE NOTIFICATION =================
+//     if (assignedToId) {
+//       try {
+//         await notifyUser({
+//           userId: assignedToId,
+//           title: "New Lead Assigned",
+//           message: `You have been assigned a new lead: "${lead.name}".`,
+//           type: NotificationType.LEAD,
+//         });
+//       } catch (notificationError) {
+//         console.error(
+//           "Lead notification failed:",
+//           notificationError
+//         );
+//       }
+//     }
 
 //     return res.status(201).json({
 //       success: true,
@@ -64,11 +123,36 @@
 // // ================= GET ALL LEADS =================
 // const getLeads = async (req, res) => {
 //   try {
-//     const leads = await prisma.lead.findMany({
-//       orderBy: {
-//         createdAt: "desc",
-//       },
-//     });
+//     let leads;
+
+//     if (req.user.role === "ADMIN") {
+
+//       leads = await prisma.lead.findMany({
+
+//         where: {
+//           companyId: req.user.companyId
+//         },
+
+//         include: leadInclude,
+
+//         orderBy: {
+//           createdAt: "desc"
+//         }
+
+//       });
+//     } else {
+//       // Employees can only view leads assigned to them
+//       leads = await prisma.lead.findMany({
+//         where: {
+//           assignedToId: req.user.userId,
+//           companyId: req.user.companyId
+//         },
+//         include: leadInclude,
+//         orderBy: {
+//           createdAt: "desc",
+//         },
+//       });
+//     }
 
 //     return res.status(200).json({
 //       success: true,
@@ -95,16 +179,18 @@
 //       name,
 //       phone,
 //       email,
-//       company,
+//       companyName: company,
 //       source,
 //       requirements,
 //       status,
+//       assignedToId,
 //     } = req.body;
 
-//     const existingLead = await prisma.lead.findUnique({
+//     const existingLead = await prisma.lead.findFirst({
 //       where: {
 //         id: Number(id),
-//       },
+//         companyId: req.user.companyId
+//       }
 //     });
 
 //     if (!existingLead) {
@@ -112,6 +198,22 @@
 //         success: false,
 //         message: "Lead not found",
 //       });
+//     }
+
+//     // Validate assigned employee (optional)
+//     if (assignedToId) {
+//       const employee = await prisma.user.findUnique({
+//         where: {
+//           id: assignedToId,
+//         },
+//       });
+
+//       if (!employee || employee.role !== "USER") {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid employee selected",
+//         });
+//       }
 //     }
 
 //     const updatedLead = await prisma.lead.update({
@@ -122,14 +224,39 @@
 //         name,
 //         phone,
 //         email,
-//         company,
+//         companyName: company,
 //         source,
 //         requirements,
 //         status: existingLead.isConverted
 //           ? existingLead.status
 //           : status,
+//         assignedToId:
+//           assignedToId === undefined
+//             ? existingLead.assignedToId
+//             : assignedToId || null,
 //       },
+//       include: leadInclude,
 //     });
+
+//     // ================= REASSIGNMENT NOTIFICATION =================
+//     if (
+//       assignedToId &&
+//       assignedToId !== existingLead.assignedToId
+//     ) {
+//       try {
+//         await notifyUser({
+//           userId: assignedToId,
+//           title: "Lead Assigned",
+//           message: `A lead has been assigned to you: "${updatedLead.name}".`,
+//           type: NotificationType.LEAD,
+//         });
+//       } catch (notificationError) {
+//         console.error(
+//           "Lead reassignment notification failed:",
+//           notificationError
+//         );
+//       }
+//     }
 
 //     return res.status(200).json({
 //       success: true,
@@ -171,10 +298,11 @@
 //       });
 //     }
 
-//     const existingLead = await prisma.lead.findUnique({
+//     const existingLead = await prisma.lead.findFirst({
 //       where: {
 //         id: Number(id),
-//       },
+//         companyId: req.user.companyId
+//       }
 //     });
 
 //     if (!existingLead) {
@@ -200,6 +328,7 @@
 //       data: {
 //         status: normalizedStatus,
 //       },
+//       include: leadInclude,
 //     });
 
 //     return res.status(200).json({
@@ -223,10 +352,11 @@
 //   try {
 //     const { id } = req.params;
 
-//     const lead = await prisma.lead.findUnique({
+//     const lead = await prisma.lead.findFirst({
 //       where: {
 //         id: Number(id),
-//       },
+//         companyId: req.user.companyId
+//       }
 //     });
 
 //     if (!lead) {
@@ -252,28 +382,28 @@
 
 //     console.log("Lead to convert:", lead);
 
-// const conditions = [];
+//     const conditions = [];
 
-// if (lead.email) {
-//   conditions.push({ email: lead.email });
-// }
+//     if (lead.email) {
+//       conditions.push({ email: lead.email });
+//     }
 
-// if (lead.phone) {
-//   conditions.push({ phone: lead.phone });
-// }
+//     if (lead.phone) {
+//       conditions.push({ phone: lead.phone });
+//     }
 
-// console.log("Search Conditions:", conditions);
+//     console.log("Search Conditions:", conditions);
 
-// const existingCustomer =
-//   conditions.length > 0
-//     ? await prisma.customer.findFirst({
-//         where: {
-//           OR: conditions,
-//         },
-//       })
-//     : null;
+//     const existingCustomer =
+//       conditions.length > 0
+//         ? await prisma.customer.findFirst({
+//           where: {
+//             OR: conditions,
+//           },
+//         })
+//         : null;
 
-// console.log("Matched Customer:", existingCustomer);
+//     console.log("Matched Customer:", existingCustomer);
 
 //     if (existingCustomer) {
 //       return res.status(400).json({
@@ -289,11 +419,15 @@
 //         name: lead.name,
 //         phone: lead.phone,
 //         email: lead.email,
-//         company: lead.company,
+
+//         companyName: lead.companyName,
+
 //         source: lead.source,
 //         requirements: lead.requirements,
+
 //         userId: req.user.userId,
-//       },
+//         companyId: req.user.companyId
+//       }
 //     });
 
 //     await prisma.lead.update({
@@ -326,10 +460,23 @@
 //   try {
 //     const { id } = req.params;
 
-//     await prisma.lead.delete({
+//     const lead = await prisma.lead.findFirst({
 //       where: {
 //         id: Number(id),
-//       },
+//         companyId: req.user.companyId
+//       }
+//     });
+
+//     if (!lead) {
+//       return res.status(404).json({
+//         message: "Lead not found"
+//       });
+//     }
+
+//     await prisma.lead.delete({
+//       where: {
+//         id: Number(id)
+//       }
 //     });
 
 //     return res.status(200).json({
@@ -355,6 +502,7 @@
 //   convertLeadToCustomer,
 //   deleteLead,
 // };
+
 
 const prisma = require("../config/prisma");
 
@@ -432,10 +580,13 @@ const createLead = async (req, res) => {
         name: name.trim(),
         phone: phone?.trim() || null,
         email: email?.trim() || null,
-        company: company?.trim() || null,
+        companyName: company?.trim() || null,
         source: source?.trim() || null,
         requirements: requirements?.trim() || null,
         status: leadStatus,
+
+        companyId: req.user.companyId,
+
         assignedToId: assignedToId || null,
       },
       include: leadInclude,
@@ -480,18 +631,26 @@ const getLeads = async (req, res) => {
     let leads;
 
     if (req.user.role === "ADMIN") {
-      // Admin can view all leads
+
       leads = await prisma.lead.findMany({
-        include: leadInclude,
-        orderBy: {
-          createdAt: "desc",
+
+        where: {
+          companyId: req.user.companyId
         },
+
+        include: leadInclude,
+
+        orderBy: {
+          createdAt: "desc"
+        }
+
       });
     } else {
       // Employees can only view leads assigned to them
       leads = await prisma.lead.findMany({
         where: {
           assignedToId: req.user.userId,
+          companyId: req.user.companyId
         },
         include: leadInclude,
         orderBy: {
@@ -525,17 +684,18 @@ const updateLead = async (req, res) => {
       name,
       phone,
       email,
-      company,
+      companyName: company,
       source,
       requirements,
       status,
       assignedToId,
     } = req.body;
 
-    const existingLead = await prisma.lead.findUnique({
+    const existingLead = await prisma.lead.findFirst({
       where: {
         id: Number(id),
-      },
+        companyId: req.user.companyId
+      }
     });
 
     if (!existingLead) {
@@ -569,7 +729,7 @@ const updateLead = async (req, res) => {
         name,
         phone,
         email,
-        company,
+        companyName: company,
         source,
         requirements,
         status: existingLead.isConverted
@@ -643,10 +803,11 @@ const updateLeadStatus = async (req, res) => {
       });
     }
 
-    const existingLead = await prisma.lead.findUnique({
+    const existingLead = await prisma.lead.findFirst({
       where: {
         id: Number(id),
-      },
+        companyId: req.user.companyId
+      }
     });
 
     if (!existingLead) {
@@ -696,10 +857,11 @@ const convertLeadToCustomer = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const lead = await prisma.lead.findUnique({
+    const lead = await prisma.lead.findFirst({
       where: {
         id: Number(id),
-      },
+        companyId: req.user.companyId
+      }
     });
 
     if (!lead) {
@@ -725,28 +887,28 @@ const convertLeadToCustomer = async (req, res) => {
 
     console.log("Lead to convert:", lead);
 
-const conditions = [];
+    const conditions = [];
 
-if (lead.email) {
-  conditions.push({ email: lead.email });
-}
+    if (lead.email) {
+      conditions.push({ email: lead.email });
+    }
 
-if (lead.phone) {
-  conditions.push({ phone: lead.phone });
-}
+    if (lead.phone) {
+      conditions.push({ phone: lead.phone });
+    }
 
-console.log("Search Conditions:", conditions);
+    console.log("Search Conditions:", conditions);
 
-const existingCustomer =
-  conditions.length > 0
-    ? await prisma.customer.findFirst({
-        where: {
-          OR: conditions,
-        },
-      })
-    : null;
+    const existingCustomer =
+      conditions.length > 0
+        ? await prisma.customer.findFirst({
+          where: {
+            OR: conditions,
+          },
+        })
+        : null;
 
-console.log("Matched Customer:", existingCustomer);
+    console.log("Matched Customer:", existingCustomer);
 
     if (existingCustomer) {
       return res.status(400).json({
@@ -762,11 +924,15 @@ console.log("Matched Customer:", existingCustomer);
         name: lead.name,
         phone: lead.phone,
         email: lead.email,
-        company: lead.company,
+
+        companyName: lead.companyName,
+
         source: lead.source,
         requirements: lead.requirements,
+
         userId: req.user.userId,
-      },
+        companyId: req.user.companyId
+      }
     });
 
     await prisma.lead.update({
@@ -799,10 +965,23 @@ const deleteLead = async (req, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.lead.delete({
+    const lead = await prisma.lead.findFirst({
       where: {
         id: Number(id),
-      },
+        companyId: req.user.companyId
+      }
+    });
+
+    if (!lead) {
+      return res.status(404).json({
+        message: "Lead not found"
+      });
+    }
+
+    await prisma.lead.delete({
+      where: {
+        id: Number(id)
+      }
     });
 
     return res.status(200).json({

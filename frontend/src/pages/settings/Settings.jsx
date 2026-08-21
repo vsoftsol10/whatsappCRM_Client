@@ -9,6 +9,7 @@ import {
   Lock,
   ChevronRight,
 } from "lucide-react";
+import BillingSubscriptionCard from "./BillingSubscriptionCard";
 
 function Settings() {
   const { user } = useAuthStore();
@@ -284,6 +285,8 @@ function Settings() {
             </div>
 
           </div>
+
+          <BillingSubscriptionCard />
 
         </div>
 

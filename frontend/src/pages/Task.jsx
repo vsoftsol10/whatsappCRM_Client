@@ -16,17 +16,19 @@
 // import ViewTaskModal from "../components/tasks/ViewTaskModal";
 // import KanbanBoard from "../components/tasks/KanbanBoard";
 // import Pagination from "../components/common/Pagination";
+// import ConfirmModal from "../components/common/ConfirmModal";
 
 // export default function Tasks() {
 //   const { user } = useAuthStore();
 
-//   const {
-//     tasks,
-//     fetchTasks,
-//     removeTask,
-//     changeTaskStatus,
-//     isLoading,
-//   } = useTaskStore();
+// const {
+// tasks,
+// fetchTasks,
+// removeTask,
+// changeTaskStatus,
+// editTask,
+// isLoading,
+// } = useTaskStore();
 
 //   const [viewMode, setViewMode] = useState("LIST");
 
@@ -39,6 +41,7 @@
 //     useState("ALL");
 
 //     const [currentPage, setCurrentPage] = useState(1);
+//     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
 // const itemsPerPage = 10;
 
@@ -54,9 +57,9 @@
 //   const [selectedTask, setSelectedTask] =
 //     useState(null);
 
-//   useEffect(() => {
-//     fetchTasks();
-//   }, []);
+// useEffect(() => {
+// fetchTasks();
+// }, [fetchTasks]);
 
 //   const filteredTasks = useMemo(() => {
 //     return tasks.filter((task) => {
@@ -114,7 +117,14 @@
 //     setShowViewModal(true);
 //   };
 
-//   const handleDelete = async (id) => {
+//   const handleDelete = (id) => {
+//     setDeleteTargetId(id);
+//   };
+
+//   const confirmDelete = async () => {
+//     const id = deleteTargetId;
+//     setDeleteTargetId(null);
+
 //     try {
 //       await removeTask(id);
 
@@ -144,8 +154,6 @@
 //       );
 //     }
 //   };
-
-//   const { editTask } = useTaskStore();
 
 //   const handlePriorityChange = async (id, priority) => {
 //     try {
@@ -336,10 +344,13 @@
 //       {/* MODALS */}
 //       {/* ========================= */}
 
-//       <CreateTaskModal
-//         isOpen={showCreateModal}
-//         onClose={() => setShowCreateModal(false)}
-//       />
+// <CreateTaskModal
+//  isOpen={showCreateModal}
+//  onClose={()=>{
+//    setShowCreateModal(false);
+//    fetchTasks();
+//  }}
+// />
 
 //       <EditTaskModal
 //         isOpen={showEditModal}
@@ -358,9 +369,21 @@
 //         }}
 //         task={selectedTask}
 //       />
+
+//       <ConfirmModal
+//         isOpen={!!deleteTargetId}
+//         title="Delete Task"
+//         message="Are you sure you want to delete this task? This cannot be undone."
+//         confirmText="Delete"
+//         cancelText="Cancel"
+//         variant="danger"
+//         onConfirm={confirmDelete}
+//         onCancel={() => setDeleteTargetId(null)}
+//       />
 //     </div>
 //   );
 // }
+
 
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -385,13 +408,14 @@ import ConfirmModal from "../components/common/ConfirmModal";
 export default function Tasks() {
   const { user } = useAuthStore();
 
-  const {
-    tasks,
-    fetchTasks,
-    removeTask,
-    changeTaskStatus,
-    isLoading,
-  } = useTaskStore();
+const {
+tasks,
+fetchTasks,
+removeTask,
+changeTaskStatus,
+editTask,
+isLoading,
+} = useTaskStore();
 
   const [viewMode, setViewMode] = useState("LIST");
 
@@ -420,9 +444,9 @@ const itemsPerPage = 10;
   const [selectedTask, setSelectedTask] =
     useState(null);
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+useEffect(() => {
+fetchTasks();
+}, [fetchTasks]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -517,8 +541,6 @@ const paginatedTasks =
       );
     }
   };
-
-  const { editTask } = useTaskStore();
 
   const handlePriorityChange = async (id, priority) => {
     try {
@@ -709,10 +731,13 @@ const paginatedTasks =
       {/* MODALS */}
       {/* ========================= */}
 
-      <CreateTaskModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-      />
+<CreateTaskModal
+ isOpen={showCreateModal}
+ onClose={()=>{
+   setShowCreateModal(false);
+   fetchTasks();
+ }}
+/>
 
       <EditTaskModal
         isOpen={showEditModal}

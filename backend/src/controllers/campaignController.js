@@ -1,12 +1,13 @@
-// const { PrismaClient } = require("@prisma/client");
-// const prisma = new PrismaClient();
+// const prisma = require("../config/prisma");
+
 // const {
 //   sendTextMessage,
 //   sendImageMessage,
+//   sendTemplateMessage,
+//   sendCampaignImageTemplate,
 // } = require("../services/whatsappService");
 // const { generateCampaign } = require("../services/geminiService");
 // const { notifyAdmins } = require("../services/notificationService");
-// const { sendTemplateMessage } = require("../services/whatsappService");
 // const {
 //   uploadCampaignImage,
 // } = require("../services/cloudinaryService");
@@ -19,29 +20,29 @@
 // exports.createCampaign = async (req, res) => {
 //   try {
 //     let {
-//   name,
-//   type,
-//   messageContent,
-//   scheduledAt,
-//   customerIds,
-// } = req.body;
+//       name,
+//       type,
+//       messageContent,
+//       scheduledAt,
+//       customerIds,
+//     } = req.body;
 
-// // =============================
-// // Convert customerIds to array
-// // =============================
-// if (!customerIds) {
-//   customerIds = [];
-// } else if (!Array.isArray(customerIds)) {
-//   customerIds = [customerIds];
-// }
+//     // =============================
+//     // Convert customerIds to array
+//     // =============================
+//     if (!customerIds) {
+//       customerIds = [];
+//     } else if (!Array.isArray(customerIds)) {
+//       customerIds = [customerIds];
+//     }
 
-// // Convert all ids to Number
-// customerIds = customerIds.map((id) => String(id));
+//     // Convert all ids to Number
+//     customerIds = customerIds.map((id) => String(id));
 
-// console.log("Customer IDs:", customerIds);
+//     console.log("Customer IDs:", customerIds);
 
-// console.log("Customer IDs:", customerIds);
-// console.log("Is Array:", Array.isArray(customerIds));
+//     console.log("Customer IDs:", customerIds);
+//     console.log("Is Array:", Array.isArray(customerIds));
 //     if (!name || !messageContent) {
 //       return res.status(400).json({
 //         success: false,
@@ -49,24 +50,25 @@
 //       });
 //     }
 
-//    // ============================
-// // Upload Image to Cloudinary
-// // ============================
-// let imageUrl = null;
+//     // ============================
+//     // Upload Image to Cloudinary
+//     // ============================
+//     let imageUrl = null;
 
-// if (req.file) {
-//   const uploadResult = await uploadCampaignImage(req.file);
+//     if (req.file) {
+//       const uploadResult = await uploadCampaignImage(req.file);
 
-//   imageUrl = uploadResult?.imageUrl || null;
-// }
+//       imageUrl = uploadResult?.imageUrl || null;
+//     }
 
 //     const campaign = await prisma.campaign.create({
 //       data: {
+//         companyId: req.user.companyId,
+
 //         name,
 //         type,
 //         messageContent,
 
-//         // NEW FIELD
 //         imageUrl,
 
 //         scheduledAt: scheduledAt
@@ -102,10 +104,10 @@
 //     });
 
 //     notifyAdmins({
-//   title: "New Campaign",
-//   message: `${campaign.name} has been created.`,
-//   type: "CAMPAIGN",
-// }).catch(console.error);
+//       title: "New Campaign",
+//       message: `${campaign.name} has been created.`,
+//       type: "CAMPAIGN",
+//     }).catch(console.error);
 
 //     return res.status(201).json({
 //       success: true,
@@ -133,7 +135,9 @@
 //   try {
 
 //     const campaigns = await prisma.campaign.findMany({
-
+//       where: {
+//         companyId: req.user.companyId
+//       },
 //       include: {
 
 //         createdBy: {
@@ -185,10 +189,10 @@
 
 //     const { id } = req.params;
 
-//     const campaign = await prisma.campaign.findUnique({
-
+//     const campaign = await prisma.campaign.findFirst({
 //       where: {
-//         id,
+//         id: campaignId,
+//         companyId: req.user.companyId,
 //       },
 
 //       include: {
@@ -263,15 +267,15 @@
 //     }
 
 //     // Keep old image
-// // Keep old image
-// let imageUrl = existingCampaign.imageUrl;
+//     // Keep old image
+//     let imageUrl = existingCampaign.imageUrl;
 
-// // Upload new image if selected
-// if (req.file) {
-//   const uploadResult = await uploadCampaignImage(req.file);
+//     // Upload new image if selected
+//     if (req.file) {
+//       const uploadResult = await uploadCampaignImage(req.file);
 
-//   imageUrl = uploadResult?.imageUrl || existingCampaign.imageUrl;
-// }
+//       imageUrl = uploadResult?.imageUrl || existingCampaign.imageUrl;
+//     }
 
 //     const campaign = await prisma.campaign.update({
 //       where: {
@@ -413,7 +417,7 @@
 // // =====================================================
 // exports.sendCampaign = async (req, res) => {
 //   try {
-//       console.log("========== SEND CAMPAIGN ==========");
+//     console.log("========== SEND CAMPAIGN ==========");
 //     console.log("Request Body:", req.body);
 //     const { campaignId, customerIds } = req.body;
 
@@ -497,50 +501,68 @@
 //         });
 //       }
 
-// // =============================
-// // Send WhatsApp Message
-// // =============================
+//       // =============================
+//       // Send WhatsApp Message
+//       // =============================
 
-// let sendStatus = "FAILED";
-// let metaMessageId = null;
+//       let sendStatus = "FAILED";
+//       let metaMessageId = null;
 
-// try {
+//       try {
 
-//   let result;
+//         let result;
 
-//   result = await sendTemplateMessage(
-//   customer.phone,
-//   "custom_campaign_message", // your approved template name
-//   [customer.name, campaign.messageContent] // fills {{1}} and {{2}}
-// );
+//         // Campaigns are business-initiated, so they must always go
+//         // through an approved template (never plain sendTextMessage).
+//         // Use the image-header template when the campaign has an image,
+//         // otherwise the text-only template.
+//         if (campaign.imageUrl) {
 
-//   console.log("WhatsApp Result:", result);
+//           result = await sendCampaignImageTemplate(
+//             customer.phone,
+//             "campaign", // approved IMAGE-header template name (Meta template: "campaign")
+//             campaign.imageUrl,
+//             [customer.name, campaign.messageContent], // fills {{1}} and {{2}}
+//             "en" // Meta approved this template under "English", not "English (US)"
+//           );
 
-//   if (result.success) {
-//     sendStatus = "SENT";
-//     metaMessageId = result.data?.messages?.[0]?.id || null;
-//   }
+//         } else {
 
-// } catch (err) {
+//           result = await sendTemplateMessage(
+//             customer.phone,
+//             "custom_campaign_message", // approved text-only template name
+//             [customer.name, campaign.messageContent] // fills {{1}} and {{2}}
+//           );
 
-//   console.error("WhatsApp Send Error:", err);
+//         }
 
-// }
-// // =============================
-// // Save Message
-// // =============================
+//         console.log("WhatsApp Result:", result);
 
-// await prisma.message.create({
-//   data: {
-//     conversationId: conversation.id,
-//     sender: "AGENT",
-//     content: campaign.messageContent,
-//     imageUrl: campaign.imageUrl,
-//     messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
-//     status: sendStatus,
-//     metaMessageId,
-//   },
-// });
+//         if (result.success) {
+//           sendStatus = "SENT";
+//           metaMessageId = result.data?.messages?.[0]?.id || null;
+//         }
+
+//       } catch (err) {
+
+//         console.error("WhatsApp Send Error:", err);
+
+//       }
+//       // =============================
+//       // Save Message
+//       // =============================
+
+//       await prisma.message.create({
+//         data: {
+//           conversationId: conversation.id,
+//           sender: "AGENT",
+//           content: campaign.messageContent,
+//           imageUrl: campaign.imageUrl,
+//           messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+//           status: sendStatus,
+//           metaMessageId,
+//         },
+//       });
 
 //       // =============================
 //       // Update Conversation
@@ -555,8 +577,8 @@
 //       });
 
 //       if (sendStatus === "SENT") {
-//   successCount++;
-// }
+//         successCount++;
+//       }
 //     }
 
 //     // =============================
@@ -647,8 +669,8 @@
 //   }
 // };
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+const prisma = require("../config/prisma");
+
 const {
   sendTextMessage,
   sendImageMessage,
@@ -669,29 +691,29 @@ const {
 exports.createCampaign = async (req, res) => {
   try {
     let {
-  name,
-  type,
-  messageContent,
-  scheduledAt,
-  customerIds,
-} = req.body;
+      name,
+      type,
+      messageContent,
+      scheduledAt,
+      customerIds,
+    } = req.body;
 
-// =============================
-// Convert customerIds to array
-// =============================
-if (!customerIds) {
-  customerIds = [];
-} else if (!Array.isArray(customerIds)) {
-  customerIds = [customerIds];
-}
+    // =============================
+    // Convert customerIds to array
+    // =============================
+    if (!customerIds) {
+      customerIds = [];
+    } else if (!Array.isArray(customerIds)) {
+      customerIds = [customerIds];
+    }
 
-// Convert all ids to Number
-customerIds = customerIds.map((id) => String(id));
+    // Convert all ids to Number
+    customerIds = customerIds.map((id) => String(id));
 
-console.log("Customer IDs:", customerIds);
+    console.log("Customer IDs:", customerIds);
 
-console.log("Customer IDs:", customerIds);
-console.log("Is Array:", Array.isArray(customerIds));
+    console.log("Customer IDs:", customerIds);
+    console.log("Is Array:", Array.isArray(customerIds));
     if (!name || !messageContent) {
       return res.status(400).json({
         success: false,
@@ -699,24 +721,25 @@ console.log("Is Array:", Array.isArray(customerIds));
       });
     }
 
-   // ============================
-// Upload Image to Cloudinary
-// ============================
-let imageUrl = null;
+    // ============================
+    // Upload Image to Cloudinary
+    // ============================
+    let imageUrl = null;
 
-if (req.file) {
-  const uploadResult = await uploadCampaignImage(req.file);
+    if (req.file) {
+      const uploadResult = await uploadCampaignImage(req.file);
 
-  imageUrl = uploadResult?.imageUrl || null;
-}
+      imageUrl = uploadResult?.imageUrl || null;
+    }
 
     const campaign = await prisma.campaign.create({
       data: {
+        companyId: req.user.companyId,
+
         name,
         type,
         messageContent,
 
-        // NEW FIELD
         imageUrl,
 
         scheduledAt: scheduledAt
@@ -752,10 +775,10 @@ if (req.file) {
     });
 
     notifyAdmins({
-  title: "New Campaign",
-  message: `${campaign.name} has been created.`,
-  type: "CAMPAIGN",
-}).catch(console.error);
+      title: "New Campaign",
+      message: `${campaign.name} has been created.`,
+      type: "CAMPAIGN",
+    }).catch(console.error);
 
     return res.status(201).json({
       success: true,
@@ -783,7 +806,9 @@ exports.getCampaigns = async (req, res) => {
   try {
 
     const campaigns = await prisma.campaign.findMany({
-
+      where: {
+        companyId: req.user.companyId
+      },
       include: {
 
         createdBy: {
@@ -835,10 +860,10 @@ exports.getCampaignById = async (req, res) => {
 
     const { id } = req.params;
 
-    const campaign = await prisma.campaign.findUnique({
-
+    const campaign = await prisma.campaign.findFirst({
       where: {
-        id,
+        id: campaignId,
+        companyId: req.user.companyId,
       },
 
       include: {
@@ -913,15 +938,15 @@ exports.updateCampaign = async (req, res) => {
     }
 
     // Keep old image
-// Keep old image
-let imageUrl = existingCampaign.imageUrl;
+    // Keep old image
+    let imageUrl = existingCampaign.imageUrl;
 
-// Upload new image if selected
-if (req.file) {
-  const uploadResult = await uploadCampaignImage(req.file);
+    // Upload new image if selected
+    if (req.file) {
+      const uploadResult = await uploadCampaignImage(req.file);
 
-  imageUrl = uploadResult?.imageUrl || existingCampaign.imageUrl;
-}
+      imageUrl = uploadResult?.imageUrl || existingCampaign.imageUrl;
+    }
 
     const campaign = await prisma.campaign.update({
       where: {
@@ -1063,7 +1088,7 @@ exports.generateAICampaign = async (req, res) => {
 // =====================================================
 exports.sendCampaign = async (req, res) => {
   try {
-      console.log("========== SEND CAMPAIGN ==========");
+    console.log("========== SEND CAMPAIGN ==========");
     console.log("Request Body:", req.body);
     const { campaignId, customerIds } = req.body;
 
@@ -1147,68 +1172,68 @@ exports.sendCampaign = async (req, res) => {
         });
       }
 
-// =============================
-// Send WhatsApp Message
-// =============================
+      // =============================
+      // Send WhatsApp Message
+      // =============================
 
-let sendStatus = "FAILED";
-let metaMessageId = null;
+      let sendStatus = "FAILED";
+      let metaMessageId = null;
 
-try {
+      try {
 
-  let result;
+        let result;
 
-  // Campaigns are business-initiated, so they must always go
-  // through an approved template (never plain sendTextMessage).
-  // Use the image-header template when the campaign has an image,
-  // otherwise the text-only template.
-  if (campaign.imageUrl) {
+        // Campaigns are business-initiated, so they must always go
+        // through an approved template (never plain sendTextMessage).
+        // Use the image-header template when the campaign has an image,
+        // otherwise the text-only template.
+        if (campaign.imageUrl) {
 
-    result = await sendCampaignImageTemplate(
-      customer.phone,
-      "campaign", // approved IMAGE-header template name (Meta template: "campaign")
-       campaign.imageUrl,
-      [customer.name, campaign.messageContent], // fills {{1}} and {{2}}
-      "en" // Meta approved this template under "English", not "English (US)"
-    );
+          result = await sendCampaignImageTemplate(
+            customer.phone,
+            "campaign", // approved IMAGE-header template name (Meta template: "campaign")
+            campaign.imageUrl,
+            [customer.name, campaign.messageContent], // fills {{1}} and {{2}}
+            "en" // Meta approved this template under "English", not "English (US)"
+          );
 
-  } else {
+        } else {
 
-    result = await sendTemplateMessage(
-      customer.phone,
-      "custom_campaign_message", // approved text-only template name
-      [customer.name, campaign.messageContent] // fills {{1}} and {{2}}
-    );
+          result = await sendTemplateMessage(
+            customer.phone,
+            "custom_campaign_message", // approved text-only template name
+            [customer.name, campaign.messageContent] // fills {{1}} and {{2}}
+          );
 
-  }
+        }
 
-  console.log("WhatsApp Result:", result);
+        console.log("WhatsApp Result:", result);
 
-  if (result.success) {
-    sendStatus = "SENT";
-    metaMessageId = result.data?.messages?.[0]?.id || null;
-  }
+        if (result.success) {
+          sendStatus = "SENT";
+          metaMessageId = result.data?.messages?.[0]?.id || null;
+        }
 
-} catch (err) {
+      } catch (err) {
 
-  console.error("WhatsApp Send Error:", err);
+        console.error("WhatsApp Send Error:", err);
 
-}
-// =============================
-// Save Message
-// =============================
+      }
+      // =============================
+      // Save Message
+      // =============================
 
-await prisma.message.create({
-  data: {
-    conversationId: conversation.id,
-    sender: "AGENT",
-    content: campaign.messageContent,
-    imageUrl: campaign.imageUrl,
-    messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
-    status: sendStatus,
-    metaMessageId,
-  },
-});
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          sender: "AGENT",
+          content: campaign.messageContent,
+          imageUrl: campaign.imageUrl,
+          messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+          status: sendStatus,
+          metaMessageId,
+        },
+      });
 
       // =============================
       // Update Conversation
@@ -1223,8 +1248,8 @@ await prisma.message.create({
       });
 
       if (sendStatus === "SENT") {
-  successCount++;
-}
+        successCount++;
+      }
     }
 
     // =============================
