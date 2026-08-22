@@ -3,11 +3,11 @@ const axios = require("axios");
 const sendEmployeeCredentials = async (
   name,
   email,
-  tempPassword
+  tempPassword,
+  companyId
 ) => {
   const loginUrl =
-    `${process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com"}/login`;
-
+  `${process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com"}/login?company=${companyId}`;
   await axios.post(
     "https://api.brevo.com/v3/smtp/email",
     {

@@ -15,13 +15,14 @@ export const useAuthStore = create((set, get) => ({
   forcePasswordChange: false,
 
   // LOGIN
-  login: async (email, password) => {
+  login: async (email, password, companyId) => {
     set({ isLoading: true, error: null });
 
     try {
       const response = await apiClient.post('/api/auth/login', {
         email,
         password,
+        companyId,
       });
 
       const { token, user, forcePasswordChange } = response.data;
@@ -94,101 +95,101 @@ export const useAuthStore = create((set, get) => ({
   },
 
   // FORGOT PASSWORD
-forgotPasswordAction: async (email) => {
-  set({ isLoading: true, error: null });
+  forgotPasswordAction: async (email) => {
+    set({ isLoading: true, error: null });
 
-  try {
-    const data = await forgotPassword(email);
+    try {
+      const data = await forgotPassword(email);
 
-    set({
-      isLoading: false,
-      error: null,
-    });
+      set({
+        isLoading: false,
+        error: null,
+      });
 
-    return {
-      success: true,
-      message: data.message,
-    };
-  } catch (error) {
+      return {
+        success: true,
+        message: data.message,
+      };
+    } catch (error) {
       console.log("ERROR RESPONSE:", error.response);
       console.log("ERROR DATA:", error.response?.data);
       console.log("FULL ERROR:", error);
 
-  const message =
-    error.response?.data?.message ||
-    "Failed to send reset email";
-    
-    set({
-      error: message,
-      isLoading: false,
-    });
-
-    return {
-      success: false,
-      message,
-    };
-  }
-},
-
-// RESET PASSWORD
-resetPasswordAction: async (token, password) => {
-  set({ isLoading: true, error: null });
-
-  try {
-    const data = await resetPassword(
-      token,
-      password
-    );
-
-    set({
-      isLoading: false,
-      error: null,
-    });
-
-    return {
-      success: true,
-      message: data.message,
-    };
-  } catch (error) {
-    const message =
-      error.response?.data?.message ||
-      "Password reset failed";
-
-    set({
-      error: message,
-      isLoading: false,
-    });
-
-    return {
-      success: false,
-      message,
-    };
-  }
-},
-
-changePasswordAction: async (passwordData) => {
-  set({ isLoading: true, error: null });
-
-  try {
-    const data = await changePassword(passwordData);
-
-    set({
-      isLoading: false,
-      error: null,
-    });
-
-    return data;
-  } catch (error) {
-    set({
-      isLoading: false,
-      error:
+      const message =
         error.response?.data?.message ||
-        "Password change failed",
-    });
+        "Failed to send reset email";
 
-    throw error;
-  }
-},
+      set({
+        error: message,
+        isLoading: false,
+      });
+
+      return {
+        success: false,
+        message,
+      };
+    }
+  },
+
+  // RESET PASSWORD
+  resetPasswordAction: async (token, password) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const data = await resetPassword(
+        token,
+        password
+      );
+
+      set({
+        isLoading: false,
+        error: null,
+      });
+
+      return {
+        success: true,
+        message: data.message,
+      };
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        "Password reset failed";
+
+      set({
+        error: message,
+        isLoading: false,
+      });
+
+      return {
+        success: false,
+        message,
+      };
+    }
+  },
+
+  changePasswordAction: async (passwordData) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const data = await changePassword(passwordData);
+
+      set({
+        isLoading: false,
+        error: null,
+      });
+
+      return data;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error:
+          error.response?.data?.message ||
+          "Password change failed",
+      });
+
+      throw error;
+    }
+  },
 
   // CLEAR ERROR
   clearError: () => set({ error: null }),

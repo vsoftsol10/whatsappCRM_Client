@@ -48,6 +48,27 @@ const createEmployee = async (req, res) => {
     console.log("TEMP PASSWORD:", tempPassword);
     console.log("=================================");
 
+    // Get company information
+    const company = await prisma.company.findUnique({
+      where: {
+        id: req.user.companyId,
+      },
+      select: {
+        id: true,
+        companyId: true,
+        companyName: true,
+      },
+    });
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
+    }
+
+    console.log("COMPANY:", company);
+
     const hashedPassword = await bcrypt.hash(
       tempPassword,
       10
@@ -102,7 +123,8 @@ const createEmployee = async (req, res) => {
       await sendEmployeeCredentials(
         employee.name,
         employee.email,
-        tempPassword
+        tempPassword,
+        company.companyId
       );
 
       emailSent = true;

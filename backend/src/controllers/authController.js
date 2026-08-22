@@ -61,7 +61,7 @@ const loginUser = async (req, res) => {
     console.log("LOGIN API CALLED");
     console.log(req.body);
 
-    const { email, password } = req.body;
+    const { email, password, companyId } = req.body;
     const user = await prisma.user.findFirst({
       where: {
         email,
@@ -290,7 +290,10 @@ const forgotPassword = async (req, res) => {
 
     const user = await prisma.user.findFirst({
       where: {
-        email,
+        email: email.trim().toLowerCase(),
+        company: {
+          companyId: companyId,
+        },
       },
       include: {
         company: true,

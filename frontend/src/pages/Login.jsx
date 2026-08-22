@@ -8,7 +8,7 @@ import {
   FiLoader,
   FiUser,
 } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const Login = ({ onLoginSuccess }) => {
   const {
@@ -19,7 +19,9 @@ const Login = ({ onLoginSuccess }) => {
   } = useAuthStore();
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
+  const companyId = searchParams.get("company");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] =
@@ -76,7 +78,8 @@ const Login = ({ onLoginSuccess }) => {
 
     const result = await login(
       email,
-      password
+      password,
+      companyId
     );
 
     if (result.success) {
@@ -128,37 +131,37 @@ const Login = ({ onLoginSuccess }) => {
               }}
             />
 
-           {/* ================= Decorative Background ================= */}
+            {/* ================= Decorative Background ================= */}
 
-          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute inset-0 overflow-hidden">
 
-            {/* Large Green Glow */}
-            <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-[#25D366]/20 blur-[120px]" />
+              {/* Large Green Glow */}
+              <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-[#25D366]/20 blur-[120px]" />
 
-            {/* Bottom Cyan Glow */}
-            <div className="absolute -bottom-28 -right-16 w-64 h-64 rounded-full bg-[#00E5C3]/15 blur-[110px]" />
+              {/* Bottom Cyan Glow */}
+              <div className="absolute -bottom-28 -right-16 w-64 h-64 rounded-full bg-[#00E5C3]/15 blur-[110px]" />
 
-            {/* Main Glass Shape */}
-            <div
-              className="absolute -left-20 top-0 h-full w-[82%] bg-white/[0.05] backdrop-blur-sm"
-              style={{
-                clipPath:
-                  "polygon(0 0,100% 0,48% 50%,100% 100%,0 100%)",
-              }}
-            />
+              {/* Main Glass Shape */}
+              <div
+                className="absolute -left-20 top-0 h-full w-[82%] bg-white/[0.05] backdrop-blur-sm"
+                style={{
+                  clipPath:
+                    "polygon(0 0,100% 0,48% 50%,100% 100%,0 100%)",
+                }}
+              />
 
-            {/* Second Layer */}
-            <div
-              className="absolute -left-8 top-0 h-full w-[74%] bg-[#25D366]/[0.06]"
-              style={{
-                clipPath:
-                  "polygon(0 0,100% 0,36% 50%,100% 100%,0 100%)",
-              }}
-            />
+              {/* Second Layer */}
+              <div
+                className="absolute -left-8 top-0 h-full w-[74%] bg-[#25D366]/[0.06]"
+                style={{
+                  clipPath:
+                    "polygon(0 0,100% 0,36% 50%,100% 100%,0 100%)",
+                }}
+              />
 
-          </div>
+            </div>
 
-          {/* Floating Glow - Top */}
+            {/* Floating Glow - Top */}
             <div className="absolute top-20 right-8 w-20 h-20 rounded-full bg-[#25D366]/20 blur-3xl animate-pulse" />
 
             {/* Floating Glow - Middle */}
@@ -180,62 +183,62 @@ const Login = ({ onLoginSuccess }) => {
 
               <div className="relative z-10 flex flex-col items-center">
 
-              {/* ================= Premium Logo ================= */}
+                {/* ================= Premium Logo ================= */}
 
-              <div className="relative mb-10">
+                <div className="relative mb-10">
 
-                {/* Outer Glow */}
-                <div className="absolute inset-0 rounded-full bg-[#25D366]/25 blur-2xl scale-125"></div>
+                  {/* Outer Glow */}
+                  <div className="absolute inset-0 rounded-full bg-[#25D366]/25 blur-2xl scale-125"></div>
 
-                {/* Glass Circle */}
-                <div className="relative w-28 h-28 rounded-full border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.35)] flex items-center justify-center">
+                  {/* Glass Circle */}
+                  <div className="relative w-28 h-28 rounded-full border border-white/15 bg-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.35)] flex items-center justify-center">
 
-                  {/* Inner Glow */}
-                  <div className="absolute w-20 h-20 rounded-full bg-[#25D366]/15 blur-xl"></div>
+                    {/* Inner Glow */}
+                    <div className="absolute w-20 h-20 rounded-full bg-[#25D366]/15 blur-xl"></div>
 
-                  <svg
-                    className="relative z-10"
-                    width="54"
-                    height="54"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <path
-                      d="M12 2C6.48 2 2 6.02 2 11c0 1.9.63 3.66 1.7 5.1L2.6 20.4a.6.6 0 00.76.75l4.5-1.45A10.3 10.3 0 0012 20c5.52 0 10-4.02 10-9s-4.48-9-10-9z"
-                      fill="#25D366"
-                    />
+                    <svg
+                      className="relative z-10"
+                      width="54"
+                      height="54"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <path
+                        d="M12 2C6.48 2 2 6.02 2 11c0 1.9.63 3.66 1.7 5.1L2.6 20.4a.6.6 0 00.76.75l4.5-1.45A10.3 10.3 0 0012 20c5.52 0 10-4.02 10-9s-4.48-9-10-9z"
+                        fill="#25D366"
+                      />
 
-                    <path
-                      d="M8.2 8.7c.2-.4.4-.5.7-.5h.5c.2 0 .4 0 .55.4.2.5.65 1.7.7 1.8.05.15.1.3 0 .5-.1.2-.15.3-.3.45s-.3.3-.4.4c-.15.15-.3.3-.15.6.2.3.85 1.3 1.8 2.1 1.25 1.05 2.25 1.4 2.6 1.55.3.15.5.1.65-.1.2-.2.75-.85.95-1.15.2-.3.4-.25.65-.15s1.6.75 1.9.9c.3.15.5.2.55.35.1.15.1.85-.2 1.65-.3.8-1.65 1.5-2.3 1.6-.6.1-1.35.15-2.2-.15a12.5 12.5 0 01-4.55-3.1c-1.4-1.5-2.3-3.05-2.55-3.6-.25-.55-.15-.85 0-1.15z"
-                      fill="#FFFFFF"
-                    />
-                  </svg>
+                      <path
+                        d="M8.2 8.7c.2-.4.4-.5.7-.5h.5c.2 0 .4 0 .55.4.2.5.65 1.7.7 1.8.05.15.1.3 0 .5-.1.2-.15.3-.3.45s-.3.3-.4.4c-.15.15-.3.3-.15.6.2.3.85 1.3 1.8 2.1 1.25 1.05 2.25 1.4 2.6 1.55.3.15.5.1.65-.1.2-.2.75-.85.95-1.15.2-.3.4-.25.65-.15s1.6.75 1.9.9c.3.15.5.2.55.35.1.15.1.85-.2 1.65-.3.8-1.65 1.5-2.3 1.6-.6.1-1.35.15-2.2-.15a12.5 12.5 0 01-4.55-3.1c-1.4-1.5-2.3-3.05-2.55-3.6-.25-.55-.15-.85 0-1.15z"
+                        fill="#FFFFFF"
+                      />
+                    </svg>
+
+                  </div>
+
+                </div>
+
+                <h1 className="text-[42px] font-extrabold tracking-tight text-white">
+                  WhatsApp CRM
+                </h1>
+
+                <p className="mt-5 max-w-sm text-[17px] leading-8 text-white/80">
+                  Manage every customer conversation from one powerful platform with messaging, automation and analytics.
+                </p>
+
+                <div className="mt-12 flex gap-3">
+
+                  <div className="w-3 h-3 rounded-full bg-white/90"></div>
+
+                  <div className="w-3 h-3 rounded-full bg-white/50"></div>
+
+                  <div className="w-3 h-3 rounded-full bg-white/25"></div>
 
                 </div>
 
               </div>
 
-              <h1 className="text-[42px] font-extrabold tracking-tight text-white">
-                WhatsApp CRM
-              </h1>
-
-              <p className="mt-5 max-w-sm text-[17px] leading-8 text-white/80">
-                Manage every customer conversation from one powerful platform with messaging, automation and analytics.
-              </p>
-
-              <div className="mt-12 flex gap-3">
-
-                <div className="w-3 h-3 rounded-full bg-white/90"></div>
-
-                <div className="w-3 h-3 rounded-full bg-white/50"></div>
-
-                <div className="w-3 h-3 rounded-full bg-white/25"></div>
-
-              </div>
-
             </div>
-
-          </div>
 
           </div>
 
@@ -275,7 +278,7 @@ const Login = ({ onLoginSuccess }) => {
               onSubmit={handleSubmit}
               className="space-y-7"
             >
-                            {/* ================= EMAIL ================= */}
+              {/* ================= EMAIL ================= */}
 
               <div>
                 <div className="flex items-center gap-4 border-b-2 border-gray-200 pb-3 transition-all duration-300 focus-within:border-[#25D366]">
