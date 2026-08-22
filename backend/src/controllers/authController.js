@@ -62,35 +62,51 @@ const loginUser = async (req, res) => {
     console.log(req.body);
 
     const { email, password, companyId } = req.body;
-    const user = await prisma.user.findFirst({
+
+    const users = await prisma.user.findMany({
       where: {
-        email,
+        email: email.trim().toLowerCase(),
       },
       include: {
         company: true,
       },
     });
 
-    console.log("USER:", user);
+    console.log("USERS FOUND:", users.length);
 
-    if (!user) {
+    if (users.length === 0) {
       return res.status(400).json({
         message: "User not found",
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password
-    );
+    let user = null;
 
-    console.log("PASSWORD MATCH:", isPasswordValid);
+    for (const candidate of users) {
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        candidate.password
+      );
 
-    if (!isPasswordValid) {
+      if (isPasswordValid) {
+        user = candidate;
+        break;
+      }
+    }
+
+    console.log("MATCHED USER:", user);
+
+    if (!user) {
       return res.status(400).json({
         message: "Invalid password",
       });
     }
+
+    console.log("LOGIN COMPANY:", {
+      id: user.company?.id,
+      companyId: user.company?.companyId,
+      companyName: user.company?.companyName,
+    });
 
     const token = jwt.sign(
       {
