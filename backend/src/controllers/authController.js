@@ -405,7 +405,7 @@ const forgotPassword = async (req, res) => {
     });
 
     const resetLink =
-      `http://localhost:5173/reset-password/${resetToken}`;
+      `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
     await sendPasswordResetEmail(
       normalizedEmail,
