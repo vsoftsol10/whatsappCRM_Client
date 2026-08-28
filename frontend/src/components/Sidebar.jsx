@@ -20,6 +20,7 @@ import {
   FaLock,
   FaCreditCard,
   FaBox,
+  FaHistory,
 } from "react-icons/fa";
 
 
@@ -130,6 +131,11 @@ const sections = [
         name: "SaaS Support",
         icon: FaTicketAlt,
         path: "/settings/support",
+      },
+      {
+        name: "Audit Logs",
+        icon: FaHistory,
+        path: "/settings/audit-logs",
       },
     ],
   },
@@ -386,7 +392,8 @@ ${openSection === section.id
 
                               if (
                                 (item.path === "/employees" ||
-                                  item.path === "/settings/support") &&
+                                  item.path === "/settings/support" ||
+                                  item.path === "/settings/audit-logs") &&
                                 user?.role !== "ADMIN"
                               ) {
                                 return false;

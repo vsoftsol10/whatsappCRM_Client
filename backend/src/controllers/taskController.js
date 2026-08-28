@@ -1,3 +1,5 @@
+
+
 // const prisma = require("../config/prisma");
 // const {
 //   notifyUser,
@@ -471,6 +473,7 @@ const {
   notifyUser,
   NotificationType,
 } = require("../services/notificationService");
+const { logAction } = require("../services/auditLogService");
 
 // ================= CREATE TASK =================
 const createTask = async (req, res) => {
@@ -555,6 +558,14 @@ const createTask = async (req, res) => {
         notificationError
       );
     }
+
+    logAction({
+      req,
+      action: "CREATE",
+      module: "TASK",
+      entityId: task.id,
+      entityName: task.title,
+    });
 
     return res.status(201).json({
       success: true,
@@ -806,6 +817,18 @@ const updateTask = async (req, res) => {
       }
     }
 
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "TASK",
+      entityId: task.id,
+      entityName: task.title,
+      changes: {
+        before: { assignedToId: existingTask.assignedToId, dueDate: existingTask.dueDate },
+        after: { assignedToId: task.assignedToId, dueDate: task.dueDate },
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: "Task updated successfully",
@@ -833,12 +856,30 @@ const deleteTask = async (req, res) => {
     }
 
     const { id } = req.params;
+
+    const existingTask = await prisma.task.findFirst({
+      where: {
+        id,
+        companyId: req.user.companyId
+      }
+    });
+
     await prisma.task.deleteMany({
       where: {
         id,
         companyId: req.user.companyId
       }
     });
+
+    if (existingTask) {
+      logAction({
+        req,
+        action: "DELETE",
+        module: "TASK",
+        entityId: existingTask.id,
+        entityName: existingTask.title,
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -906,6 +947,18 @@ const updateTaskStatus = async (req, res) => {
             email: true,
           },
         },
+      },
+    });
+
+    logAction({
+      req,
+      action: "STATUS_CHANGE",
+      module: "TASK",
+      entityId: updatedTask.id,
+      entityName: updatedTask.title,
+      changes: {
+        before: { status: task.status },
+        after: { status: updatedTask.status },
       },
     });
 

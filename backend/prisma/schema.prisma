@@ -65,6 +65,7 @@ model Company {
   tasks Task[]
   tickets Ticket[]
   employees Employee[]
+  crmAuditLogs CrmAuditLog[]
   subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
 }
 
@@ -1240,4 +1241,103 @@ model SupportTicketNote {
   supportTicket SupportTicket @relation( fields:[supportTicketId],references:[id],onDelete:Cascade)
   
   @@index([supportTicketId])
+}
+
+//////////////////////////////////////////////////////
+// AUDIT LOG
+//////////////////////////////////////////////////////
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  // Who performed the action
+  actorId String?
+  actorType String?
+  actorName String?
+  // What action was performed
+  action String
+
+  // What was affected
+  entityType String
+  entityId String?
+
+  // Related company, if applicable
+  companyId Int?
+
+  // Human-readable description
+  description String?
+
+  // Data before and after the change
+  oldValue Json?
+  newValue Json?
+
+  // Request information
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+model CrmAuditLog {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+
+  userId String?
+  userName String
+  userRole String
+
+  action CrmAuditAction
+  module CrmAuditModule
+
+  entityId String?
+  entityName String?
+
+  changes Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  ///////////////////////////////////////
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([module])
+  @@index([createdAt])
+  @@index([companyId, module, createdAt])
+  @@map("crm_audit_logs")
+}
+
+enum CrmAuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  ASSIGN
+
+  @@map("CrmAuditAction")
+}
+
+enum CrmAuditModule {
+  CUSTOMER
+  EMPLOYEE
+  LEAD
+  DEAL
+  TASK
+  TICKET
+  CAMPAIGN
+  TEMPLATE
+  USER
+
+  @@map("CrmAuditModule")
 }

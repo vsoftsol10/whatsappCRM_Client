@@ -1,3 +1,5 @@
+
+
 // const prisma = require("../config/prisma");
 
 // const {
@@ -669,6 +671,7 @@
 //   }
 // };
 
+
 const prisma = require("../config/prisma");
 
 const {
@@ -685,6 +688,7 @@ const {
 const {
   getOrCreateConversation,
 } = require("../helpers/conversationHelper");
+const { logAction } = require("../services/auditLogService");
 // =====================================================
 // CREATE CAMPAIGN
 // =====================================================
@@ -779,6 +783,14 @@ exports.createCampaign = async (req, res) => {
       message: `${campaign.name} has been created.`,
       type: "CAMPAIGN",
     }).catch(console.error);
+
+    logAction({
+      req,
+      action: "CREATE",
+      module: "CAMPAIGN",
+      entityId: campaign.id,
+      entityName: campaign.name,
+    });
 
     return res.status(201).json({
       success: true,
@@ -986,6 +998,18 @@ exports.updateCampaign = async (req, res) => {
       },
     });
 
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "CAMPAIGN",
+      entityId: campaign.id,
+      entityName: campaign.name,
+      changes: {
+        before: { status: existingCampaign.status, messageContent: existingCampaign.messageContent },
+        after: { status: campaign.status, messageContent: campaign.messageContent },
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: "Campaign updated successfully.",
@@ -1028,6 +1052,14 @@ exports.deleteCampaign = async (req, res) => {
       where: {
         id,
       },
+    });
+
+    logAction({
+      req,
+      action: "DELETE",
+      module: "CAMPAIGN",
+      entityId: campaign.id,
+      entityName: campaign.name,
     });
 
     return res.status(200).json({
@@ -1272,6 +1304,17 @@ exports.sendCampaign = async (req, res) => {
       data: {
         status: "COMPLETED",
         audienceCount,
+      },
+    });
+
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "CAMPAIGN",
+      entityId: campaignId,
+      entityName: campaign.name,
+      changes: {
+        after: { status: "COMPLETED", totalSent: successCount, audienceCount },
       },
     });
 

@@ -27,7 +27,7 @@ import CustomerProfile from "./pages/CustomerProfile";
 import CampaignDetails from "./pages/CampaignDetails";
 import Templates from "./pages/Templates";
 
-
+import AuditLogs from "./pages/settings/AuditLogs";
 import AddCustomer from "./pages/AddCustomer";
 // import EditCustomer from "./pages/EditCustomer";
 
@@ -167,6 +167,11 @@ function App() {
               <Route
                 path="/settings/support"
                 element={<SaasSupportPage />}
+              />
+
+              <Route
+                path="/settings/audit-logs"
+                element={<AuditLogs />}
               />
 
             </Route>

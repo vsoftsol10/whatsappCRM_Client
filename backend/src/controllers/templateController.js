@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 // const { generateTemplate } = require("../services/geminiService");
 // const { sendTextMessage, sendTemplateMessage } = require("../services/whatsappService");
@@ -604,6 +605,7 @@ const { sendTextMessage, sendTemplateMessage } = require("../services/whatsappSe
 const {
   getOrCreateConversation,
 } = require("../helpers/conversationHelper");
+const { logAction } = require("../services/auditLogService");
 // ================= CREATE TEMPLATE =================
 const createTemplate = async (req, res) => {
   try {
@@ -630,6 +632,14 @@ const createTemplate = async (req, res) => {
         createdById: req.user.userId,
         companyId: req.user.companyId,
       },
+    });
+
+    logAction({
+      req,
+      action: "CREATE",
+      module: "TEMPLATE",
+      entityId: template.id,
+      entityName: template.name,
     });
 
     return res.status(201).json({
@@ -806,6 +816,18 @@ const updateTemplate = async (req, res) => {
       },
     });
 
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "TEMPLATE",
+      entityId: template.id,
+      entityName: template.name,
+      changes: {
+        before: { status: existingTemplate.status, content: existingTemplate.content },
+        after: { status: template.status, content: template.content },
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: "Template updated successfully",
@@ -846,6 +868,14 @@ const deleteTemplate = async (req, res) => {
       where: {
         id,
       },
+    });
+
+    logAction({
+      req,
+      action: "DELETE",
+      module: "TEMPLATE",
+      entityId: existingTemplate.id,
+      entityName: existingTemplate.name,
     });
 
     return res.status(200).json({

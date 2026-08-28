@@ -503,13 +503,14 @@
 //   deleteLead,
 // };
 
-
 const prisma = require("../config/prisma");
 
 const {
   notifyUser,
   NotificationType,
 } = require("../services/notificationService");
+
+const { logAction } = require("../services/auditLogService");
 
 // ======================================================
 // COMMON INCLUDE
@@ -608,6 +609,14 @@ const createLead = async (req, res) => {
         );
       }
     }
+
+    logAction({
+      req,
+      action: "CREATE",
+      module: "LEAD",
+      entityId: lead.id,
+      entityName: lead.name,
+    });
 
     return res.status(201).json({
       success: true,
@@ -763,6 +772,18 @@ const updateLead = async (req, res) => {
       }
     }
 
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "LEAD",
+      entityId: updatedLead.id,
+      entityName: updatedLead.name,
+      changes: {
+        before: { status: existingLead.status, assignedToId: existingLead.assignedToId },
+        after: { status: updatedLead.status, assignedToId: updatedLead.assignedToId },
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: "Lead updated successfully",
@@ -834,6 +855,18 @@ const updateLeadStatus = async (req, res) => {
         status: normalizedStatus,
       },
       include: leadInclude,
+    });
+
+    logAction({
+      req,
+      action: "STATUS_CHANGE",
+      module: "LEAD",
+      entityId: lead.id,
+      entityName: lead.name,
+      changes: {
+        before: { status: existingLead.status },
+        after: { status: normalizedStatus },
+      },
     });
 
     return res.status(200).json({
@@ -944,6 +977,18 @@ const convertLeadToCustomer = async (req, res) => {
       },
     });
 
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "LEAD",
+      entityId: lead.id,
+      entityName: lead.name,
+      changes: {
+        before: { isConverted: false },
+        after: { isConverted: true, convertedToCustomerId: customer.id },
+      },
+    });
+
     return res.status(201).json({
       success: true,
       message: "Lead converted successfully",
@@ -982,6 +1027,14 @@ const deleteLead = async (req, res) => {
       where: {
         id: Number(id)
       }
+    });
+
+    logAction({
+      req,
+      action: "DELETE",
+      module: "LEAD",
+      entityId: lead.id,
+      entityName: lead.name,
     });
 
     return res.status(200).json({
