@@ -108,8 +108,8 @@ function Customers() {
 
         setAllCustomers(
           data.customers ||
-            data.data ||
-            []
+          data.data ||
+          []
         );
       } catch (error) {
         console.error(
@@ -138,8 +138,8 @@ function Customers() {
 
         setCustomers(
           data.customers ||
-            data.data ||
-            []
+          data.data ||
+          []
         );
       } catch (error) {
         console.error(
@@ -376,9 +376,15 @@ function Customers() {
     } catch (error) {
       console.error(error);
 
+      // 403 is already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        return;
+      }
+
+      // Other errors
       toast.error(
         error?.response?.data?.message ||
-          "Failed to delete customer"
+        "Failed to delete customer"
       );
     }
   };
@@ -495,11 +501,10 @@ function Customers() {
                     item.key
                   )
                 }
-                className={`rounded-xl border px-5 py-2.5 text-sm font-semibold transition ${
-                  isActive
+                className={`rounded-xl border px-5 py-2.5 text-sm font-semibold transition ${isActive
                     ? "border-[#25D366] bg-[#25D366] text-black shadow-md"
                     : "border-gray-300 bg-white text-slate-700 hover:border-[#25D366] hover:bg-[#DCF8C6]"
-                }`}
+                  }`}
               >
                 {item.label}
               </button>
@@ -585,12 +590,11 @@ function Customers() {
                       <td className="crm-td">
 
                         <span
-                          className={`crm-badge ${
-                            customer.status ===
-                            "ACTIVE"
+                          className={`crm-badge ${customer.status ===
+                              "ACTIVE"
                               ? "bg-green-100 text-green-700"
                               : "bg-red-100 text-red-700"
-                          }`}
+                            }`}
                         >
                           {customer.status}
                         </span>
@@ -740,12 +744,11 @@ function Customers() {
                     index + 1
                   )
                 }
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  currentPage ===
-                  index + 1
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${currentPage ===
+                    index + 1
                     ? "bg-[#25D366] text-black"
                     : "border border-gray-300 bg-white hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 {index + 1}
               </button>
@@ -820,8 +823,8 @@ function Customers() {
 
             setCustomers(
               data.customers ||
-                data.data ||
-                []
+              data.data ||
+              []
             );
 
             const allData =
@@ -832,8 +835,8 @@ function Customers() {
 
             setAllCustomers(
               allData.customers ||
-                allData.data ||
-                []
+              allData.data ||
+              []
             );
           }}
         />
@@ -858,8 +861,8 @@ function Customers() {
 
             setCustomers(
               data.customers ||
-                data.data ||
-                []
+              data.data ||
+              []
             );
 
             const allData =
@@ -870,8 +873,8 @@ function Customers() {
 
             setAllCustomers(
               allData.customers ||
-                allData.data ||
-                []
+              allData.data ||
+              []
             );
           }}
         />

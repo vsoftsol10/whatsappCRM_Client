@@ -105,16 +105,24 @@ export default function AddLeadModal({
 
       // Automatically close modal
       onClose();
+
     } catch (error) {
       console.error("Create lead error:", error);
 
+      // 403 errors are already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        setLoading(false);
+        onClose();
+        return;
+      }
+      // Other errors
       toast.error(
         error?.response?.data?.message ||
-          error?.message ||
-          "Failed to create lead"
+        error?.message ||
+        "Failed to create lead"
       );
-    } finally {
-      // Always stop loading
+
+      // Allow user to try again
       setLoading(false);
     }
   };
@@ -159,11 +167,10 @@ export default function AddLeadModal({
                 type="text"
                 placeholder="Enter lead name"
                 disabled={loading}
-                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                  errors.name
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.name
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  }`}
               />
 
               {errors.name && (
@@ -186,11 +193,10 @@ export default function AddLeadModal({
                 onChange={handleChange}
                 placeholder="Enter email"
                 disabled={loading}
-                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                  errors.email
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.email
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  }`}
               />
 
               {errors.email && (
@@ -213,11 +219,10 @@ export default function AddLeadModal({
                 onChange={handleChange}
                 placeholder="Enter phone number"
                 disabled={loading}
-                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                  errors.phone
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.phone
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  }`}
               />
 
               {errors.phone && (
@@ -255,11 +260,10 @@ export default function AddLeadModal({
                 value={formData.source}
                 onChange={handleChange}
                 disabled={loading}
-                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                  errors.source
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                className={`w-full rounded-lg border px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.source
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  }`}
               >
                 <option value="">Select Source</option>
                 <option value="Website">Website</option>
@@ -335,11 +339,10 @@ export default function AddLeadModal({
                 onChange={handleChange}
                 placeholder="Enter lead requirements"
                 disabled={loading}
-                className={`w-full rounded-lg border px-4 py-3 outline-none resize-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                  errors.requirements
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
+                className={`w-full rounded-lg border px-4 py-3 outline-none resize-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.requirements
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  }`}
               />
 
               {errors.requirements && (

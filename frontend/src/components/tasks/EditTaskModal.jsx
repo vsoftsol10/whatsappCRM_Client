@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -23,7 +23,7 @@ export default function EditTaskModal({
   });
 
   const [errors, setErrors] = useState({});
-
+  const submitLock = useRef(false);
   const [loadingEmployees, setLoadingEmployees] =
     useState(true);
 
@@ -133,42 +133,41 @@ export default function EditTaskModal({
   // ============================
   // HANDLE SUBMIT
   // ============================
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Prevent double click / duplicate request
-    if (isSubmitting) return;
+    // Prevent duplicate submit immediately
+    if (submitLock.current) return;
 
-    // Validate first
-    if (!validateForm()) return;
+    // Lock immediately before any async operation
+    submitLock.current = true;
+    setIsSubmitting(true);
+
+    console.log("UPDATE TASK CLICKED");
+
+    if (!validateForm()) {
+      submitLock.current = false;
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      // Disable update button immediately
-      setIsSubmitting(true);
-
       await editTask(task.id, formData);
 
       toast.success("Task updated successfully!");
 
       setErrors({});
 
-      // Automatically close modal
       onClose();
-
     } catch (error) {
-      console.error(
-        "Failed to update task:",
-        error
-      );
+      console.error("Failed to update task:", error);
 
       toast.error(
         error?.response?.data?.message ||
         "Failed to update task"
       );
-
     } finally {
-      // Enable button again if request failed
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -205,11 +204,10 @@ export default function EditTaskModal({
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className={`p-2 rounded-full transition ${
-                isSubmitting
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-[#128C7E]"
-              }`}
+              className={`p-2 rounded-full transition ${isSubmitting
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:bg-[#128C7E]"
+                }`}
             >
               <X size={22} />
             </button>
@@ -237,15 +235,13 @@ export default function EditTaskModal({
                 onChange={handleChange}
                 placeholder="Enter task title"
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.title
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.title
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.title && (
@@ -269,15 +265,13 @@ export default function EditTaskModal({
                 onChange={handleChange}
                 placeholder="Enter description"
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.description
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.description
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.description && (
@@ -300,15 +294,13 @@ export default function EditTaskModal({
                 value={formData.priority}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.priority
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.priority
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="LOW">
                   Low
@@ -344,15 +336,13 @@ export default function EditTaskModal({
                 value={formData.dueDate}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.dueDate
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.dueDate
+                  ? "border-red-500"
+                  : "border-gray-300 focus:border-[#25D366]"
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.dueDate && (
@@ -381,15 +371,13 @@ export default function EditTaskModal({
                     value={formData.assignedToId}
                     onChange={handleChange}
                     disabled={isSubmitting}
-                    className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                      errors.assignedToId
-                        ? "border-red-500"
-                        : "border-gray-300 focus:border-[#25D366]"
-                    } ${
-                      isSubmitting
+                    className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.assignedToId
+                      ? "border-red-500"
+                      : "border-gray-300 focus:border-[#25D366]"
+                      } ${isSubmitting
                         ? "bg-gray-100 cursor-not-allowed"
                         : ""
-                    }`}
+                      }`}
                   >
                     <option value="">
                       Select Employee
@@ -433,11 +421,10 @@ export default function EditTaskModal({
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${
-                  isSubmitting
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-gray-100"
-                }`}
+                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${isSubmitting
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-gray-100"
+                  }`}
               >
                 Cancel
               </button>
@@ -447,11 +434,10 @@ export default function EditTaskModal({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg text-gray-800 font-semibold transition flex items-center justify-center gap-2 ${
-                  isSubmitting
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-[#25D366] hover:bg-[#128C7E]"
-                }`}
+                className={`px-6 py-3 rounded-lg text-gray-800 font-semibold transition flex items-center justify-center gap-2 ${isSubmitting
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#25D366] hover:bg-[#128C7E]"
+                  }`}
               >
                 {isSubmitting ? (
                   <>

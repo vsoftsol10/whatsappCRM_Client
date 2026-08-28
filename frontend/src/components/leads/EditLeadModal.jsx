@@ -169,9 +169,17 @@ export default function EditLeadModal({
     } catch (error) {
       console.error(error);
 
+      // 403 is already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        setIsUpdating(false);
+        onClose();
+        return;
+      }
+
+      // Other errors
       toast.error(
         error?.response?.data?.message ||
-          "Failed to update lead"
+        "Failed to update lead"
       );
 
       // Allow user to try again
@@ -229,15 +237,13 @@ export default function EditLeadModal({
                 type="text"
                 placeholder="Enter lead name"
                 disabled={isUpdating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.name
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.name
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isUpdating
+                  } ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.name && (
@@ -261,15 +267,13 @@ export default function EditLeadModal({
                 onChange={handleChange}
                 placeholder="Enter email"
                 disabled={isUpdating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.email
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.email
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isUpdating
+                  } ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.email && (
@@ -294,15 +298,13 @@ export default function EditLeadModal({
                 placeholder="Enter phone number"
                 maxLength={10}
                 disabled={isUpdating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.phone
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.phone
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isUpdating
+                  } ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.phone && (
@@ -325,11 +327,10 @@ export default function EditLeadModal({
                 onChange={handleChange}
                 placeholder="Enter company name"
                 disabled={isUpdating}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${
-                  isUpdating
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
             </div>
 
@@ -345,15 +346,13 @@ export default function EditLeadModal({
                 value={formData.source}
                 onChange={handleChange}
                 disabled={isUpdating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.source
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.source
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isUpdating
+                  } ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="">
                   Select Source
@@ -398,11 +397,10 @@ export default function EditLeadModal({
                 value={formData.assignedToId}
                 onChange={handleChange}
                 disabled={isUpdating}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${
-                  isUpdating
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="">
                   Unassigned
@@ -431,11 +429,10 @@ export default function EditLeadModal({
                 value={formData.status}
                 onChange={handleChange}
                 disabled={isUpdating}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${
-                  isUpdating
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="NEW">
                   New
@@ -469,15 +466,13 @@ export default function EditLeadModal({
                 onChange={handleChange}
                 placeholder="Enter lead requirements"
                 disabled={isUpdating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none resize-none ${
-                  errors.requirements
+                className={`w-full rounded-lg border px-4 py-3 outline-none resize-none ${errors.requirements
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isUpdating
+                  } ${isUpdating
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.requirements && (

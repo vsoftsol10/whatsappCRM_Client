@@ -6,7 +6,7 @@ import {
   Users,
   UsersRound,
   Megaphone,
-  Bot,
+  FileText,
   CheckCircle,
   Clock,
   XCircle,
@@ -279,8 +279,8 @@ function BillingSubscriptionCard() {
 
               <LimitCard
                 icon={<UsersRound />}
-                title="Contacts"
-                value={plan?.maxContacts ?? 0}
+                title="Customers"
+                value={plan?.maxCustomers ?? 0}
               />
 
               <LimitCard
@@ -290,9 +290,9 @@ function BillingSubscriptionCard() {
               />
 
               <LimitCard
-                icon={<Bot />}
-                title="Bots"
-                value={plan?.maxBots ?? 0}
+                icon={<FileText />}
+                title="Templates"
+                value={plan?.maxTemplates ?? 0}
               />
 
             </div>

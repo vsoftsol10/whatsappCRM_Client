@@ -177,7 +177,7 @@ export default function CreateTemplateModal({
 
       toast.error(
         error?.response?.data?.message ||
-          "Failed to generate template."
+        "Failed to generate template."
       );
     } finally {
       setGenerating(false);
@@ -253,9 +253,20 @@ export default function CreateTemplateModal({
         error
       );
 
+      // 403 errors are already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        setIsSubmitting(false);
+
+        // Automatically close the modal
+        onClose();
+
+        return;
+      }
+
+      // Handle other errors normally
       toast.error(
         error?.response?.data?.message ||
-          "Failed to create template!"
+        "Failed to create template!"
       );
 
       // Allow retry if API failed
@@ -301,11 +312,10 @@ export default function CreateTemplateModal({
               type="button"
               onClick={handleClose}
               disabled={isSubmitting || generating}
-              className={`rounded-full p-2 transition ${
-                isSubmitting || generating
+              className={`rounded-full p-2 transition ${isSubmitting || generating
                   ? "cursor-not-allowed opacity-50"
                   : "hover:bg-[#128C7E]"
-              }`}
+                }`}
             >
               <X size={22} />
             </button>
@@ -338,15 +348,13 @@ export default function CreateTemplateModal({
                 value={formData.name}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.name
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.name
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "cursor-not-allowed bg-gray-100"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.name && (
@@ -371,15 +379,13 @@ export default function CreateTemplateModal({
                 value={formData.category}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.category
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.category
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "cursor-not-allowed bg-gray-100"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="MARKETING">
                   Marketing
@@ -412,15 +418,13 @@ export default function CreateTemplateModal({
                 value={formData.messageType}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.messageType
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.messageType
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "cursor-not-allowed bg-gray-100"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="TEXT">
                   Text
@@ -482,15 +486,13 @@ export default function CreateTemplateModal({
                         onClick={() =>
                           setAiPrompt(item.label)
                         }
-                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
-                          aiPrompt === item.label
+                        className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${aiPrompt === item.label
                             ? "bg-green-600 text-white"
                             : "border border-gray-300 hover:bg-green-50"
-                        } ${
-                          isSubmitting
+                          } ${isSubmitting
                             ? "cursor-not-allowed opacity-50"
                             : ""
-                        }`}
+                          }`}
                       >
                         <Icon size={16} />
                         {item.label}
@@ -512,11 +514,10 @@ export default function CreateTemplateModal({
                   setAiPrompt(e.target.value)
                 }
                 disabled={isSubmitting || generating}
-                className={`mb-3 w-full rounded-lg border px-4 py-3 ${
-                  isSubmitting || generating
+                className={`mb-3 w-full rounded-lg border px-4 py-3 ${isSubmitting || generating
                     ? "cursor-not-allowed bg-gray-100"
                     : ""
-                }`}
+                  }`}
               />
 
               {/* Tone + Generate */}
@@ -531,11 +532,10 @@ export default function CreateTemplateModal({
                   disabled={
                     isSubmitting || generating
                   }
-                  className={`rounded-lg border px-4 py-3 ${
-                    isSubmitting || generating
+                  className={`rounded-lg border px-4 py-3 ${isSubmitting || generating
                       ? "cursor-not-allowed bg-gray-100"
                       : ""
-                  }`}
+                    }`}
                 >
                   <option>
                     Professional
@@ -560,11 +560,10 @@ export default function CreateTemplateModal({
                   disabled={
                     generating || isSubmitting
                   }
-                  className={`crm-primary-button flex items-center justify-center gap-2 ${
-                    generating || isSubmitting
+                  className={`crm-primary-button flex items-center justify-center gap-2 ${generating || isSubmitting
                       ? "cursor-not-allowed opacity-70"
                       : ""
-                  }`}
+                    }`}
                 >
                   {generating ? (
                     <>
@@ -606,15 +605,13 @@ export default function CreateTemplateModal({
                 value={formData.content}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.content
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.content
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "cursor-not-allowed bg-gray-100"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.content && (
@@ -641,15 +638,13 @@ export default function CreateTemplateModal({
                 value={formData.status}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.status
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.status
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "cursor-not-allowed bg-gray-100"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="DRAFT">
                   Draft
@@ -686,11 +681,10 @@ export default function CreateTemplateModal({
                 disabled={
                   isSubmitting || generating
                 }
-                className={`crm-secondary-button ${
-                  isSubmitting || generating
+                className={`crm-secondary-button ${isSubmitting || generating
                     ? "cursor-not-allowed opacity-50"
                     : ""
-                }`}
+                  }`}
               >
                 Cancel
               </button>
@@ -702,11 +696,10 @@ export default function CreateTemplateModal({
                 disabled={
                   isSubmitting || generating
                 }
-                className={`crm-primary-button flex min-w-[160px] items-center justify-center gap-2 ${
-                  isSubmitting || generating
+                className={`crm-primary-button flex min-w-[160px] items-center justify-center gap-2 ${isSubmitting || generating
                     ? "cursor-not-allowed opacity-70"
                     : ""
-                }`}
+                  }`}
               >
                 {isSubmitting ? (
                   <>

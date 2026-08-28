@@ -99,50 +99,50 @@ export default function EditTemplateModal({
   // HANDLE SUBMIT
   // ==================================================
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    // Prevent duplicate submission
-    if (updating) return;
+  // Prevent duplicate submission
+  if (updating) return;
 
-    // Validate only when Update Template is clicked
-    if (!validateForm()) {
-      return;
-    }
+  // Validate only when Update Template is clicked
+  if (!validateForm()) {
+    return;
+  }
 
-    try {
-      // Immediately disable button
-      setUpdating(true);
+  try {
+    // Immediately disable button
+    setUpdating(true);
 
-      await editTemplate(template.id, formData);
+    await editTemplate(template.id, formData);
 
-      toast.success("Template updated successfully!");
+    toast.success("Template updated successfully!");
 
-      // Reset form
-      setFormData({
-        name: "",
-        category: "MARKETING",
-        messageType: "TEXT",
-        content: "",
-        status: "DRAFT",
-      });
+    // Reset form
+    setFormData({
+      name: "",
+      category: "MARKETING",
+      messageType: "TEXT",
+      content: "",
+      status: "DRAFT",
+    });
 
-      setErrors({});
+    setErrors({});
 
-      // Close modal after successful update
-      onClose();
-    } catch (error) {
-      console.error(error);
+    // Close modal after successful update
+    onClose();
 
-      toast.error(
-        error?.response?.data?.message ||
-          "Failed to update template. Please try again."
-      );
+  } catch (error) {
+    console.error("Failed to update template:", error);
 
-      // Allow user to try again if update failed
-      setUpdating(false);
-    }
-  };
+    // Do NOT show another toast here.
+    // apiClient already shows the 403 message.
+
+    setUpdating(false);
+
+    onClose();
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
@@ -196,11 +196,10 @@ export default function EditTemplateModal({
                 value={formData.name}
                 onChange={handleChange}
                 disabled={updating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.name
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.name
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } disabled:cursor-not-allowed disabled:bg-gray-100`}
+                  } disabled:cursor-not-allowed disabled:bg-gray-100`}
               />
 
               {errors.name && (
@@ -225,11 +224,10 @@ export default function EditTemplateModal({
                 value={formData.category}
                 onChange={handleChange}
                 disabled={updating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.category
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.category
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } disabled:cursor-not-allowed disabled:bg-gray-100`}
+                  } disabled:cursor-not-allowed disabled:bg-gray-100`}
               >
                 <option value="MARKETING">
                   Marketing
@@ -274,11 +272,10 @@ export default function EditTemplateModal({
                 value={formData.messageType}
                 onChange={handleChange}
                 disabled={updating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.messageType
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.messageType
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } disabled:cursor-not-allowed disabled:bg-gray-100`}
+                  } disabled:cursor-not-allowed disabled:bg-gray-100`}
               >
                 <option value="TEXT">
                   Text
@@ -321,11 +318,10 @@ export default function EditTemplateModal({
                 value={formData.content}
                 onChange={handleChange}
                 disabled={updating}
-                className={`w-full resize-none rounded-lg border px-4 py-3 outline-none ${
-                  errors.content
+                className={`w-full resize-none rounded-lg border px-4 py-3 outline-none ${errors.content
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } disabled:cursor-not-allowed disabled:bg-gray-100`}
+                  } disabled:cursor-not-allowed disabled:bg-gray-100`}
               />
 
               {errors.content && (
@@ -350,11 +346,10 @@ export default function EditTemplateModal({
                 value={formData.status}
                 onChange={handleChange}
                 disabled={updating}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.status
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.status
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } disabled:cursor-not-allowed disabled:bg-gray-100`}
+                  } disabled:cursor-not-allowed disabled:bg-gray-100`}
               >
                 <option value="DRAFT">
                   Draft

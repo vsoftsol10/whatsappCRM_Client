@@ -255,14 +255,28 @@ export default function CreateCampaignModal({
 
       onClose();
     } catch (error) {
-      console.error(error);
+      console.error("Create campaign failed:", error);
 
+      // =========================
+      // PLAN LIMIT REACHED
+      // =========================
+      if (error?.response?.status === 403) {
+        setSubmitting(false);
+
+        // Close modal automatically
+        onClose();
+
+        return;
+      }
+
+      // =========================
+      // OTHER ERRORS
+      // =========================
       toast.error(
         error?.response?.data?.message ||
-          "Unable to create campaign."
+        "Unable to create campaign."
       );
 
-      // Allow user to try again
       setSubmitting(false);
     }
   };
@@ -315,11 +329,10 @@ export default function CreateCampaignModal({
               type="button"
               onClick={handleClose}
               disabled={submitting}
-              className={`rounded-full p-2 transition ${
-                submitting
+              className={`rounded-full p-2 transition ${submitting
                   ? "cursor-not-allowed opacity-50"
                   : "hover:bg-[#128C7E]"
-              }`}
+                }`}
             >
               <X size={22} />
             </button>
@@ -549,11 +562,10 @@ export default function CreateCampaignModal({
                       {customers.map((customer) => (
                         <label
                           key={customer.id}
-                          className={`flex items-center gap-3 rounded-lg p-2 transition ${
-                            submitting
+                          className={`flex items-center gap-3 rounded-lg p-2 transition ${submitting
                               ? "cursor-not-allowed opacity-60"
                               : "cursor-pointer hover:bg-white"
-                          }`}
+                            }`}
                         >
                           <input
                             type="checkbox"
@@ -627,11 +639,10 @@ export default function CreateCampaignModal({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className={`rounded-lg px-6 py-3 font-semibold text-white transition ${
-                    submitting
+                  className={`rounded-lg px-6 py-3 font-semibold text-white transition ${submitting
                       ? "cursor-not-allowed bg-gray-400"
                       : "bg-[#25D366] hover:bg-[#128C7E]"
-                  }`}
+                    }`}
                 >
                   {submitting ? (
                     <span className="flex items-center gap-2">

@@ -117,9 +117,20 @@ function AddCustomer({ onClose, onSuccess }) {
     } catch (error) {
       console.error("Create customer error:", error);
 
+      // 403 errors are already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        setLoading(false);
+
+        // Automatically close the modal
+        onClose();
+
+        return;
+      }
+
+      // Handle other errors normally
       toast.error(
-        error.response?.data?.message ||
-          "Failed to create customer"
+        error?.response?.data?.message ||
+        "Failed to create customer"
       );
 
       // Allow user to try again
@@ -179,11 +190,10 @@ function AddCustomer({ onClose, onSuccess }) {
               onChange={handleChange}
               disabled={loading}
               placeholder="Enter customer name"
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.name
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.name
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.name && (
@@ -207,11 +217,10 @@ function AddCustomer({ onClose, onSuccess }) {
               onChange={handleChange}
               disabled={loading}
               placeholder="Enter phone number"
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.phone
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.phone
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.phone && (
@@ -237,11 +246,10 @@ function AddCustomer({ onClose, onSuccess }) {
               onChange={handleChange}
               disabled={loading}
               placeholder="Enter email"
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.email
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.email
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.email && (
@@ -265,11 +273,10 @@ function AddCustomer({ onClose, onSuccess }) {
               onChange={handleChange}
               disabled={loading}
               placeholder="Enter company name"
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.company
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.company
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.company && (
@@ -325,11 +332,10 @@ function AddCustomer({ onClose, onSuccess }) {
               value={formData.status}
               onChange={handleChange}
               disabled={loading}
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.status
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.status
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             >
               <option value="ACTIVE">
                 ACTIVE

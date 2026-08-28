@@ -100,53 +100,56 @@ export default function CreateTaskModal({
   // HANDLE SUBMIT
   // ============================
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    // Prevent double submission
-    if (isSubmitting) return;
+  if (isSubmitting) return;
 
-    // Validate form
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    try {
-      // Disable button immediately
-      setIsSubmitting(true);
+  try {
+    setIsSubmitting(true);
 
-      await addTask(formData);
+    await addTask(formData);
 
-      toast.success("Task created successfully!");
+    toast.success("Task created successfully!");
 
-      // Reset form
-      setFormData({
-        title: "",
-        description: "",
-        priority: "MEDIUM",
-        dueDate: "",
-        assignedToId: "",
-      });
+    setFormData({
+      title: "",
+      description: "",
+      priority: "MEDIUM",
+      dueDate: "",
+      assignedToId: "",
+    });
 
-      setErrors({});
+    setErrors({});
 
-      // Automatically close modal
+    // Close after successful creation
+    onClose();
+
+  } catch (error) {
+    console.error(
+      "Failed to create task:",
+      error
+    );
+
+    // Inactive company
+    if (error?.response?.status === 403) {
+      // apiClient already showed the toast
       onClose();
-
-    } catch (error) {
-      console.error(
-        "Failed to create task:",
-        error
-      );
-
-      toast.error(
-        error?.response?.data?.message ||
-        "Failed to create task"
-      );
-
-    } finally {
-      // Enable button again
-      setIsSubmitting(false);
+      return;
     }
-  };
+
+    // Other errors
+    toast.error(
+      error?.response?.data?.message ||
+        "Failed to create task"
+    );
+
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // ============================
   // CLOSE MODAL
@@ -180,11 +183,10 @@ export default function CreateTaskModal({
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className={`p-2 rounded-full transition ${
-                isSubmitting
+              className={`p-2 rounded-full transition ${isSubmitting
                   ? "opacity-50 cursor-not-allowed"
                   : "hover:bg-[#128C7E]"
-              }`}
+                }`}
             >
               <X size={22} />
             </button>
@@ -213,15 +215,13 @@ export default function CreateTaskModal({
                 value={formData.title}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.title
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.title
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.title && (
@@ -247,15 +247,13 @@ export default function CreateTaskModal({
                 value={formData.description}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.description
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.description
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.description && (
@@ -280,15 +278,13 @@ export default function CreateTaskModal({
                 value={formData.priority}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.priority
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.priority
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="LOW">
                   Low
@@ -327,15 +323,13 @@ export default function CreateTaskModal({
                 value={formData.dueDate}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.dueDate
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.dueDate
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
 
               {errors.dueDate && (
@@ -360,15 +354,13 @@ export default function CreateTaskModal({
                 value={formData.assignedToId}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.assignedToId
+                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.assignedToId
                     ? "border-red-500"
                     : "border-gray-300 focus:border-[#25D366]"
-                } ${
-                  isSubmitting
+                  } ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
 
                 <option value="">
@@ -404,11 +396,10 @@ export default function CreateTaskModal({
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${
-                  isSubmitting
+                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${isSubmitting
                     ? "opacity-50 cursor-not-allowed"
                     : "hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 Cancel
               </button>
@@ -418,11 +409,10 @@ export default function CreateTaskModal({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg text-gray-800 font-semibold transition flex items-center justify-center gap-2 ${
-                  isSubmitting
+                className={`px-6 py-3 rounded-lg text-gray-800 font-semibold transition flex items-center justify-center gap-2 ${isSubmitting
                     ? "bg-gray-400 cursor-not-allowed"
                     : "bg-[#25D366] hover:bg-[#128C7E]"
-                }`}
+                  }`}
               >
 
                 {isSubmitting ? (

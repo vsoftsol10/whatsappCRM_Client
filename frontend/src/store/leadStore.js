@@ -31,8 +31,9 @@ const useLeadStore = create((set) => ({
     } catch (error) {
       set({
         error:
-          error.response?.data?.message ||
-          "Failed to fetch leads",
+          error.response?.status === 403
+            ? null
+            : error.response?.data?.message || "Failed to fetch leads",
         isLoading: false,
       });
     }
@@ -127,36 +128,36 @@ const useLeadStore = create((set) => ({
   },
 
   // ================= CONVERT LEAD =================
-convertLead: async (id) => {
-  set({
-    isLoading: true,
-    error: null,
-  });
+  convertLead: async (id) => {
+    set({
+      isLoading: true,
+      error: null,
+    });
 
-  try {
-    const response = await convertLeadToCustomer(id);
+    try {
+      const response = await convertLeadToCustomer(id);
 
-    set((state) => ({
-      leads: state.leads.map((lead) =>
-        lead.id === id
-          ? {
+      set((state) => ({
+        leads: state.leads.map((lead) =>
+          lead.id === id
+            ? {
               ...lead,
               isConverted: true,
             }
-          : lead
-      ),
-      isLoading: false,
-    }));
+            : lead
+        ),
+        isLoading: false,
+      }));
 
-    return response;
-  } catch (error) {
-    set({
-      isLoading: false,
-    });
+      return response;
+    } catch (error) {
+      set({
+        isLoading: false,
+      });
 
-    throw error;
-  }
-},
+      throw error;
+    }
+  },
 
   // ================= DELETE LEAD =================
   removeLead: async (id) => {

@@ -184,14 +184,22 @@ function EditCustomer({
       // Close automatically
       onClose();
     } catch (error) {
-      console.error(
-        "Update customer error:",
-        error
-      );
+      console.error("Update customer error:", error);
 
+      // 403 errors are already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        setLoading(false);
+
+        // Automatically close the modal
+        onClose();
+
+        return;
+      }
+
+      // Handle other errors normally
       toast.error(
-        error.response?.data?.message ||
-          "Failed to update customer"
+        error?.response?.data?.message ||
+        "Failed to update customer"
       );
 
       // Allow retry
@@ -276,11 +284,10 @@ function EditCustomer({
               value={formData.name}
               onChange={handleChange}
               disabled={loading}
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.name
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.name
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.name && (
@@ -303,11 +310,10 @@ function EditCustomer({
               value={formData.phone}
               onChange={handleChange}
               disabled={loading}
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.phone
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.phone
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.phone && (
@@ -332,11 +338,10 @@ function EditCustomer({
               value={formData.email}
               onChange={handleChange}
               disabled={loading}
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.email
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.email
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.email && (
@@ -360,11 +365,10 @@ function EditCustomer({
               onChange={handleChange}
               disabled={loading}
               placeholder="Enter company name"
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.company
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.company
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             />
 
             {errors.company && (
@@ -420,11 +424,10 @@ function EditCustomer({
               value={formData.status}
               onChange={handleChange}
               disabled={loading}
-              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                errors.status
+              className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.status
                   ? "border-red-500"
                   : "border-gray-300 focus:border-[#25D366]"
-              }`}
+                }`}
             >
               <option value="ACTIVE">
                 ACTIVE

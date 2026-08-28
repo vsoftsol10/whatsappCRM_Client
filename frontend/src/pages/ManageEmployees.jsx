@@ -24,6 +24,7 @@ import toast from "react-hot-toast";
 import Pagination from "../components/common/Pagination";
 import ConfirmModal from "../components/common/ConfirmModal";
 import EditEmployee from "../pages/EditEmployee";
+import AddEmployeeModal from "../components/employee/AddEmployeeModal";
 
 const ManageEmployees = () => {
   const navigate = useNavigate();
@@ -42,6 +43,9 @@ const ManageEmployees = () => {
 
   const [editingEmployeeId, setEditingEmployeeId] =
     useState(null);
+
+  const [showAddEmployeeModal, setShowAddEmployeeModal] =
+    useState(false);
 
   const itemsPerPage = 10;
 
@@ -187,7 +191,7 @@ const ManageEmployees = () => {
         </div>
 
         <button
-          onClick={() => navigate("/employees/add")}
+          onClick={() => setShowAddEmployeeModal(true)}
           className="crm-primary-button w-full sm:w-auto"
         >
           <FiUserPlus />
@@ -280,6 +284,12 @@ const ManageEmployees = () => {
         <EditEmployee
           employeeId={editingEmployeeId}
           onClose={() => setEditingEmployeeId(null)}
+          onSuccess={fetchEmployees}
+        />
+      )}
+      {showAddEmployeeModal && (
+        <AddEmployeeModal
+          onClose={() => setShowAddEmployeeModal(false)}
           onSuccess={fetchEmployees}
         />
       )}

@@ -128,61 +128,52 @@ export default function CreateCampaignModal({
   // HANDLE SUBMIT
   // ==================================================
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    // IMPORTANT:
-    // If already updating, don't allow another request.
-    if (isSubmitting) {
-      return;
-    }
+  if (isSubmitting) {
+    return;
+  }
 
-    // Basic validation
-    if (!formData.name.trim()) {
-      toast.error("Campaign name is required.");
-      return;
-    }
+  if (!formData.name.trim()) {
+    toast.error("Campaign name is required.");
+    return;
+  }
 
-    if (!formData.messageContent.trim()) {
-      toast.error("Campaign message is required.");
-      return;
-    }
+  if (!formData.messageContent.trim()) {
+    toast.error("Campaign message is required.");
+    return;
+  }
 
-    if (!campaign?.id) {
-      toast.error("Campaign ID is missing.");
-      return;
-    }
+  if (!campaign?.id) {
+    toast.error("Campaign ID is missing.");
+    return;
+  }
 
-    try {
-      // IMPORTANT:
-      // Set this BEFORE the API request.
-      // This immediately changes the button to "Updating..."
-      setIsSubmitting(true);
+  try {
+    setIsSubmitting(true);
 
-      await editCampaign(campaign.id, {
-        ...formData,
-        image,
-      });
+    await editCampaign(campaign.id, {
+      ...formData,
+      image,
+    });
 
-      toast.success("Campaign updated successfully!");
+    toast.success("Campaign updated successfully!");
 
-      // Reset form
-      resetForm();
+    resetForm();
 
-      // Close modal only after successful update
-      onClose();
-    } catch (error) {
-      console.error("Failed to update campaign:", error);
+    onClose();
+  } catch (error) {
+    console.error("Failed to update campaign:", error);
 
-      toast.error(
-        error?.response?.data?.message ||
-          "Failed to update campaign. Please try again."
-      );
+    // Don't show another toast here.
+    // apiClient interceptor already handles 403 errors.
 
-      // Allow user to try again if request failed
-      setIsSubmitting(false);
-    }
-  };
+    setIsSubmitting(false);
+
+    onClose();
+  }
+};
 
   // ==================================================
   // CLOSE MODAL
@@ -233,11 +224,10 @@ export default function CreateCampaignModal({
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className={`p-2 rounded-full transition ${
-                isSubmitting
+              className={`p-2 rounded-full transition ${isSubmitting
                   ? "cursor-not-allowed opacity-50"
                   : "hover:bg-[#128C7E]"
-              }`}
+                }`}
             >
               <X size={22} />
             </button>
@@ -271,11 +261,10 @@ export default function CreateCampaignModal({
                 onChange={handleChange}
                 required
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${
-                  isSubmitting
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
             </div>
 
@@ -294,11 +283,10 @@ export default function CreateCampaignModal({
                 value={formData.type}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${
-                  isSubmitting
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="PROMOTIONAL">
                   Promotional
@@ -336,11 +324,10 @@ export default function CreateCampaignModal({
                 onChange={handleChange}
                 required
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none resize-none focus:border-[#25D366] ${
-                  isSubmitting
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none resize-none focus:border-[#25D366] ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
             </div>
 
@@ -359,11 +346,10 @@ export default function CreateCampaignModal({
                 value={formData.scheduledAt}
                 onChange={handleChange}
                 disabled={isSubmitting}
-                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${
-                  isSubmitting
+                className={`w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] ${isSubmitting
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
-                }`}
+                  }`}
               />
             </div>
 
@@ -393,11 +379,10 @@ export default function CreateCampaignModal({
                   onClick={() =>
                     fileInputRef.current?.click()
                   }
-                  className={`flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#25D366] bg-green-50 p-8 ${
-                    isSubmitting
+                  className={`flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#25D366] bg-green-50 p-8 ${isSubmitting
                       ? "cursor-not-allowed opacity-50"
                       : "hover:bg-green-100"
-                  }`}
+                    }`}
                 >
                   <div className="text-5xl">
                     🖼️
@@ -434,11 +419,10 @@ export default function CreateCampaignModal({
                       onClick={() =>
                         fileInputRef.current?.click()
                       }
-                      className={`rounded-lg bg-[#25D366] px-4 py-2 text-white ${
-                        isSubmitting
+                      className={`rounded-lg bg-[#25D366] px-4 py-2 text-white ${isSubmitting
                           ? "cursor-not-allowed opacity-50"
                           : "hover:bg-[#128C7E]"
-                      }`}
+                        }`}
                     >
                       Change Image
                     </button>
@@ -447,11 +431,10 @@ export default function CreateCampaignModal({
                       type="button"
                       disabled={isSubmitting}
                       onClick={removeImage}
-                      className={`rounded-lg bg-red-500 px-4 py-2 text-white ${
-                        isSubmitting
+                      className={`rounded-lg bg-red-500 px-4 py-2 text-white ${isSubmitting
                           ? "cursor-not-allowed opacity-50"
                           : "hover:bg-red-600"
-                      }`}
+                        }`}
                     >
                       Remove
                     </button>
@@ -475,11 +458,10 @@ export default function CreateCampaignModal({
                 type="button"
                 onClick={handleClose}
                 disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${
-                  isSubmitting
+                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${isSubmitting
                     ? "cursor-not-allowed opacity-50"
                     : "hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 Cancel
               </button>
@@ -489,11 +471,10 @@ export default function CreateCampaignModal({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg bg-[#25D366] text-gray-800 font-semibold transition flex items-center justify-center min-w-[160px] ${
-                  isSubmitting
+                className={`px-6 py-3 rounded-lg bg-[#25D366] text-gray-800 font-semibold transition flex items-center justify-center min-w-[160px] ${isSubmitting
                     ? "cursor-not-allowed opacity-70"
                     : "hover:bg-[#128C7E]"
-                }`}
+                  }`}
               >
                 {isSubmitting ? (
                   <>

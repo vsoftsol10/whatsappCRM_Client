@@ -31,7 +31,7 @@ import Templates from "./pages/Templates";
 import AddCustomer from "./pages/AddCustomer";
 // import EditCustomer from "./pages/EditCustomer";
 
-import AddEmployee from "./pages/AddEmployee";
+
 import EditEmployee from "./pages/EditEmployee";
 import ViewEmployee from "./pages/ViewEmployee";
 
@@ -95,11 +95,7 @@ function App() {
               path="/customers/add"
               element={<AddCustomer />}
             />
-{/* 
-            <Route
-              path="/customers/edit/:id"
-              element={<EditCustomer />}
-            /> */}
+
 
             <Route
               path="/customers/:id"
@@ -111,9 +107,7 @@ function App() {
               element={<CampaignDetails />}
             />
 
-            {/* <Route path="/deals" element={<DealsPage />} /> */}
 
-            {/* <Route path="/products" element={<Products />} /> */}
 
             <Route path="/leads" element={<Leads />} />
 
@@ -162,10 +156,6 @@ function App() {
                 element={<ManageEmployees />}
               />
 
-              <Route
-                path="/employees/add"
-                element={<AddEmployee />}
-              />
 
               <Route
                 path="/employees/edit/:id"
