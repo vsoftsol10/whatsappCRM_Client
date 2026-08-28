@@ -60,7 +60,7 @@ export default function Lead() {
   const [currentPage, setCurrentPage] =
     useState(1);
 
-  const itemsPerPage = 9;
+  const itemsPerPage = 10;
 
   useEffect(() => {
     fetchLeads();
@@ -181,6 +181,21 @@ export default function Lead() {
       await removeLead(id);
 
       toast.success("Lead deleted successfully");
+
+      // Check whether the current page becomes empty
+      const remainingItems = filteredLeads.length - 1;
+
+      const newTotalPages = Math.ceil(
+        remainingItems / itemsPerPage
+      );
+
+      if (
+        currentPage > newTotalPages &&
+        newTotalPages > 0
+      ) {
+        setCurrentPage(newTotalPages);
+      }
+
     } catch (error) {
       console.error(error);
 
@@ -260,8 +275,8 @@ export default function Lead() {
             <button
               onClick={() => setViewMode("grid")}
               className={`p-2 transition ${viewMode === "grid"
-                  ? "bg-[#25D366]"
-                  : "hover:bg-gray-100"
+                ? "bg-[#25D366]"
+                : "hover:bg-gray-100"
                 }`}
             >
               <LayoutGrid size={18} />
@@ -270,8 +285,8 @@ export default function Lead() {
             <button
               onClick={() => setViewMode("list")}
               className={`p-2 transition ${viewMode === "list"
-                  ? "bg-[#25D366]"
-                  : "hover:bg-gray-100"
+                ? "bg-[#25D366]"
+                : "hover:bg-gray-100"
                 }`}
             >
               <List size={18} />

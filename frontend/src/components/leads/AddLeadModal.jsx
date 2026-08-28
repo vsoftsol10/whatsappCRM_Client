@@ -103,9 +103,11 @@ export default function AddLeadModal({
       setFormData(initialFormData);
       setErrors({});
 
+      // IMPORTANT: reset loading before closing
+      setLoading(false);
+
       // Automatically close modal
       onClose();
-
     } catch (error) {
       console.error("Create lead error:", error);
 
