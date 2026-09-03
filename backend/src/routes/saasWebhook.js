@@ -11,6 +11,13 @@ const {
 } = require("../helpers/messageHelper");
 
 // ============================================
+// TEST ROUTE
+// ============================================
+router.get("/test", (req, res) => {
+  res.status(200).send("SAAS WEBHOOK ROUTE IS WORKING");
+});
+
+// ============================================
 // META WEBHOOK VERIFICATION
 // ============================================
 router.get("/", (req, res) => {
