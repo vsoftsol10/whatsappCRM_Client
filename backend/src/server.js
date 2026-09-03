@@ -103,6 +103,8 @@ const planRoutes = require("./routes/planRoutes");
 const upgradeRequestRoutes = require("./routes/upgradeRequestRoutes");
 const supportTicketRoutes = require("./routes/supportTicketRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
+const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
+
 
 const app = express();
 
@@ -131,11 +133,21 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/subscriptions", planRoutes);
 app.use("/api/upgrade-requests", upgradeRequestRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
+const saasWebhookRoutes = require("./routes/saasWebhook");
+app.use(
+  "/api/whatsapp/accounts",
+  whatsappAccountRoutes
+);
 
 // Test route
 app.get("/", (req, res) => {
   res.send("Backend is running...");
 });
+
+app.use(
+  "/api/saas/webhook",
+  saasWebhookRoutes
+);
 
 app.use(
   "/api/support-tickets",
@@ -146,4 +158,5 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
 });

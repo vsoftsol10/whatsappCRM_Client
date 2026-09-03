@@ -19,6 +19,7 @@ export default function Templates() {
     fetchTemplates,
     removeTemplate,
     editTemplate,
+    submitTemplateForApproval,
     isLoading,
   } = useTemplateStore();
 
@@ -32,7 +33,7 @@ export default function Templates() {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const [showSendModal, setShowSendModal] = useState(false);
-  
+
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -119,6 +120,28 @@ export default function Templates() {
     }
   };
 
+
+  const handleSubmitForApproval = async (id) => {
+    try {
+      await submitTemplateForApproval(id);
+
+      toast.success(
+        "Template submitted for approval successfully!"
+      );
+    } catch (error) {
+      console.error(
+        "SUBMIT FOR APPROVAL ERROR",
+        error
+      );
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to submit template for approval."
+      );
+    }
+  };
+
+
   const handlePreview = (template) => {
     setSelectedTemplate(template);
     setShowPreviewModal(true);
@@ -204,21 +227,22 @@ export default function Templates() {
                   onDelete={handleDelete}
                   onPreview={handlePreview}
                   onSend={handleSend}
+                  onSubmitForApproval={handleSubmitForApproval}
                 />
               )
             )}
           </div>
         )}
 
-        {filteredTemplates.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredTemplates.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-          />
-        )}
+      {filteredTemplates.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredTemplates.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       {/* MODAL */}
 

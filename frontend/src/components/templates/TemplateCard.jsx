@@ -1,9 +1,11 @@
+
 import {
   FileText,
   Eye,
   SquarePen,
   Send,
   Trash2,
+  ClipboardCheck,
 } from "lucide-react";
 
 export default function TemplateCard({
@@ -12,10 +14,13 @@ export default function TemplateCard({
   onDelete,
   onPreview,
   onSend,
+  onSubmitForApproval,
 }) {
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString("en-IN");
   };
+
+  const isDraft = template.status === "DRAFT";
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
@@ -42,10 +47,14 @@ export default function TemplateCard({
 
         <span
           className={`px-4 py-1 rounded-full text-xs font-semibold ${
-            template.status === "ACTIVE"
+            template.status === "APPROVED"
               ? "bg-green-100 text-green-700"
-              : template.status === "INACTIVE"
+              : template.status === "PENDING"
+              ? "bg-yellow-100 text-yellow-700"
+              : template.status === "REJECTED"
               ? "bg-red-100 text-red-700"
+              : template.status === "DRAFT"
+              ? "bg-gray-100 text-gray-700"
               : "bg-gray-100 text-gray-700"
           }`}
         >
@@ -86,7 +95,11 @@ export default function TemplateCard({
       <div className="border-t" />
 
       {/* ACTIONS */}
-      <div className="grid grid-cols-4 text-center py-3">
+      <div
+        className={`grid ${
+          isDraft ? "grid-cols-5" : "grid-cols-4"
+        } text-center py-3`}
+      >
         {/* Preview */}
         <button
           onClick={() =>
@@ -95,8 +108,9 @@ export default function TemplateCard({
           className="flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition"
         >
           <Eye size={22} />
+
           <span className="text-sm">
-            view
+            View
           </span>
         </button>
 
@@ -105,22 +119,50 @@ export default function TemplateCard({
           onClick={() =>
             onEdit?.(template)
           }
-          className="flex flex-col items-center gap-1 text-amber-500 hover:text-amber-600 transition"
+          disabled={!isDraft}
+          className={`flex flex-col items-center gap-1 transition ${
+            isDraft
+              ? "text-amber-500 hover:text-amber-600"
+              : "text-gray-300 cursor-not-allowed"
+          }`}
         >
           <SquarePen size={22} />
+
           <span className="text-sm">
             Edit
           </span>
         </button>
+
+        {/* Submit For Approval */}
+        {isDraft && (
+          <button
+            onClick={() =>
+              onSubmitForApproval?.(template.id)
+            }
+            className="flex flex-col items-center gap-1 text-purple-600 hover:text-purple-700 transition"
+          >
+            <ClipboardCheck size={22} />
+
+            <span className="text-sm">
+              Submit
+            </span>
+          </button>
+        )}
 
         {/* Send */}
         <button
           onClick={() =>
             onSend?.(template)
           }
-          className="flex flex-col items-center gap-1 text-green-600 hover:text-green-700 transition"
+          disabled={template.status !== "APPROVED"}
+          className={`flex flex-col items-center gap-1 transition ${
+            template.status === "APPROVED"
+              ? "text-green-600 hover:text-green-700"
+              : "text-gray-300 cursor-not-allowed"
+          }`}
         >
           <Send size={22} />
+
           <span className="text-sm">
             Send
           </span>
@@ -134,6 +176,7 @@ export default function TemplateCard({
           className="flex flex-col items-center gap-1 text-red-600 hover:text-red-700 transition"
         >
           <Trash2 size={22} />
+
           <span className="text-sm">
             Delete
           </span>
@@ -142,3 +185,4 @@ export default function TemplateCard({
     </div>
   );
 }
+

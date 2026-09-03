@@ -1,5 +1,11 @@
 import { Link } from "react-router-dom";
-import { Lock, ChevronRight } from "lucide-react";
+import {
+  Lock,
+  ChevronRight,
+  MessageCircle,
+} from "lucide-react";
+
+import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 
 function SecuritySettings() {
   return (
@@ -17,7 +23,7 @@ function SecuritySettings() {
         </p>
       </div>
 
-      {/* Security Card */}
+      {/* Password & Security Card */}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
 
@@ -56,6 +62,55 @@ function SecuritySettings() {
 
             <ChevronRight size={18} />
           </Link>
+
+        </div>
+
+      </div>
+
+
+      {/* WhatsApp Business Card */}
+
+      <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+
+          <div className="flex items-start gap-4">
+
+            <div className="rounded-2xl bg-[#DCF8C6] p-4">
+
+              <MessageCircle
+                size={28}
+                className="text-[#25D366]"
+              />
+
+            </div>
+
+            <div>
+
+              <h2 className="text-xl font-bold text-slate-900">
+                WhatsApp Business
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Connect your WhatsApp Business Account to send and receive
+                WhatsApp messages through the CRM.
+              </p>
+
+              <div className="mt-3 flex items-center gap-2">
+
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+
+                <span className="text-sm font-medium text-slate-500">
+                  Not Connected
+                </span>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <ConnectWhatsApp />
 
         </div>
 

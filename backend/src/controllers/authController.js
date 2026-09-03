@@ -407,6 +407,11 @@ const forgotPassword = async (req, res) => {
     const resetLink =
       `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
+    console.log("========== RESET PASSWORD ==========");
+    console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+    console.log("RESET TOKEN:", resetToken);
+    console.log("RESET LINK:", resetLink);
+
     await sendPasswordResetEmail(
       normalizedEmail,
       resetLink

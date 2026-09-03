@@ -1,62 +1,68 @@
+
 import apiClient from "./apiClient";
 
+// ============================================================
+// GET ALL TEMPLATES
+// ============================================================
 
-// ================= GET ALL TEMPLATES =================
-export const getTemplates = async () => {
-
+export const getTemplates = async (params = {}) => {
   const response = await apiClient.get(
-    "/api/templates"
+    "/api/templates",
+    {
+      params,
+    }
   );
 
   return response.data;
-
 };
 
+// ============================================================
+// GET SINGLE TEMPLATE
+// ============================================================
 
-
-// ================= GET SINGLE TEMPLATE =================
 export const getTemplateById = async (id) => {
-
   const response = await apiClient.get(
     `/api/templates/${id}`
   );
 
   return response.data;
-
 };
 
-// ================= GET TEMPLATE RECIPIENTS =================
-export const getTemplateRecipients = async (id) => {
+// ============================================================
+// GET TEMPLATE RECIPIENTS
+// ============================================================
 
+export const getTemplateRecipients = async (id) => {
   const response = await apiClient.get(
     `/api/templates/${id}/recipients`
   );
 
   return response.data;
-
 };
 
+// ============================================================
+// CREATE TEMPLATE
+// ============================================================
 
-// ================= CREATE TEMPLATE =================
 export const createTemplate = async (
   templateData
 ) => {
-
   const response = await apiClient.post(
     "/api/templates",
     templateData
   );
 
   return response.data;
-
 };
 
-// ================= GENERATE TEMPLATE WITH AI =================
+// ============================================================
+// GENERATE TEMPLATE WITH AI
+// ============================================================
+
 export const generateTemplateWithAI = async (
   topic,
   tone = "Professional"
 ) => {
-
   const response = await apiClient.post(
     "/api/templates/generate",
     {
@@ -66,69 +72,65 @@ export const generateTemplateWithAI = async (
   );
 
   return response.data;
-
 };
 
-// ================= UPDATE TEMPLATE =================
+// ============================================================
+// UPDATE TEMPLATE
+// ============================================================
+
 export const updateTemplate = async (
   id,
   templateData
 ) => {
-
   const response = await apiClient.put(
     `/api/templates/${id}`,
     templateData
   );
 
   return response.data;
-
 };
 
+// ============================================================
+// DELETE TEMPLATE
+// ============================================================
 
-
-// ================= DELETE TEMPLATE =================
-export const deleteTemplate = async (
-  id
-) => {
-
+export const deleteTemplate = async (id) => {
   const response = await apiClient.delete(
     `/api/templates/${id}`
   );
 
   return response.data;
-
 };
 
+// ============================================================
+// SEND TEMPLATE
+// ============================================================
 
-
-// ================= SEND TEMPLATE =================
 export const sendTemplate = async (
   templateId,
   customerIds
 ) => {
-
-
-  console.log(
-    "SEND TEMPLATE REQUEST:",
-    {
-      templateId,
-      customerIds
-    }
-  );
-
-
   const response = await apiClient.post(
-
     "/api/templates/send",
-
     {
       templateId,
-      customerIds
+      customerIds,
     }
-
   );
-
 
   return response.data;
-
 };
+
+
+// ============================================================
+// SUBMIT TEMPLATE FOR APPROVAL
+// ============================================================
+
+export const submitTemplateForApproval = async (id) => {
+  const response = await apiClient.post(
+    `/api/templates/${id}/submit`
+  );
+
+  return response.data;
+};
+

@@ -2,59 +2,151 @@
 const prisma = require("../config/prisma");
 
 const {
-  sendTextMessage,
-  sendImageMessage,
   sendTemplateMessage,
   sendCampaignImageTemplate,
 } = require("../services/whatsappService");
+
 const { generateCampaign } = require("../services/geminiService");
+
 const { notifyAdmins } = require("../services/notificationService");
+
 const {
   uploadCampaignImage,
 } = require("../services/cloudinaryService");
+
 const {
   getOrCreateConversation,
 } = require("../helpers/conversationHelper");
+
 const { logAction } = require("../services/auditLogService");
+
+
 // =====================================================
 // CREATE CAMPAIGN
 // =====================================================
+
 exports.createCampaign = async (req, res) => {
   try {
     let {
       name,
       type,
+      templateId,
       messageContent,
       scheduledAt,
       customerIds,
     } = req.body;
 
-    // =============================
-    // Convert customerIds to array
-    // =============================
+    const companyId = req.user.companyId;
+    const createdById = req.user.userId;
+
+    // =====================================================
+    // NORMALIZE CUSTOMER IDS
+    // =====================================================
+
     if (!customerIds) {
       customerIds = [];
     } else if (!Array.isArray(customerIds)) {
       customerIds = [customerIds];
     }
 
-    // Convert all ids to Number
-    customerIds = customerIds.map((id) => String(id));
+    customerIds = customerIds
+      .filter(Boolean)
+      .map((id) => String(id));
 
-    console.log("Customer IDs:", customerIds);
+    // Remove duplicates
+    customerIds = [...new Set(customerIds)];
 
-    console.log("Customer IDs:", customerIds);
-    console.log("Is Array:", Array.isArray(customerIds));
-    if (!name || !messageContent) {
+    // =====================================================
+    // BASIC VALIDATION
+    // =====================================================
+
+    if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Campaign name and message are required.",
+        message: "Campaign name is required.",
       });
     }
 
-    // ============================
-    // Upload Image to Cloudinary
-    // ============================
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: "Campaign type is required.",
+      });
+    }
+
+    // =====================================================
+    // TEMPLATE VALIDATION
+    // =====================================================
+
+    let template = null;
+
+    if (templateId) {
+      template = await prisma.template.findFirst({
+        where: {
+          id: String(templateId),
+          companyId,
+        },
+      });
+
+      if (!template) {
+        return res.status(404).json({
+          success: false,
+          message: "Selected template was not found.",
+        });
+      }
+
+      // Campaigns are business initiated WhatsApp messages.
+      // Only approved templates should be used for sending.
+      if (template.status !== "APPROVED") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Only approved WhatsApp templates can be used for campaigns.",
+        });
+      }
+    }
+
+    // =====================================================
+    // CUSTOMER VALIDATION
+    // =====================================================
+
+    let validCustomerIds = [];
+
+    if (customerIds.length > 0) {
+      const customers = await prisma.customer.findMany({
+        where: {
+          id: {
+            in: customerIds,
+          },
+          companyId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      validCustomerIds = customers.map((customer) =>
+        String(customer.id)
+      );
+
+      const invalidCustomerIds = customerIds.filter(
+        (id) => !validCustomerIds.includes(id)
+      );
+
+      if (invalidCustomerIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "One or more selected customers do not belong to your company.",
+          invalidCustomerIds,
+        });
+      }
+    }
+
+    // =====================================================
+    // UPLOAD CAMPAIGN IMAGE
+    // =====================================================
+
     let imageUrl = null;
 
     if (req.file) {
@@ -63,26 +155,67 @@ exports.createCampaign = async (req, res) => {
       imageUrl = uploadResult?.imageUrl || null;
     }
 
+    // =====================================================
+    // DETERMINE STATUS
+    // =====================================================
+
+    let campaignStatus = "DRAFT";
+
+    if (scheduledAt) {
+      const scheduleDate = new Date(scheduledAt);
+
+      if (isNaN(scheduleDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid scheduled date.",
+        });
+      }
+
+      if (scheduleDate <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: "Scheduled time must be in the future.",
+        });
+      }
+
+      campaignStatus = "SCHEDULED";
+    }
+
+    // =====================================================
+    // CREATE CAMPAIGN
+    // =====================================================
+
     const campaign = await prisma.campaign.create({
       data: {
-        companyId: req.user.companyId,
+        companyId,
 
-        name,
+        name: name.trim(),
+
         type,
-        messageContent,
 
-        imageUrl,
+        templateId: template
+          ? template.id
+          : null,
+
+        messageContent:
+          messageContent?.trim() || null,
+
+        status: campaignStatus,
 
         scheduledAt: scheduledAt
           ? new Date(scheduledAt)
           : null,
 
-        audienceCount: customerIds.length,
+        audienceCount: validCustomerIds.length,
 
-        createdById: req.user.userId,
+        totalRecipients: validCustomerIds.length,
+
+        imageUrl,
+
+        createdById,
 
         recipients: {
-          create: customerIds.map((customerId) => ({
+          create: validCustomerIds.map((customerId) => ({
             customerId,
           })),
         },
@@ -97,6 +230,18 @@ exports.createCampaign = async (req, res) => {
           },
         },
 
+        template: {
+          select: {
+            id: true,
+            name: true,
+            language: true,
+            category: true,
+            messageType: true,
+            content: true,
+            status: true,
+          },
+        },
+
         recipients: {
           include: {
             customer: true,
@@ -105,11 +250,19 @@ exports.createCampaign = async (req, res) => {
       },
     });
 
+    // =====================================================
+    // NOTIFICATION
+    // =====================================================
+
     notifyAdmins({
       title: "New Campaign",
       message: `${campaign.name} has been created.`,
       type: "CAMPAIGN",
     }).catch(console.error);
+
+    // =====================================================
+    // AUDIT LOG
+    // =====================================================
 
     logAction({
       req,
@@ -119,14 +272,19 @@ exports.createCampaign = async (req, res) => {
       entityName: campaign.name,
     });
 
+    // =====================================================
+    // RESPONSE
+    // =====================================================
+
     return res.status(201).json({
       success: true,
-      message: "Campaign created successfully.",
+      message: scheduledAt
+        ? "Campaign scheduled successfully."
+        : "Campaign created successfully.",
       data: campaign,
     });
 
   } catch (error) {
-
     console.error("Create Campaign Error:", error);
 
     return res.status(500).json({
@@ -134,22 +292,24 @@ exports.createCampaign = async (req, res) => {
       message: "Failed to create campaign.",
       error: error.message,
     });
-
   }
 };
+
 
 // =====================================================
 // GET ALL CAMPAIGNS
 // =====================================================
+
 exports.getCampaigns = async (req, res) => {
   try {
+    const companyId = req.user.companyId;
 
     const campaigns = await prisma.campaign.findMany({
       where: {
-        companyId: req.user.companyId
+        companyId,
       },
-      include: {
 
+      include: {
         createdBy: {
           select: {
             id: true,
@@ -158,18 +318,30 @@ exports.getCampaigns = async (req, res) => {
           },
         },
 
-        recipients: {
-          include: {
-            customer: true,
+        template: {
+          select: {
+            id: true,
+            name: true,
+            language: true,
+            category: true,
+            messageType: true,
+            content: true,
+            status: true,
           },
         },
 
+        // Don't load every customer for the campaign list.
+        // SaaS CRM campaign tables should use statistics instead.
+        _count: {
+          select: {
+            recipients: true,
+          },
+        },
       },
 
       orderBy: {
         createdAt: "desc",
       },
-
     });
 
     return res.status(200).json({
@@ -179,7 +351,6 @@ exports.getCampaigns = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error("Get Campaigns Error:", error);
 
     return res.status(500).json({
@@ -187,26 +358,26 @@ exports.getCampaigns = async (req, res) => {
       message: "Failed to fetch campaigns.",
       error: error.message,
     });
-
   }
 };
+
 
 // =====================================================
 // GET CAMPAIGN BY ID
 // =====================================================
+
 exports.getCampaignById = async (req, res) => {
   try {
-
     const { id } = req.params;
+    const companyId = req.user.companyId;
 
     const campaign = await prisma.campaign.findFirst({
       where: {
-        id: campaignId,
-        companyId: req.user.companyId,
+        id,
+        companyId,
       },
 
       include: {
-
         createdBy: {
           select: {
             id: true,
@@ -215,14 +386,27 @@ exports.getCampaignById = async (req, res) => {
           },
         },
 
+        template: {
+          select: {
+            id: true,
+            name: true,
+            language: true,
+            category: true,
+            messageType: true,
+            content: true,
+            status: true,
+          },
+        },
+
         recipients: {
           include: {
             customer: true,
           },
+          orderBy: {
+            createdAt: "desc",
+          },
         },
-
       },
-
     });
 
     if (!campaign) {
@@ -238,7 +422,6 @@ exports.getCampaignById = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error("Get Campaign Error:", error);
 
     return res.status(500).json({
@@ -246,28 +429,40 @@ exports.getCampaignById = async (req, res) => {
       message: "Failed to fetch campaign.",
       error: error.message,
     });
-
   }
 };
+
+
 // =====================================================
 // UPDATE CAMPAIGN
 // =====================================================
+
 exports.updateCampaign = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const companyId = req.user.companyId;
+
     const {
       name,
       type,
+      templateId,
       messageContent,
       status,
       scheduledAt,
     } = req.body;
 
-    // Find campaign
-    const existingCampaign = await prisma.campaign.findUnique({
-      where: { id },
-    });
+    // =====================================================
+    // FIND CAMPAIGN
+    // =====================================================
+
+    const existingCampaign =
+      await prisma.campaign.findFirst({
+        where: {
+          id,
+          companyId,
+        },
+      });
 
     if (!existingCampaign) {
       return res.status(404).json({
@@ -276,54 +471,181 @@ exports.updateCampaign = async (req, res) => {
       });
     }
 
-    // Keep old image
-    // Keep old image
-    let imageUrl = existingCampaign.imageUrl;
+    // =====================================================
+    // DON'T MODIFY COMPLETED CAMPAIGNS
+    // =====================================================
 
-    // Upload new image if selected
-    if (req.file) {
-      const uploadResult = await uploadCampaignImage(req.file);
-
-      imageUrl = uploadResult?.imageUrl || existingCampaign.imageUrl;
+    if (
+      existingCampaign.status === "COMPLETED" ||
+      existingCampaign.status === "SENDING"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Completed or currently sending campaigns cannot be edited.",
+      });
     }
 
-    const campaign = await prisma.campaign.update({
-      where: {
-        id,
-      },
+    // =====================================================
+    // TEMPLATE VALIDATION
+    // =====================================================
 
-      data: {
-        ...(name && { name }),
-        ...(type && { type }),
-        ...(messageContent && { messageContent }),
-        ...(status && { status }),
+    let validatedTemplateId =
+      existingCampaign.templateId;
 
-        imageUrl,
+    if (templateId !== undefined) {
+      if (!templateId) {
+        validatedTemplateId = null;
+      } else {
+        const template =
+          await prisma.template.findFirst({
+            where: {
+              id: String(templateId),
+              companyId,
+            },
+          });
 
-        scheduledAt:
-          scheduledAt !== undefined
-            ? scheduledAt
-              ? new Date(scheduledAt)
-              : null
-            : undefined,
-      },
+        if (!template) {
+          return res.status(404).json({
+            success: false,
+            message: "Selected template was not found.",
+          });
+        }
 
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+        if (template.status !== "APPROVED") {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Only approved templates can be used for campaigns.",
+          });
+        }
+
+        validatedTemplateId = template.id;
+      }
+    }
+
+    // =====================================================
+    // IMAGE
+    // =====================================================
+
+    let imageUrl = existingCampaign.imageUrl;
+
+    if (req.file) {
+      const uploadResult =
+        await uploadCampaignImage(req.file);
+
+      imageUrl =
+        uploadResult?.imageUrl ||
+        existingCampaign.imageUrl;
+    }
+
+    // =====================================================
+    // SCHEDULE
+    // =====================================================
+
+    let finalScheduledAt =
+      existingCampaign.scheduledAt;
+
+    let finalStatus =
+      status || existingCampaign.status;
+
+    if (scheduledAt !== undefined) {
+      if (scheduledAt) {
+        const scheduleDate =
+          new Date(scheduledAt);
+
+        if (isNaN(scheduleDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid scheduled date.",
+          });
+        }
+
+        if (scheduleDate <= new Date()) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Scheduled time must be in the future.",
+          });
+        }
+
+        finalScheduledAt = scheduleDate;
+        finalStatus = "SCHEDULED";
+      } else {
+        finalScheduledAt = null;
+
+        if (finalStatus === "SCHEDULED") {
+          finalStatus = "DRAFT";
+        }
+      }
+    }
+
+    // =====================================================
+    // UPDATE
+    // =====================================================
+
+    const campaign =
+      await prisma.campaign.update({
+        where: {
+          id,
         },
 
-        recipients: {
-          include: {
-            customer: true,
+        data: {
+          ...(name !== undefined && {
+            name: name.trim(),
+          }),
+
+          ...(type !== undefined && {
+            type,
+          }),
+
+          templateId: validatedTemplateId,
+
+          ...(messageContent !== undefined && {
+            messageContent:
+              messageContent?.trim() || null,
+          }),
+
+          status: finalStatus,
+
+          scheduledAt:
+            finalScheduledAt,
+
+          imageUrl,
+        },
+
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+
+          template: {
+            select: {
+              id: true,
+              name: true,
+              language: true,
+              category: true,
+              messageType: true,
+              content: true,
+              status: true,
+            },
+          },
+
+          _count: {
+            select: {
+              recipients: true,
+            },
           },
         },
-      },
-    });
+      });
+
+    // =====================================================
+    // AUDIT
+    // =====================================================
 
     logAction({
       req,
@@ -331,9 +653,23 @@ exports.updateCampaign = async (req, res) => {
       module: "CAMPAIGN",
       entityId: campaign.id,
       entityName: campaign.name,
+
       changes: {
-        before: { status: existingCampaign.status, messageContent: existingCampaign.messageContent },
-        after: { status: campaign.status, messageContent: campaign.messageContent },
+        before: {
+          status: existingCampaign.status,
+          templateId:
+            existingCampaign.templateId,
+          scheduledAt:
+            existingCampaign.scheduledAt,
+        },
+
+        after: {
+          status: campaign.status,
+          templateId:
+            campaign.templateId,
+          scheduledAt:
+            campaign.scheduledAt,
+        },
       },
     });
 
@@ -344,7 +680,6 @@ exports.updateCampaign = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error("Update Campaign Error:", error);
 
     return res.status(500).json({
@@ -352,26 +687,41 @@ exports.updateCampaign = async (req, res) => {
       message: "Failed to update campaign.",
       error: error.message,
     });
-
   }
 };
+
 
 // =====================================================
 // DELETE CAMPAIGN
 // =====================================================
+
 exports.deleteCampaign = async (req, res) => {
   try {
-
     const { id } = req.params;
 
-    const campaign = await prisma.campaign.findUnique({
-      where: { id },
-    });
+    const companyId = req.user.companyId;
+
+    const campaign =
+      await prisma.campaign.findFirst({
+        where: {
+          id,
+          companyId,
+        },
+      });
 
     if (!campaign) {
       return res.status(404).json({
         success: false,
         message: "Campaign not found.",
+      });
+    }
+
+    // Don't delete campaigns that are currently sending
+    if (campaign.status === "SENDING") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "A campaign that is currently sending cannot be deleted.",
       });
     }
 
@@ -395,7 +745,6 @@ exports.deleteCampaign = async (req, res) => {
     });
 
   } catch (error) {
-
     console.error("Delete Campaign Error:", error);
 
     return res.status(500).json({
@@ -403,16 +752,16 @@ exports.deleteCampaign = async (req, res) => {
       message: "Failed to delete campaign.",
       error: error.message,
     });
-
   }
 };
+
 
 // =====================================================
 // GENERATE AI CAMPAIGN
 // =====================================================
+
 exports.generateAICampaign = async (req, res) => {
   try {
-
     const { prompt } = req.body;
 
     if (!prompt || prompt.trim() === "") {
@@ -422,34 +771,49 @@ exports.generateAICampaign = async (req, res) => {
       });
     }
 
-    const campaign = await generateCampaign(prompt);
+    const campaign =
+      await generateCampaign(prompt);
 
     return res.status(200).json({
       success: true,
-      message: "AI campaign generated successfully.",
+      message:
+        "AI campaign generated successfully.",
       data: campaign,
     });
 
   } catch (error) {
-
-    console.error("Generate AI Campaign Error:", error);
+    console.error(
+      "Generate AI Campaign Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to generate AI campaign.",
+      message:
+        "Failed to generate campaign.",
       error: error.message,
     });
-
   }
 };
+
+
 // =====================================================
-// SEND CAMPAIGN TO CUSTOMERS
+// SEND CAMPAIGN
 // =====================================================
+
 exports.sendCampaign = async (req, res) => {
   try {
-    console.log("========== SEND CAMPAIGN ==========");
-    console.log("Request Body:", req.body);
-    const { campaignId, customerIds } = req.body;
+    console.log(
+      "========== SEND CAMPAIGN =========="
+    );
+
+    const { campaignId } = req.body;
+
+    const companyId = req.user.companyId;
+
+    // =====================================================
+    // VALIDATION
+    // =====================================================
 
     if (!campaignId) {
       return res.status(400).json({
@@ -458,18 +822,27 @@ exports.sendCampaign = async (req, res) => {
       });
     }
 
-    if (!customerIds || customerIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Please select at least one customer.",
-      });
-    }
+    // =====================================================
+    // GET CAMPAIGN
+    // =====================================================
 
-    const campaign = await prisma.campaign.findUnique({
-      where: {
-        id: campaignId,
-      },
-    });
+    const campaign =
+      await prisma.campaign.findFirst({
+        where: {
+          id: String(campaignId),
+          companyId,
+        },
+
+        include: {
+          template: true,
+
+          recipients: {
+            include: {
+              customer: true,
+            },
+          },
+        },
+      });
 
     if (!campaign) {
       return res.status(404).json({
@@ -478,223 +851,487 @@ exports.sendCampaign = async (req, res) => {
       });
     }
 
-    let successCount = 0;
+    // =====================================================
+    // VALIDATE TEMPLATE
+    // =====================================================
 
-    for (const customerId of customerIds) {
-
-      // =============================
-      // Find Customer
-      // =============================
-      const customer = await prisma.customer.findUnique({
-        where: {
-          id: customerId,
-        },
+    if (!campaign.templateId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This campaign does not have a WhatsApp template selected.",
       });
+    }
 
-      if (!customer) continue;
+    if (!campaign.template) {
+      return res.status(400).json({
+        success: false,
+        message: "Campaign template not found.",
+      });
+    }
 
-      // =============================
-      // Save Campaign Recipient
-      // =============================
-      const existingRecipient =
-        await prisma.campaignRecipient.findUnique({
+    if (campaign.template.status !== "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "The selected WhatsApp template is not approved.",
+      });
+    }
+
+    // =====================================================
+    // VALIDATE STATUS
+    // =====================================================
+
+    if (
+      campaign.status === "COMPLETED"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This campaign has already been completed.",
+      });
+    }
+
+    if (
+      campaign.status === "SENDING"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This campaign is already being sent.",
+      });
+    }
+
+    // =====================================================
+    // CHECK RECIPIENTS
+    // =====================================================
+
+    if (
+      !campaign.recipients ||
+      campaign.recipients.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please select at least one customer.",
+      });
+    }
+
+    // =====================================================
+    // MARK CAMPAIGN AS SENDING
+    // =====================================================
+
+    await prisma.campaign.update({
+      where: {
+        id: campaign.id,
+      },
+
+      data: {
+        status: "SENDING",
+        startedAt: new Date(),
+        totalRecipients:
+          campaign.recipients.length,
+        audienceCount:
+          campaign.recipients.length,
+        sentCount: 0,
+        deliveredCount: 0,
+        readCount: 0,
+        failedCount: 0,
+      },
+    });
+
+    // =====================================================
+    // SEND TO RECIPIENTS
+    // =====================================================
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    for (const recipient of campaign.recipients) {
+      const customer = recipient.customer;
+
+      if (!customer) {
+        failedCount++;
+
+        await prisma.campaignRecipient.update({
           where: {
-            campaignId_customerId: {
-              campaignId,
-              customerId,
-            },
+            id: recipient.id,
           },
-        });
 
-      if (!existingRecipient) {
-        await prisma.campaignRecipient.create({
           data: {
-            campaignId,
-            customerId,
+            status: "FAILED",
           },
         });
+
+        continue;
       }
 
-      // =============================
-      // Find or Create Conversation (by phone — avoids duplicate
-      // conversations / unique constraint crashes when a
-      // Conversation already exists for this phone but isn't
-      // linked to this customerId yet, e.g. inbound webhook
-      // messages that arrived before the Customer record existed)
-      // =============================
-      let conversation = await getOrCreateConversation(customer.phone);
+      if (!customer.phone) {
+        failedCount++;
 
-      if (conversation.customerId !== customerId) {
-        conversation = await prisma.conversation.update({
-          where: { id: conversation.id },
-          data: { customerId },
+        await prisma.campaignRecipient.update({
+          where: {
+            id: recipient.id,
+          },
+
+          data: {
+            status: "FAILED",
+          },
         });
+
+        continue;
       }
-
-      // =============================
-      // Send WhatsApp Message
-      // =============================
-
-      let sendStatus = "FAILED";
-      let metaMessageId = null;
 
       try {
+        // =====================================================
+        // CONVERSATION
+        // =====================================================
+
+        let conversation =
+          await getOrCreateConversation(
+            customer.phone
+          );
+
+        if (
+          conversation.customerId !==
+          customer.id
+        ) {
+          conversation =
+            await prisma.conversation.update({
+              where: {
+                id: conversation.id,
+              },
+
+              data: {
+                customerId:
+                  customer.id,
+              },
+            });
+        }
+
+        // =====================================================
+        // SEND TEMPLATE
+        // =====================================================
 
         let result;
 
-        // Campaigns are business-initiated, so they must always go
-        // through an approved template (never plain sendTextMessage).
-        // Use the image-header template when the campaign has an image,
-        // otherwise the text-only template.
-        if (campaign.imageUrl) {
+        /*
+         * Your current template system appears to use:
+         *
+         * {{1}} = Customer name
+         * {{2}} = Campaign/custom message
+         *
+         * Keep this compatible with your existing
+         * WhatsApp service for now.
+         */
 
-          result = await sendCampaignImageTemplate(
-            customer.phone,
-            "campaign", // approved IMAGE-header template name (Meta template: "campaign")
-            campaign.imageUrl,
-            [customer.name, campaign.messageContent], // fills {{1}} and {{2}}
-            "en" // Meta approved this template under "English", not "English (US)"
-          );
+        if (campaign.imageUrl) {
+          result =
+            await sendCampaignImageTemplate(
+              customer.phone,
+
+              campaign.template.name,
+
+              campaign.imageUrl,
+
+              [
+                customer.name,
+                campaign.messageContent || "",
+              ],
+
+              campaign.template.language ||
+                "en_US"
+            );
+        } else {
+          result =
+            await sendTemplateMessage(
+              customer.phone,
+
+              campaign.template.name,
+
+              [
+                customer.name,
+                campaign.messageContent || "",
+              ],
+
+              campaign.template.language ||
+                "en_US"
+            );
+        }
+
+        console.log(
+          "WhatsApp Result:",
+          result
+        );
+
+        // =====================================================
+        // SUCCESS
+        // =====================================================
+
+        if (result?.success) {
+          const metaMessageId =
+            result.data?.messages?.[0]?.id ||
+            null;
+
+          sentCount++;
+
+          await prisma.campaignRecipient.update({
+            where: {
+              id: recipient.id,
+            },
+
+            data: {
+              status: "SENT",
+              sentAt: new Date(),
+            },
+          });
+
+          // =====================================================
+          // SAVE MESSAGE
+          // =====================================================
+
+          await prisma.message.create({
+            data: {
+              conversationId:
+                conversation.id,
+
+              sender: "AGENT",
+
+              content:
+                campaign.messageContent ||
+                campaign.template.content,
+
+              imageUrl:
+                campaign.imageUrl,
+
+              messageType:
+                campaign.imageUrl
+                  ? "IMAGE"
+                  : "TEXT",
+
+              status: "SENT",
+
+              metaMessageId,
+            },
+          });
+
+          // =====================================================
+          // UPDATE CONVERSATION
+          // =====================================================
+
+          await prisma.conversation.update({
+            where: {
+              id: conversation.id,
+            },
+
+            data: {
+              lastMessage:
+                campaign.messageContent ||
+                campaign.template.content,
+            },
+          });
 
         } else {
+          failedCount++;
 
-          result = await sendTemplateMessage(
-            customer.phone,
-            "custom_campaign_message", // approved text-only template name
-            [customer.name, campaign.messageContent] // fills {{1}} and {{2}}
-          );
+          await prisma.campaignRecipient.update({
+            where: {
+              id: recipient.id,
+            },
 
+            data: {
+              status: "FAILED",
+            },
+          });
         }
 
-        console.log("WhatsApp Result:", result);
+      } catch (error) {
+        console.error(
+          `Campaign send failed for ${customer.phone}:`,
+          error
+        );
 
-        if (result.success) {
-          sendStatus = "SENT";
-          metaMessageId = result.data?.messages?.[0]?.id || null;
-        }
+        failedCount++;
 
-      } catch (err) {
+        await prisma.campaignRecipient.update({
+          where: {
+            id: recipient.id,
+          },
 
-        console.error("WhatsApp Send Error:", err);
-
-      }
-      // =============================
-      // Save Message
-      // =============================
-
-      await prisma.message.create({
-        data: {
-          conversationId: conversation.id,
-          sender: "AGENT",
-          content: campaign.messageContent,
-          imageUrl: campaign.imageUrl,
-          messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
-          status: sendStatus,
-          metaMessageId,
-        },
-      });
-
-      // =============================
-      // Update Conversation
-      // =============================
-      await prisma.conversation.update({
-        where: {
-          id: conversation.id,
-        },
-        data: {
-          lastMessage: campaign.messageContent,
-        },
-      });
-
-      if (sendStatus === "SENT") {
-        successCount++;
+          data: {
+            status: "FAILED",
+          },
+        });
       }
     }
 
-    // =============================
-    // Audience Count
-    // =============================
-    const audienceCount =
-      await prisma.campaignRecipient.count({
+    // =====================================================
+    // FINAL CAMPAIGN STATUS
+    // =====================================================
+
+    let finalStatus = "COMPLETED";
+
+    if (
+      sentCount === 0 &&
+      failedCount > 0
+    ) {
+      finalStatus = "FAILED";
+    }
+
+    const completedCampaign =
+      await prisma.campaign.update({
         where: {
-          campaignId,
+          id: campaign.id,
+        },
+
+        data: {
+          status: finalStatus,
+
+          completedAt:
+            new Date(),
+
+          sentCount,
+
+          failedCount,
+
+          totalRecipients:
+            campaign.recipients.length,
+
+          audienceCount:
+            campaign.recipients.length,
         },
       });
 
-    // =============================
-    // Update Campaign
-    // =============================
-    await prisma.campaign.update({
-      where: {
-        id: campaignId,
-      },
-      data: {
-        status: "COMPLETED",
-        audienceCount,
-      },
-    });
+    // =====================================================
+    // AUDIT
+    // =====================================================
 
     logAction({
       req,
       action: "UPDATE",
       module: "CAMPAIGN",
-      entityId: campaignId,
+      entityId: campaign.id,
       entityName: campaign.name,
+
       changes: {
-        after: { status: "COMPLETED", totalSent: successCount, audienceCount },
+        after: {
+          status: finalStatus,
+          totalRecipients:
+            campaign.recipients.length,
+          sentCount,
+          failedCount,
+        },
       },
     });
 
+    // =====================================================
+    // RESPONSE
+    // =====================================================
+
     return res.status(200).json({
       success: true,
-      totalSent: successCount,
-      audienceCount,
-      message: `${successCount} customer(s) received the campaign.`,
+
+      message:
+        finalStatus === "COMPLETED"
+          ? "Campaign sent successfully."
+          : "Campaign sending failed.",
+
+      data: {
+        campaignId:
+          completedCampaign.id,
+
+        status:
+          completedCampaign.status,
+
+        totalRecipients:
+          campaign.recipients.length,
+
+        sentCount,
+
+        failedCount,
+      },
     });
 
   } catch (error) {
-
-    console.error("Send Campaign Error:", error);
+    console.error(
+      "Send Campaign Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Failed to send campaign.",
+      message:
+        "Failed to send campaign.",
       error: error.message,
     });
-
   }
 };
+
 
 // =====================================================
 // GET CAMPAIGN RECIPIENTS
 // =====================================================
-exports.getCampaignRecipients = async (req, res) => {
-  try {
 
+exports.getCampaignRecipients = async (
+  req,
+  res
+) => {
+  try {
     const { id } = req.params;
+
+    const companyId =
+      req.user.companyId;
+
+    // =====================================================
+    // MAKE SURE CAMPAIGN BELONGS TO COMPANY
+    // =====================================================
+
+    const campaign =
+      await prisma.campaign.findFirst({
+        where: {
+          id,
+          companyId,
+        },
+
+        select: {
+          id: true,
+        },
+      });
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Campaign not found.",
+      });
+    }
+
+    // =====================================================
+    // GET RECIPIENTS
+    // =====================================================
 
     const recipients =
       await prisma.campaignRecipient.findMany({
-
         where: {
           campaignId: id,
         },
 
-        select: {
-          customerId: true,
+        include: {
+          customer: true,
         },
 
+        orderBy: {
+          createdAt: "desc",
+        },
       });
 
     return res.status(200).json({
       success: true,
-      data: recipients.map(
-        (recipient) => recipient.customerId
-      ),
+      count: recipients.length,
+      data: recipients,
     });
 
   } catch (error) {
-
     console.error(
       "Get Campaign Recipients Error:",
       error
@@ -706,6 +1343,6 @@ exports.getCampaignRecipients = async (req, res) => {
         "Failed to fetch campaign recipients.",
       error: error.message,
     });
-
   }
 };
+
