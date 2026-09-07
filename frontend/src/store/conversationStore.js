@@ -4,6 +4,7 @@ import {
   getConversationById,
   createConversation,
   updateConversationStatus,
+  toggleConversationBot,
   markConversationAsRead,
   markConversationAsUnread,
   clearConversationMessages,
@@ -95,6 +96,29 @@ const useConversationStore = create((set) => ({
     }
   },
 
+  // TOGGLE BOT (AI AUTO-REPLY)
+  toggleBot: async (id, botEnabled) => {
+    try {
+      const data = await toggleConversationBot(id, botEnabled);
+
+      set((state) => ({
+        conversations: state.conversations.map((conversation) =>
+          conversation.id === id
+            ? { ...conversation, botEnabled }
+            : conversation
+        ),
+        selectedConversation:
+          state.selectedConversation?.id === id
+            ? { ...state.selectedConversation, botEnabled }
+            : state.selectedConversation,
+      }));
+
+      return data.conversation;
+    } catch (error) {
+      console.error(error);
+    }
+  },
+
   // MARK AS READ
   markAsRead: async (id) => {
     try {
@@ -169,4 +193,3 @@ const useConversationStore = create((set) => ({
 }));
 
 export default useConversationStore;
-

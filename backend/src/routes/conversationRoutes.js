@@ -6,6 +6,7 @@ const {
   getConversations,
   getConversationById,
   updateConversationStatus,
+  toggleConversationBot,
   markConversationAsRead,
   markConversationAsUnread,
   clearConversationMessages,
@@ -23,6 +24,9 @@ router.get("/:id", getConversationById);
 
 // UPDATE CONVERSATION STATUS
 router.patch("/:id", updateConversationStatus);
+
+// TOGGLE BOT (AI AUTO-REPLY)
+router.patch("/:id/bot-toggle", toggleConversationBot);
 
 // MARK CONVERSATION AS READ
 router.patch("/:id/read", markConversationAsRead);

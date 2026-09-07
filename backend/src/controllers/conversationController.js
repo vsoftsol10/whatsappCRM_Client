@@ -226,6 +226,39 @@ const markConversationAsUnread = async (req, res) => {
   }
 };
 
+// TOGGLE BOT (AI AUTO-REPLY) FOR A CONVERSATION
+const toggleConversationBot = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { botEnabled } = req.body;
+
+    if (typeof botEnabled !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "botEnabled must be true or false",
+      });
+    }
+
+    const conversation = await prisma.conversation.update({
+      where: { id },
+      data: { botEnabled },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Bot ${botEnabled ? "enabled" : "disabled"} for this conversation`,
+      conversation,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to update bot status",
+    });
+  }
+};
+
 // CLEAR CHAT (delete all messages in a conversation)
 const clearConversationMessages = async (req, res) => {
   try {
@@ -287,6 +320,7 @@ module.exports = {
   getConversations,
   getConversationById,
   updateConversationStatus,
+  toggleConversationBot,
   markConversationAsRead,
   markConversationAsUnread,
   clearConversationMessages,

@@ -76,6 +76,11 @@ const sendMessage = async (req, res) => {
             increment: 1,
           },
         }),
+        // An agent stepping in manually means the bot should stop
+        // auto-replying on this chat until someone turns it back on.
+        ...(sender === "AGENT" && {
+          botEnabled: false,
+        }),
       },
     });
 

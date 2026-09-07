@@ -47,6 +47,20 @@ export const updateConversationStatus = async (
 };
 
 // ===============================
+// TOGGLE BOT (AI AUTO-REPLY)
+// ===============================
+export const toggleConversationBot = async (id, botEnabled) => {
+  const response = await apiClient.patch(
+    `/api/conversations/${id}/bot-toggle`,
+    {
+      botEnabled,
+    }
+  );
+
+  return response.data;
+};
+
+// ===============================
 // MARK CONVERSATION AS READ
 // ===============================
 export const markConversationAsRead = async (id) => {
