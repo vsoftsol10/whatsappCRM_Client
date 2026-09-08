@@ -189,16 +189,9 @@ const ConnectWhatsApp = () => {
 
         const configId = import.meta.env.VITE_META_EMBEDDED_SIGNUP_CONFIG_ID;
 
-        // 🔍 DEBUG — check your browser console when you click the button
-        console.log("VITE_META_EMBEDDED_SIGNUP_CONFIG_ID =", configId);
-
         if (!configId) {
-            console.error(
-                "Missing VITE_META_EMBEDDED_SIGNUP_CONFIG_ID — check your .env file and restart the dev server / redeploy."
-            );
-            alert(
-                "WhatsApp signup is not configured correctly (missing Configuration ID). Please contact support."
-            );
+            console.error("Missing VITE_META_EMBEDDED_SIGNUP_CONFIG_ID");
+            alert("WhatsApp signup is not configured correctly. Please contact support.");
             return;
         }
 
@@ -218,6 +211,7 @@ const ConnectWhatsApp = () => {
                 config_id: configId,
                 response_type: "code",
                 override_default_response_type: true,
+                use_fedcm_for_login: false,   // ⬅️ THE FIX: forces classic popup, not broken FedCM flow
                 extras: { feature: "whatsapp_embedded_signup", setup: {} },
             }
         );
