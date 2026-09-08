@@ -32,44 +32,43 @@ model SuperAdmin {
 //////////////////////////////////////////////////////
 
 model Company {
-  id            Int      @id @default(autoincrement())
-  companyId     String   @unique
+  id          Int    @id @default(autoincrement())
+  companyId   String @unique
+  companyName String
+  ownerName   String
 
-  companyName   String
-  ownerName     String
+  email   String @unique
+  phone   String
+  address String
 
-  email         String   @unique
-  phone         String
-  address       String
+  plan       String
+  status     CompanyStatus @default(ACTIVE)
+  expiryDate DateTime
 
-  plan          String
-  status        CompanyStatus @default(ACTIVE)
-  expiryDate    DateTime
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // WhatsApp Business connection
   whatsappAccounts WhatsAppAccount[]
 
   // SaaS
-  subscriptions Subscription[]
-  supportTickets SupportTicket[]
-  payments Payment[]
+  subscriptions   Subscription[]
+  supportTickets  SupportTicket[]
+  payments        Payment[]
 
-  // CRM (add these)
-  users User[]
-  customers Customer[]
-  conversations Conversation[]
-  campaigns Campaign[]
-  templates Template[]
-  leads Lead[]
-  deals Deal[]
-  tasks Task[]
-  tickets Ticket[]
-  employees Employee[]
-  crmAuditLogs CrmAuditLog[]
-  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
+  // CRM
+  users                        User[]
+  customers                    Customer[]
+  conversations                Conversation[]
+  campaigns                    Campaign[]
+  templates                    Template[]
+  leads                        Lead[]
+  deals                        Deal[]
+  tasks                        Task[]
+  tickets                      Ticket[]
+  employees                    Employee[]
+  crmAuditLogs                 CrmAuditLog[]
+  subscriptionUpgradeRequests  SubscriptionUpgradeRequest[]
 }
 
 enum CompanyStatus {
@@ -94,18 +93,18 @@ model WhatsAppAccount {
   companyId Int
 
   // Meta / WhatsApp Business information
-  wabaId String?
+  wabaId        String?
   phoneNumberId String? @unique
 
   whatsappBusinessName String?
-  displayPhoneNumber String?
+  displayPhoneNumber   String?
 
   // Access token used to communicate with Meta
   whatsappAccessToken String?
 
   status WhatsAppStatus @default(NOT_CONNECTED)
 
-  connectedAt DateTime?
+  connectedAt    DateTime?
   disconnectedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -118,8 +117,8 @@ model WhatsAppAccount {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   conversations Conversation[]
-  campaigns Campaign[]
-  templates Template[]
+  campaigns     Campaign[]
+  templates     Template[]
 
   ///////////////////////////////////////
   // INDEXES
@@ -206,7 +205,7 @@ model SubscriptionPlan {
 
   durationDays Int
 
-  maxUsers Int
+  maxUsers     Int
   maxCustomers Int @default(100)
   maxCampaigns Int
   maxTemplates Int @default(20)
@@ -218,16 +217,14 @@ model SubscriptionPlan {
   status String @default("ACTIVE")
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////////
 
   subscriptions Subscription[]
+  payments      Payment[]
 
-  payments Payment[]
-
- currentPlanUpgradeRequests   SubscriptionUpgradeRequest[] @relation("CurrentPlan")
+  currentPlanUpgradeRequests   SubscriptionUpgradeRequest[] @relation("CurrentPlan")
   requestedPlanUpgradeRequests SubscriptionUpgradeRequest[] @relation("RequestedPlan")
 }
 
@@ -239,59 +236,52 @@ model Subscription {
   id Int @id @default(autoincrement())
 
   companyId Int
+  planId    Int
 
-  planId Int
-
-  startDate DateTime
-
+  startDate  DateTime
   expiryDate DateTime
 
-   usersAtSubscriptionStart Int @default(0)
+  usersAtSubscriptionStart Int @default(0)
 
-  status SubscriptionStatus @default(ACTIVE)
-
-  paymentStatus PaymentStatus @default(PENDING)
+  status        SubscriptionStatus @default(ACTIVE)
+  paymentStatus PaymentStatus      @default(PENDING)
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+  company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    SubscriptionPlan @relation(fields: [planId], references: [id])
 
   reminders SubscriptionReminder[]
-
-  payments Payment[]
+  payments  Payment[]
 
   @@index([companyId])
   @@index([planId])
 }
 
 model SubscriptionUpgradeRequest {
-  id              Int                  @id @default(autoincrement())
+  id              Int @id @default(autoincrement())
   companyId       Int
   currentPlanId   Int
   requestedPlanId Int
 
-  status          UpgradeRequestStatus @default(PENDING)
+  status UpgradeRequestStatus @default(PENDING)
 
-  requestedBy     String
-  approvedBy      String?
+  requestedBy String
+  approvedBy  String?
 
   remarks         String?
   rejectionReason String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  company         Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  currentPlan     SubscriptionPlan @relation("CurrentPlan", fields: [currentPlanId], references: [id])
-
-  requestedPlan   SubscriptionPlan @relation("RequestedPlan", fields: [requestedPlanId], references: [id])
+  currentPlan   SubscriptionPlan @relation("CurrentPlan", fields: [currentPlanId], references: [id])
+  requestedPlan SubscriptionPlan @relation("RequestedPlan", fields: [requestedPlanId], references: [id])
 
   @@index([companyId])
   @@index([status])
@@ -317,17 +307,14 @@ model SubscriptionReminder {
   channel String @default("EMAIL")
 
   recipientEmail String
-
-  subject String
-
-  content String
+  subject        String
+  content        String
 
   status String @default("SENT")
 
   sentAt DateTime @default(now())
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////////
@@ -348,18 +335,14 @@ model Employee {
 
   employeeId String @unique
 
-  name String
-
-  email String @unique
-
+  name     String
+  email    String @unique
   password String
 
-  phone String?
-
+  phone   String?
   address String?
 
-  role String @default("EMPLOYEE")
-
+  role   String @default("EMPLOYEE")
   status String @default("ACTIVE")
 
   mustChangePassword Boolean @default(true)
@@ -368,15 +351,13 @@ model Employee {
   resetTokenExpiry DateTime?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ////////////////////////////////////////////////
 
   company Company? @relation(fields: [companyId], references: [id])
 
-  notifications Notification[]
-
+  notifications   Notification[]
   assignedTickets SupportTicket[]
 
   @@index([companyId])
@@ -389,23 +370,23 @@ model Employee {
 model Notification {
   id Int @id @default(autoincrement())
 
-  employeeId String?
+  employeeId   String?
   superAdminId String?
 
-  title String
+  title   String
   message String
 
   isRead Boolean @default(false)
 
   createdAt DateTime @default(now())
 
-  employee Employee? @relation( fields: [employeeId], references: [id], onDelete: Cascade )
-
+  employee   Employee?   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   superAdmin SuperAdmin? @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([superAdminId])
 }
+
 //////////////////////////////////////////////////////
 // SUPPORT TICKET
 //////////////////////////////////////////////////////
@@ -413,26 +394,23 @@ model Notification {
 model SupportTicket {
   id Int @id @default(autoincrement())
 
-  companyId Int
-
+  companyId  Int
   employeeId String?
 
-  title String
-
+  title       String
   description String
 
   priority TicketPriority @default(MEDIUM)
+  status   TicketStatus   @default(OPEN)
 
-  status TicketStatus @default(OPEN)
   notes SupportTicketNote[]
-  createdAt DateTime @default(now())
 
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   ////////////////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignedTo Employee? @relation(fields: [employeeId], references: [id])
 
   @@index([companyId])
@@ -448,55 +426,46 @@ model Payment {
 
   paymentId String @unique
 
-  companyId Int?
-
+  companyId      Int?
   subscriptionId Int?
-
-  planId Int?
+  planId         Int?
 
   companyName String
+  ownerName   String
+  email       String
+  phone       String
 
-  ownerName String
-
-  email String
-
-  phone String
-
-  amount Float
-
-  tax Float @default(0)
-
-  discount Float @default(0)
-
+  amount      Float
+  tax         Float @default(0)
+  discount    Float @default(0)
   totalAmount Float
 
   paymentMethod PaymentMethod
-
   paymentStatus PaymentStatus
 
   gateway String?
 
   transactionId String?
-
   invoiceNumber String?
+
+  // Razorpay payment details
+  razorpayOrderId   String? @unique
+  razorpayPaymentId String? @unique
+  razorpaySignature String?
 
   paidAt DateTime?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
-  ////////////////////////////////////////////////
-
-  company Company? @relation(fields: [companyId], references: [id])
-
-  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
-
-  plan SubscriptionPlan? @relation(fields: [planId], references: [id])
+  company      Company?          @relation(fields: [companyId], references: [id])
+  subscription Subscription?     @relation(fields: [subscriptionId], references: [id])
+  plan         SubscriptionPlan? @relation(fields: [planId], references: [id])
 
   @@index([companyId])
   @@index([subscriptionId])
   @@index([planId])
+  @@index([paymentStatus])
 }
 
 //////////////////////////////////////////////////////
@@ -508,68 +477,53 @@ model User {
 
   companyId Int
 
-  name String
-
-  email String
-
+  name     String
+  email    String
   password String
 
   role Role @default(USER)
 
   isFirstLogin Boolean @default(true)
 
-  resetToken String?
-
+  resetToken       String?
   resetTokenExpiry DateTime?
 
-  address String?
-
-  department String?
-
+  address     String?
+  department  String?
   designation String?
-
-  phone String?
+  phone       String?
 
   profileImage String?
 
   status UserStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  campaigns Campaign[]
+  campaigns  Campaign[]
+  customers  Customer[]
+  templates  Template[]
 
-  customers Customer[]
-
-  assignedLeads Lead[] @relation("AssignedLeads")
-
-  leadWorkNotes LeadWorkNote[] @relation("LeadWorkNotes")
+  assignedLeads  Lead[] @relation("AssignedLeads")
+  leadWorkNotes  LeadWorkNote[] @relation("LeadWorkNotes")
 
   assignedDeals Deal[] @relation("AssignedDeals")
-
-  createdDeals Deal[] @relation("CreatedDeals")
+  createdDeals  Deal[] @relation("CreatedDeals")
 
   dealActivities DealActivity[] @relation("CreatedDealActivities")
 
   notifications UserNotification[]
 
   assignedTasks Task[] @relation("AssignedTasks")
-
-  createdTasks Task[] @relation("CreatedTasks")
-
+  createdTasks  Task[] @relation("CreatedTasks")
   taskWorkNotes TaskWorkNote[] @relation("TaskWorkNotes")
 
-  templates Template[]
-
   assignedTickets Ticket[] @relation("AssignedTickets")
-
-  createdTickets Ticket[] @relation("CreatedTickets")
-
+  createdTickets  Ticket[] @relation("CreatedTickets")
   ticketWorkNotes TicketWorkNote[] @relation("TicketWorkNotes")
 
   ///////////////////////////////////////
@@ -587,12 +541,9 @@ model Customer {
 
   companyId Int
 
-  name String
-
-  phone String
-
-  email String?
-
+  name        String
+  phone       String
+  email       String?
   companyName String?
 
   status String @default("ACTIVE")
@@ -600,28 +551,21 @@ model Customer {
   userId String
 
   requirements String?
-
-  source String?
+  source       String?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
 
-  user User @relation(fields: [userId], references: [id])
-
-  conversations Conversation?
-
-  campaignRecipients CampaignRecipient[]
-
-  templateRecipients TemplateRecipient[]
-
-  deals Deal[]
-
-  tickets Ticket[]
+  conversations       Conversation?
+  campaignRecipients  CampaignRecipient[]
+  templateRecipients  TemplateRecipient[]
+  deals               Deal[]
+  tickets             Ticket[]
 
   ///////////////////////////////////////
 
@@ -645,27 +589,27 @@ model Conversation {
 
   phone String?
 
-  status String @default("OPEN")
-
+  status  String @default("OPEN")
   channel String @default("WHATSAPP")
 
   lastMessage String?
-
-  unreadCount Int @default(0)
+  unreadCount Int    @default(0)
 
   welcomeSent Boolean @default(false)
 
-  createdAt DateTime @default(now())
+  // AI AUTO-REPLY (Grok)
+  // Per-conversation toggle. Defaults ON; auto-flipped to false the
+  // moment an AGENT sends a manual reply so bot and human don't clash.
+  botEnabled Boolean @default(true)
 
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  customer Customer? @relation(fields: [customerId], references: [id])
-
-  whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId],references: [id],onDelete: SetNull)
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer        Customer?        @relation(fields: [customerId], references: [id])
+  whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId], references: [id], onDelete: SetNull)
 
   messages Message[]
 
@@ -685,23 +629,19 @@ model Message {
   conversationId String
 
   content String
-
-  sender String
+  sender  String
 
   messageType String @default("TEXT")
-
-  status String @default("SENT")
+  status      String @default("SENT")
 
   imageUrl String?
 
   metaMessageId String? @unique
 
   failureReason String?
-
-  isEdited Boolean @default(false)
+  isEdited      Boolean @default(false)
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
@@ -720,11 +660,9 @@ model UserNotification {
 
   userId String
 
-  title String
-
+  title   String
   message String
-
-  type NotificationType
+  type    NotificationType
 
   isRead Boolean @default(false)
 
@@ -747,16 +685,12 @@ model Lead {
 
   companyId Int
 
-  name String
-
-  phone String?
-
-  email String?
-
+  name        String
+  phone       String?
+  email       String?
   companyName String?
 
-  source String?
-
+  source       String?
   requirements String?
 
   status LeadStatus
@@ -766,14 +700,12 @@ model Lead {
   assignedToId String?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  assignedTo User? @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo User?   @relation("AssignedLeads", fields: [assignedToId], references: [id])
 
   workNotes LeadWorkNote[]
 
@@ -788,20 +720,17 @@ model Lead {
 model LeadWorkNote {
   id String @id @default(uuid())
 
-  leadId Int
-
+  leadId     Int
   employeeId String
 
   note String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
+  lead     Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
   employee User @relation("LeadWorkNotes", fields: [employeeId], references: [id])
 
   @@index([leadId])
@@ -820,7 +749,6 @@ model Campaign {
   whatsappAccountId Int?
 
   name String
-
   type CampaignType
 
   // WhatsApp template used by this campaign
@@ -838,15 +766,15 @@ model Campaign {
   scheduledAt DateTime?
 
   // Actual execution times
-  startedAt DateTime?
+  startedAt   DateTime?
   completedAt DateTime?
 
   // Campaign statistics
   totalRecipients Int @default(0)
-  sentCount Int @default(0)
-  deliveredCount Int @default(0)
-  readCount Int @default(0)
-  failedCount Int @default(0)
+  sentCount       Int @default(0)
+  deliveredCount  Int @default(0)
+  readCount       Int @default(0)
+  failedCount     Int @default(0)
 
   // Optional media
   imageUrl String?
@@ -854,20 +782,16 @@ model Campaign {
   createdById String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
   // RELATIONS
   ///////////////////////////////////////
 
-  company Company @relation(fields: [companyId],references: [id], onDelete: Cascade)
-
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId], references: [id], onDelete: SetNull)
-
-  createdBy User @relation( fields: [createdById], references: [id] )
-
-  template Template? @relation(fields: [templateId], references: [id], onDelete: SetNull )
+  createdBy       User             @relation(fields: [createdById], references: [id])
+  template        Template?        @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   recipients CampaignRecipient[]
 
@@ -891,7 +815,6 @@ model CampaignRecipient {
   id String @id @default(uuid())
 
   campaignId String
-
   customerId String
 
   status RecipientStatus @default(PENDING)
@@ -900,10 +823,10 @@ model CampaignRecipient {
   whatsappMessageId String?
 
   // Delivery timestamps
-  sentAt DateTime?
+  sentAt      DateTime?
   deliveredAt DateTime?
-  readAt DateTime?
-  failedAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
 
   // Failure information
   failureReason String?
@@ -914,9 +837,8 @@ model CampaignRecipient {
   // RELATIONS
   ///////////////////////////////////////
 
-  campaign Campaign @relation( fields: [campaignId],references: [id], onDelete: Cascade)
-
-  customer Customer @relation(fields: [customerId],references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   ///////////////////////////////////////
   // INDEXES
@@ -932,7 +854,6 @@ model CampaignRecipient {
 // TEMPLATE
 //////////////////////////////////////////////////////
 
-
 model Template {
   id String @id @default(uuid())
 
@@ -940,37 +861,31 @@ model Template {
 
   whatsappAccountId Int?
 
-  name String
-
+  name     String
   language String @default("en_US")
 
-  category TemplateCategory
-
-  messageType MessageType @default(TEXT)
+  category    TemplateCategory
+  messageType MessageType      @default(TEXT)
 
   content String
 
   status TemplateStatus @default(DRAFT)
 
-  purpose TemplatePurpose @default(CUSTOM)
-
-  autoSend Boolean @default(false)
+  purpose  TemplatePurpose @default(CUSTOM)
+  autoSend Boolean         @default(false)
 
   createdById String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
-  company Company @relation(fields: [companyId],references: [id], onDelete: Cascade)
-
-  whatsappAccount WhatsAppAccount? @relation( fields: [whatsappAccountId],references: [id], onDelete: SetNull)
-
-  createdBy User @relation( fields: [createdById],references: [id])
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId], references: [id], onDelete: SetNull)
+  createdBy       User             @relation(fields: [createdById], references: [id])
 
   recipients TemplateRecipient[]
-  campaigns Campaign[]
-  
+  campaigns  Campaign[]
+
   @@unique([companyId, name, language])
   @@index([companyId])
   @@index([whatsappAccountId])
@@ -985,25 +900,20 @@ model TemplateRecipient {
   id String @id @default(uuid())
 
   templateId String
-
   customerId String
 
   status RecipientStatus @default(PENDING)
 
-  sentAt DateTime?
-
+  sentAt      DateTime?
   deliveredAt DateTime?
-
-  readAt DateTime?
+  readAt      DateTime?
 
   metaMessageId String?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([templateId, customerId])
@@ -1020,33 +930,25 @@ model Deal {
 
   companyId Int
 
-  title String
-
+  title       String
   description String?
 
   value Float @default(0)
-
   stage DealStage @default(LEAD)
 
-  customerId String
-
-  createdById String
-
+  customerId   String
+  createdById  String
   assignedToId String?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ///////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  customer Customer @relation(fields: [customerId], references: [id])
-
-  createdBy User @relation("CreatedDeals", fields: [createdById], references: [id])
-
-  assignedTo User? @relation("AssignedDeals", fields: [assignedToId], references: [id])
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id])
+  createdBy  User     @relation("CreatedDeals", fields: [createdById], references: [id])
+  assignedTo User?    @relation("AssignedDeals", fields: [assignedToId], references: [id])
 
   activities DealActivity[]
 
@@ -1066,7 +968,6 @@ model DealActivity {
   dealId String
 
   type String
-
   note String
 
   createdById String
@@ -1075,8 +976,7 @@ model DealActivity {
 
   ///////////////////////////////////////
 
-  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
-
+  deal      Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   createdBy User @relation("CreatedDealActivities", fields: [createdById], references: [id])
 
   @@index([dealId])
@@ -1092,31 +992,25 @@ model Task {
 
   companyId Int
 
-  title String
-
+  title       String
   description String?
 
-  status TaskStatus @default(TODO)
-
+  status   TaskStatus   @default(TODO)
   priority TaskPriority @default(MEDIUM)
 
   dueDate DateTime?
 
-  createdById String
-
+  createdById  String
   assignedToId String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ////////////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  createdBy User @relation("CreatedTasks", fields: [createdById], references: [id])
-
-  assignedTo User @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy  User    @relation("CreatedTasks", fields: [createdById], references: [id])
+  assignedTo User    @relation("AssignedTasks", fields: [assignedToId], references: [id])
 
   workNotes TaskWorkNote[]
 
@@ -1132,20 +1026,17 @@ model Task {
 model TaskWorkNote {
   id String @id @default(uuid())
 
-  taskId String
-
+  taskId     String
   employeeId String
 
   note String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ////////////////////////////////////////////
 
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   employee User @relation("TaskWorkNotes", fields: [employeeId], references: [id])
 
   @@index([taskId])
@@ -1161,33 +1052,25 @@ model Ticket {
 
   companyId Int
 
-  title String
-
+  title       String
   description String?
 
-  status TicketStatus @default(OPEN)
-
+  status   TicketStatus   @default(OPEN)
   priority TicketPriority @default(MEDIUM)
 
-  customerId String
-
-  createdById String
-
+  customerId   String
+  createdById  String
   assignedToId String?
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ////////////////////////////////////////////
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  customer Customer @relation(fields: [customerId], references: [id])
-
-  createdBy User @relation("CreatedTickets", fields: [createdById], references: [id])
-
-  assignedTo User? @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id])
+  createdBy  User     @relation("CreatedTickets", fields: [createdById], references: [id])
+  assignedTo User?    @relation("AssignedTickets", fields: [assignedToId], references: [id])
 
   workNotes TicketWorkNote[]
 
@@ -1204,28 +1087,25 @@ model Ticket {
 model TicketWorkNote {
   id String @id @default(uuid())
 
-  ticketId String
-
+  ticketId   String
   employeeId String
 
   note String
 
   createdAt DateTime @default(now())
-
   updatedAt DateTime @updatedAt
 
   ////////////////////////////////////////////
 
-  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  employee User @relation("TicketWorkNotes", fields: [employeeId], references: [id])
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  employee User   @relation("TicketWorkNotes", fields: [employeeId], references: [id])
 
   @@index([ticketId])
   @@index([employeeId])
 }
 
 //////////////////////////////////////////////////////
-// LEAD
+// LEAD ENUM
 //////////////////////////////////////////////////////
 
 enum LeadStatus {
@@ -1236,7 +1116,7 @@ enum LeadStatus {
 }
 
 //////////////////////////////////////////////////////
-// CAMPAIGN
+// CAMPAIGN ENUM
 //////////////////////////////////////////////////////
 
 enum CampaignType {
@@ -1263,7 +1143,7 @@ enum RecipientStatus {
 }
 
 //////////////////////////////////////////////////////
-// TEMPLATE
+// TEMPLATE ENUM
 //////////////////////////////////////////////////////
 
 enum TemplateCategory {
@@ -1293,8 +1173,15 @@ enum MessageType {
   DOCUMENT
 }
 
+// NOTE: This enum was DIFFERENT between the two source schemas.
+// SuperAdmin version:   DRAFT, ACTIVE, INACTIVE
+// WhatsApp CRM version: DRAFT, PENDING, APPROVED, REJECTED, PAUSED, DISABLED
+// All values are unioned below so no existing row breaks on migration.
+// You still need to pick ONE lifecycle for the app to actually use going forward.
 enum TemplateStatus {
   DRAFT
+  ACTIVE
+  INACTIVE
   PENDING
   APPROVED
   REJECTED
@@ -1303,7 +1190,7 @@ enum TemplateStatus {
 }
 
 //////////////////////////////////////////////////////
-// TASK
+// TASK ENUM
 //////////////////////////////////////////////////////
 
 enum TaskStatus {
@@ -1320,7 +1207,7 @@ enum TaskPriority {
 }
 
 //////////////////////////////////////////////////////
-// DEAL
+// DEAL ENUM
 //////////////////////////////////////////////////////
 
 enum DealStage {
@@ -1332,7 +1219,7 @@ enum DealStage {
 }
 
 //////////////////////////////////////////////////////
-// CRM NOTIFICATION
+// CRM NOTIFICATION ENUM
 //////////////////////////////////////////////////////
 
 enum NotificationType {
@@ -1345,24 +1232,24 @@ enum NotificationType {
   SUBSCRIPTION
   SYSTEM
 }
+
 //////////////////////////////////////////////////////
 // SUPPORT TICKET NOTE
 //////////////////////////////////////////////////////
 
 model SupportTicketNote {
-
-  id String @id @default(uuid())
+  id              String @id @default(uuid())
   supportTicketId Int
-  note String
-  createdById String
-  createdByName String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  note            String
+  createdById     String
+  createdByName   String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   ///////////////////////////////////////
 
-  supportTicket SupportTicket @relation( fields:[supportTicketId],references:[id],onDelete:Cascade)
-  
+  supportTicket SupportTicket @relation(fields: [supportTicketId], references: [id], onDelete: Cascade)
+
   @@index([supportTicketId])
 }
 
@@ -1374,15 +1261,16 @@ model AuditLog {
   id String @id @default(uuid())
 
   // Who performed the action
-  actorId String?
+  actorId   String?
   actorType String?
   actorName String?
+
   // What action was performed
   action String
 
   // What was affected
   entityType String
-  entityId String?
+  entityId   String?
 
   // Related company, if applicable
   companyId Int?
@@ -1413,14 +1301,14 @@ model CrmAuditLog {
 
   companyId Int
 
-  userId String?
+  userId   String?
   userName String
   userRole String
 
   action CrmAuditAction
   module CrmAuditModule
 
-  entityId String?
+  entityId   String?
   entityName String?
 
   changes Json?
@@ -1463,4 +1351,30 @@ enum CrmAuditModule {
   USER
 
   @@map("CrmAuditModule")
+}
+
+//////////////////////////////////////////////////////
+// AI SETTINGS (Grok Auto-Reply)
+//////////////////////////////////////////////////////
+
+// Single global row (not per-company) — one Grok key/config shared
+// across all companies. Master isEnabled switch plus each
+// Conversation's own botEnabled controls whether a given chat
+// actually gets auto-replied.
+model AiSettings {
+  id Int @id @default(autoincrement())
+
+  isEnabled Boolean @default(false)
+
+  provider String @default("GROK")
+  apiKey   String?
+  model    String @default("grok-4")
+
+  systemPrompt String @default("You are a helpful, friendly customer support assistant for this business. Keep replies short, clear, and polite. If you don't know the answer or the customer wants a human, say you'll connect them to the team.")
+
+  // How many previous messages (both sides) to send as context
+  historyLimit Int @default(10)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
