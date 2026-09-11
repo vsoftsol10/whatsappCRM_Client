@@ -1,4 +1,3 @@
-
 import {
   FileText,
   Eye,
@@ -6,6 +5,7 @@ import {
   Send,
   Trash2,
   ClipboardCheck,
+  AlertCircle,
 } from "lucide-react";
 
 export default function TemplateCard({
@@ -21,6 +21,11 @@ export default function TemplateCard({
   };
 
   const isDraft = template.status === "DRAFT";
+  const isRejected = template.status === "REJECTED";
+
+  // Templates can be edited and (re)submitted from DRAFT or REJECTED
+  const canEdit = isDraft || isRejected;
+  const canSubmit = isDraft || isRejected;
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
@@ -53,6 +58,10 @@ export default function TemplateCard({
               ? "bg-yellow-100 text-yellow-700"
               : template.status === "REJECTED"
               ? "bg-red-100 text-red-700"
+              : template.status === "PAUSED"
+              ? "bg-orange-100 text-orange-700"
+              : template.status === "DISABLED"
+              ? "bg-red-100 text-red-700"
               : template.status === "DRAFT"
               ? "bg-gray-100 text-gray-700"
               : "bg-gray-100 text-gray-700"
@@ -72,6 +81,24 @@ export default function TemplateCard({
             {template.content}
           </p>
         </div>
+
+        {/* REJECTION REASON */}
+        {isRejected && template.rejectionReason && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl bg-red-50 border border-red-200 p-3">
+            <AlertCircle
+              size={18}
+              className="text-red-500 mt-0.5 shrink-0"
+            />
+            <div>
+              <p className="text-sm font-semibold text-red-700">
+                Rejected by Meta
+              </p>
+              <p className="text-sm text-red-600 mt-0.5">
+                {template.rejectionReason}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* INFO */}
         <div className="mt-5 pt-4 border-t space-y-1 text-sm">
@@ -97,7 +124,7 @@ export default function TemplateCard({
       {/* ACTIONS */}
       <div
         className={`grid ${
-          isDraft ? "grid-cols-5" : "grid-cols-4"
+          canSubmit ? "grid-cols-5" : "grid-cols-4"
         } text-center py-3`}
       >
         {/* Preview */}
@@ -119,9 +146,9 @@ export default function TemplateCard({
           onClick={() =>
             onEdit?.(template)
           }
-          disabled={!isDraft}
+          disabled={!canEdit}
           className={`flex flex-col items-center gap-1 transition ${
-            isDraft
+            canEdit
               ? "text-amber-500 hover:text-amber-600"
               : "text-gray-300 cursor-not-allowed"
           }`}
@@ -133,8 +160,8 @@ export default function TemplateCard({
           </span>
         </button>
 
-        {/* Submit For Approval */}
-        {isDraft && (
+        {/* Submit For Approval (available for DRAFT and REJECTED) */}
+        {canSubmit && (
           <button
             onClick={() =>
               onSubmitForApproval?.(template.id)
@@ -144,7 +171,7 @@ export default function TemplateCard({
             <ClipboardCheck size={22} />
 
             <span className="text-sm">
-              Submit
+              {isRejected ? "Resubmit" : "Submit"}
             </span>
           </button>
         )}
@@ -185,4 +212,3 @@ export default function TemplateCard({
     </div>
   );
 }
-

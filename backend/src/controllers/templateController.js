@@ -3,10 +3,11 @@ const prisma = require("../config/prisma");
 const { generateTemplate } = require("../services/geminiService");
 const {
   sendTemplateMessage,
-} = require("../services/whatsappService");
+  createMetaTemplate,
+} = require("../services/saasWhatsAppService");
 const {
-  getOrCreateConversation,
-} = require("../helpers/conversationHelper");
+  getOrCreateSaaSConversation,
+} = require("../helpers/saasConversationHelper");
 const { logAction } = require("../services/auditLogService");
 
 // ============================================================
@@ -622,6 +623,33 @@ const sendTemplate = async (req, res) => {
     }
 
     // ----------------------------------------------------------
+    // CONFIRM COMPANY HAS A CONNECTED WHATSAPP ACCOUNT
+    // ----------------------------------------------------------
+
+    const whatsappAccount = await prisma.whatsAppAccount.findFirst({
+      where: {
+        companyId: req.user.companyId,
+        status: "CONNECTED",
+      },
+    });
+
+    if (!whatsappAccount) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No connected WhatsApp Business Account found for your company.",
+      });
+    }
+
+    if (!template.metaTemplateId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This template has not been submitted to Meta yet, so it has no approved Meta template name to send.",
+      });
+    }
+
+    // ----------------------------------------------------------
     // SEND TO CUSTOMERS
     // ----------------------------------------------------------
 
@@ -652,59 +680,29 @@ const sendTemplate = async (req, res) => {
         }
 
         // ------------------------------------------------------
-        // GET / CREATE CONVERSATION
+        // GET / CREATE CONVERSATION (scoped to this company)
         // ------------------------------------------------------
 
-        let conversation =
-          await getOrCreateConversation(
-            customer.phone
-          );
-
-        if (
-          conversation.customerId !== customerId
-        ) {
-          conversation =
-            await prisma.conversation.update({
-              where: {
-                id: conversation.id,
-              },
-
-              data: {
-                customerId,
-              },
-            });
-        }
+        const conversation = await getOrCreateSaaSConversation(
+          req.user.companyId,
+          whatsappAccount.id,
+          customer.phone
+        );
 
         // ------------------------------------------------------
-        // SEND META TEMPLATE
+        // SEND META TEMPLATE (using this company's own WABA/token)
         // ------------------------------------------------------
 
-        /*
-         * IMPORTANT:
-         *
-         * This currently assumes your Template model
-         * contains the actual Meta template name.
-         *
-         * Your current Prisma model does NOT yet have
-         * metaTemplateName.
-         *
-         * Therefore this is a temporary placeholder.
-         *
-         * We will add the Meta fields later when you
-         * connect Embedded Signup / WABA.
-         */
-
-        const metaTemplateName =
-          template.name;
-
+        const metaTemplateName = template.name;
         const variables = [];
 
-        const result =
-          await sendTemplateMessage(
-            customer.phone,
-            metaTemplateName,
-            variables
-          );
+        const result = await sendTemplateMessage(
+          req.user.companyId,
+          customer.phone,
+          metaTemplateName,
+          template.language,
+          variables
+        );
 
         let sendStatus = "FAILED";
         let metaMessageId = null;
@@ -986,6 +984,10 @@ const getTemplateRecipients = async (
 // SUBMIT TEMPLATE FOR APPROVAL
 // ============================================================
 
+// ============================================================
+// SUBMIT TEMPLATE FOR APPROVAL  (now actually calls Meta)
+// ============================================================
+
 const submitTemplateForApproval = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1012,10 +1014,7 @@ const submitTemplateForApproval = async (req, res) => {
     // ONLY DRAFT / REJECTED CAN BE SUBMITTED
     // ----------------------------------------------------------
 
-    if (
-      template.status !== "DRAFT" &&
-      template.status !== "REJECTED"
-    ) {
+    if (template.status !== "DRAFT" && template.status !== "REJECTED") {
       return res.status(400).json({
         success: false,
         message: `Template cannot be submitted from ${template.status} status.`,
@@ -1027,44 +1026,75 @@ const submitTemplateForApproval = async (req, res) => {
     // ----------------------------------------------------------
 
     if (!template.name?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Template name is required.",
-      });
+      return res.status(400).json({ success: false, message: "Template name is required." });
     }
-
     if (!template.category) {
-      return res.status(400).json({
-        success: false,
-        message: "Template category is required.",
-      });
+      return res.status(400).json({ success: false, message: "Template category is required." });
     }
-
     if (!template.language) {
-      return res.status(400).json({
-        success: false,
-        message: "Template language is required.",
-      });
+      return res.status(400).json({ success: false, message: "Template language is required." });
     }
-
     if (!template.content?.trim()) {
+      return res.status(400).json({ success: false, message: "Template body is required." });
+    }
+
+    // ----------------------------------------------------------
+    // CONFIRM COMPANY HAS A CONNECTED WHATSAPP ACCOUNT
+    // ----------------------------------------------------------
+
+    const whatsappAccount = await prisma.whatsAppAccount.findFirst({
+      where: {
+        companyId: req.user.companyId,
+        status: "CONNECTED",
+      },
+    });
+
+    if (!whatsappAccount || !whatsappAccount.wabaId || !whatsappAccount.whatsappAccessToken) {
       return res.status(400).json({
         success: false,
-        message: "Template body is required.",
+        message:
+          "No connected WhatsApp Business Account found for your company. Please connect WhatsApp before submitting templates.",
       });
     }
 
     // ----------------------------------------------------------
-    // UPDATE STATUS
+    // CALL META'S GRAPH API (using this company's own WABA + token)
     // ----------------------------------------------------------
+
+    const metaResult = await createMetaTemplate(req.user.companyId, {
+      name: template.name,
+      category: template.category,
+      language: template.language,
+      headerType: template.headerType,
+      headerContent: template.headerContent,
+      bodyText: template.content,
+      footerContent: template.footerContent,
+    });
+
+    if (!metaResult.success) {
+      const metaErrorMessage =
+        typeof metaResult.error === "string"
+          ? metaResult.error
+          : metaResult.error?.message || "Unknown error";
+
+      return res.status(400).json({
+        success: false,
+        message: `Meta rejected this template: ${metaErrorMessage}`,
+      });
+    }
+
+    // ----------------------------------------------------------
+    // UPDATE LOCAL RECORD WITH META'S RESPONSE
+    // ----------------------------------------------------------
+    // Meta's create-template response includes: { id, status, category }
+    // status here is usually "PENDING" immediately after creation.
 
     const updatedTemplate = await prisma.template.update({
-      where: {
-        id: template.id,
-      },
-
+      where: { id: template.id },
       data: {
         status: "PENDING",
+        metaTemplateId: metaResult.data.id,
+        rejectionReason: null,
       },
     });
 
@@ -1078,15 +1108,9 @@ const submitTemplateForApproval = async (req, res) => {
       module: "TEMPLATE",
       entityId: updatedTemplate.id,
       entityName: updatedTemplate.name,
-
       changes: {
-        before: {
-          status: template.status,
-        },
-
-        after: {
-          status: updatedTemplate.status,
-        },
+        before: { status: template.status },
+        after: { status: updatedTemplate.status, metaTemplateId: metaResult.data.id },
       },
     });
 
@@ -1096,14 +1120,11 @@ const submitTemplateForApproval = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Template submitted for approval successfully.",
+      message: "Template submitted to Meta for approval.",
       data: updatedTemplate,
     });
   } catch (error) {
-    console.error(
-      "Submit Template For Approval Error:",
-      error
-    );
+    console.error("Submit Template For Approval Error:", error);
 
     return res.status(500).json({
       success: false,

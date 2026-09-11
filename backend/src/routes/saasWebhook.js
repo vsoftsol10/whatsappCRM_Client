@@ -50,9 +50,47 @@ router.post("/", async (req, res) => {
 
     const entry = req.body.entry?.[0];
     const change = entry?.changes?.[0];
+    const field = change?.field;
     const value = change?.value;
 
     if (!value) {
+      return res.sendStatus(200);
+    }
+
+    // ============================================
+    // TEMPLATE STATUS UPDATE (Approved / Rejected / Paused / Disabled)
+    // ============================================
+    // Must be checked BEFORE the phone_number_id lookup below,
+    // since template status events don't include a phone_number_id.
+
+    if (field === "message_template_status_update") {
+      const metaTemplateId = value.message_template_id?.toString();
+      const newStatus = value.event; // "APPROVED" | "REJECTED" | "PAUSED" | "DISABLED"
+      const reason = value.reason || null;
+
+      console.log("Template status update:", {
+        metaTemplateId,
+        newStatus,
+        reason,
+      });
+
+      if (metaTemplateId) {
+        try {
+          await prisma.template.updateMany({
+            where: { metaTemplateId },
+            data: {
+              status: newStatus,
+              rejectionReason: newStatus === "REJECTED" ? reason : null,
+            },
+          });
+        } catch (error) {
+          console.error(
+            "Failed to update template status from webhook:",
+            error
+          );
+        }
+      }
+
       return res.sendStatus(200);
     }
 

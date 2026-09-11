@@ -869,10 +869,17 @@ model Template {
 
   content String
 
+  headerType    HeaderType @default(NONE)
+  headerContent String?
+  footerContent String?
+
   status TemplateStatus @default(DRAFT)
 
   purpose  TemplatePurpose @default(CUSTOM)
   autoSend Boolean         @default(false)
+
+  metaTemplateId  String?
+  rejectionReason String?
 
   createdById String
 
@@ -890,6 +897,7 @@ model Template {
   @@index([companyId])
   @@index([whatsappAccountId])
   @@index([createdById])
+  @@index([metaTemplateId])
 }
 
 //////////////////////////////////////////////////////
@@ -1154,6 +1162,14 @@ enum TemplateCategory {
   AUTHENTICATION
 }
 
+enum HeaderType {
+  NONE
+  TEXT
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
 enum TemplatePurpose {
   WELCOME
   ORDER_CONFIRMATION
@@ -1377,4 +1393,24 @@ model AiSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Testimonial {
+  id           Int               @id @default(autoincrement())
+  customerName String
+  designation  String?
+  companyName  String?
+  content      String
+  rating       Int               @default(5)
+  status       TestimonialStatus @default(DRAFT)
+  displayOrder Int               @default(0)
+  isFeatured   Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+enum TestimonialStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
 }
