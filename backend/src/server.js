@@ -161,11 +161,8 @@
 //   console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
 // });
 
+
 const dns = require("dns");
-// Render's network doesn't have a working IPv6 route, but Node 17+
-// resolves hostnames IPv6-first by default. This breaks outbound
-// connections like Gmail SMTP (nodemailer) with ENETUNREACH.
-// Forcing IPv4-first resolution for the whole process fixes it.
 dns.setDefaultResultOrder("ipv4first");
 
 const express = require("express");
@@ -197,44 +194,119 @@ const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
 const aiSettingsRoutes = require("./routes/aiSettingsRoutes");
 const backupRoutes = require("./routes/backupRoutes");
 
+const saasWebhookRoutes = require("./routes/saasWebhook");
+
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// ======================================================
+// GLOBAL MIDDLEWARE
+// ======================================================
 
-// Routes
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
+// Parse JSON requests
+app.use(express.json({ limit: "10mb" }));
+
+// Parse URL encoded requests
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+  })
+);
+
+// ======================================================
+// DEBUG BODY MIDDLEWARE
+// ======================================================
+
+app.use((req, res, next) => {
+  if (
+    req.path.includes("/customers/import") ||
+    req.path.includes("/customers")
+  ) {
+    console.log("========================================");
+    console.log("REQUEST:", req.method, req.originalUrl);
+    console.log("CONTENT-TYPE:", req.headers["content-type"]);
+    console.log("BODY:", req.body);
+    console.log("========================================");
+  }
+
+  next();
+});
+
+// ======================================================
+// API ROUTES
+// ======================================================
+
 app.use("/api/auth", authRoutes);
+
 app.use("/api/users", userRoutes);
+
 app.use("/api/customers", customerRoutes);
+
 app.use("/api/employees", employeeRoutes);
+
 app.use("/api/conversations", conversationRoutes);
+
 app.use("/api/messages", messageRoutes);
+
 app.use("/api/dashboard", dashboardRoutes);
+
 app.use("/api/leads", leadRoutes);
+
 app.use("/api/campaigns", campaignRoutes);
+
 app.use("/api/templates", templateRoutes);
+
 app.use("/api/tasks", taskRoutes);
+
 app.use("/api/tickets", ticketRoutes);
+
 app.use("/api/deals", dealRoutes);
+
 app.use("/api/deals", dealActivityRoutes);
+
 app.use("/api/webhook", webhookRoutes);
-app.use("/api/user-notifications", userNotificationRoutes);
-app.use("/api/subscriptions", subscriptionRoutes);
-app.use("/api/subscriptions", planRoutes);
-app.use("/api/upgrade-requests", upgradeRequestRoutes);
-app.use("/api/audit-logs", auditLogRoutes);
-app.use("/api/ai-settings", aiSettingsRoutes);
-const saasWebhookRoutes = require("./routes/saasWebhook");
+
+app.use(
+  "/api/user-notifications",
+  userNotificationRoutes
+);
+
+app.use(
+  "/api/subscriptions",
+  subscriptionRoutes
+);
+
+app.use(
+  "/api/subscriptions",
+  planRoutes
+);
+
+app.use(
+  "/api/upgrade-requests",
+  upgradeRequestRoutes
+);
+
+app.use(
+  "/api/audit-logs",
+  auditLogRoutes
+);
+
+app.use(
+  "/api/ai-settings",
+  aiSettingsRoutes
+);
+
 app.use(
   "/api/whatsapp/accounts",
   whatsappAccountRoutes
 );
-
-// Test route
-app.get("/", (req, res) => {
-  res.send("Backend is running...");
-});
 
 app.use(
   "/api/saas/webhook",
@@ -246,11 +318,45 @@ app.use(
   supportTicketRoutes
 );
 
-app.use("/api/backups", backupRoutes);
+app.use(
+  "/api/backups",
+  backupRoutes
+);
+
+// ======================================================
+// TEST ROUTE
+// ======================================================
+
+app.get("/", (req, res) => {
+  res.status(200).send("Backend is running...");
+});
+
+// ======================================================
+// GLOBAL ERROR HANDLER
+// ======================================================
+
+app.use((err, req, res, next) => {
+  console.error("========================================");
+  console.error("GLOBAL ERROR");
+  console.error(err);
+  console.error("========================================");
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
+});
+
+// ======================================================
+// START SERVER
+// ======================================================
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+  console.log(
+    "FRONTEND_URL:",
+    process.env.FRONTEND_URL
+  );
 });

@@ -3,6 +3,7 @@ const prisma = require("../config/prisma");
 const { validateCustomer } = require("../validations/customerValidation");
 const { normalizeIndianPhone } = require("../utils/phoneUtils");
 const { logAction } = require("../services/auditLogService");
+const customerImportService = require("../services/customerImportService");
 
 const createCustomer = async (req, res) => {
   try {
@@ -65,6 +66,65 @@ const createCustomer = async (req, res) => {
       success: false,
       message: error.message,
       error,
+    });
+  }
+};
+
+const previewCustomerImport = async (req, res) => {
+  try {
+    const result = await customerImportService.previewImport(
+      req.file,
+      req.user
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error(
+      "❌ Customer import preview error:",
+      error
+    );
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to preview customer import.",
+    });
+  }
+};
+
+const importCustomers = async (req, res) => {
+  try {
+    console.log("🔥 IMPORT BODY:", req.body);
+    console.log("🔥 IMPORT USER:", req.user);
+
+    const { rows } = req.body || {};
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No customer rows received for import.",
+      });
+    }
+
+    const result =
+      await customerImportService.importCustomers(
+        rows,
+        req.user
+      );
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error(
+      "❌ Customer import error:",
+      error
+    );
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to import customers.",
     });
   }
 };
@@ -330,4 +390,6 @@ module.exports = {
   getCustomerById,
   updateCustomer,
   deleteCustomer,
+  previewCustomerImport,
+  importCustomers,
 };
