@@ -69,6 +69,7 @@ model Company {
   employees                    Employee[]
   crmAuditLogs                 CrmAuditLog[]
   subscriptionUpgradeRequests  SubscriptionUpgradeRequest[]
+  backups Backup[]
 }
 
 enum CompanyStatus {
@@ -517,6 +518,8 @@ model User {
   dealActivities DealActivity[] @relation("CreatedDealActivities")
 
   notifications UserNotification[]
+
+  backups Backup[]
 
   assignedTasks Task[] @relation("AssignedTasks")
   createdTasks  Task[] @relation("CreatedTasks")
@@ -1413,4 +1416,60 @@ enum TestimonialStatus {
   DRAFT
   PUBLISHED
   HIDDEN
+}
+//////////////////////////////////////////////////////
+// CRM BACKUP
+//////////////////////////////////////////////////////
+
+model Backup {
+  id String @id @default(uuid())
+
+  // Company whose CRM data is being backed up
+  companyId Int
+
+  // User who manually created the backup
+  createdById String?
+
+  backupType BackupType @default(MANUAL)
+  status     BackupStatus @default(PENDING)
+
+  fileName    String?
+  storagePath String?
+
+  // Size of generated ZIP file in bytes
+  fileSize BigInt?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ///////////////////////////////////////
+  // RELATIONS
+  ///////////////////////////////////////
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  ///////////////////////////////////////
+  // INDEXES
+  ///////////////////////////////////////
+
+  @@index([companyId])
+  @@index([companyId, createdAt])
+  @@index([status])
+}
+
+enum BackupType {
+  MANUAL
+}
+
+enum BackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }

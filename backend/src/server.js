@@ -195,7 +195,7 @@ const supportTicketRoutes = require("./routes/supportTicketRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
 const aiSettingsRoutes = require("./routes/aiSettingsRoutes");
-
+const backupRoutes = require("./routes/backupRoutes");
 
 const app = express();
 
@@ -245,6 +245,8 @@ app.use(
   "/api/support-tickets",
   supportTicketRoutes
 );
+
+app.use("/api/backups", backupRoutes);
 
 const PORT = process.env.PORT || 5000;
 

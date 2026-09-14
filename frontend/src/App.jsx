@@ -1,3 +1,4 @@
+
 // import React from "react";
 // import {
 //   BrowserRouter,
@@ -28,6 +29,7 @@
 // import Templates from "./pages/Templates";
 
 // import AuditLogs from "./pages/settings/AuditLogs";
+// import AiAutoReply from "./pages/settings/AiAutoReply";
 // import AddCustomer from "./pages/AddCustomer";
 // // import EditCustomer from "./pages/EditCustomer";
 
@@ -174,6 +176,11 @@
 //                 element={<AuditLogs />}
 //               />
 
+//               <Route
+//                 path="/settings/ai-auto-reply"
+//                 element={<AiAutoReply />}
+//               />
+
 //             </Route>
 //           </Route>
 //         </Route>
@@ -231,7 +238,6 @@ import AiAutoReply from "./pages/settings/AiAutoReply";
 import AddCustomer from "./pages/AddCustomer";
 // import EditCustomer from "./pages/EditCustomer";
 
-
 import EditEmployee from "./pages/EditEmployee";
 import ViewEmployee from "./pages/ViewEmployee";
 
@@ -247,6 +253,8 @@ import SecuritySettings from "./pages/settings/SecuritySettings";
 import BillingSubscription from "./pages/settings/BillingSubscription";
 import Plans from "./pages/settings/Plans";
 
+// BACKUP
+import Backup from "./pages/Backup";
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -254,7 +262,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* LOGIN */}
+        {/* =====================================================
+            LOGIN
+        ====================================================== */}
+
         <Route
           path="/login"
           element={
@@ -276,26 +287,43 @@ function App() {
           element={<ResetPassword />}
         />
 
-        {/* PROTECTED ROUTES */}
-        <Route element={<ProtectedRoute />}>
-          {/* LAYOUT */}
-          <Route element={<AppLayout />}>
-            {/* Dashboard */}
-            <Route path="/dashboard" element={<Dashboard />} />
+        {/* =====================================================
+            PROTECTED ROUTES
+        ====================================================== */}
 
-            {/* CRM */}
+        <Route element={<ProtectedRoute />}>
+          {/* =================================================
+              MAIN APP LAYOUT
+          ================================================== */}
+
+          <Route element={<AppLayout />}>
+            {/* =================================================
+                DASHBOARD
+            ================================================== */}
+
+            <Route
+              path="/dashboard"
+              element={<Dashboard />}
+            />
+
+            {/* =================================================
+                CRM
+            ================================================== */}
+
             <Route
               path="/conversations"
               element={<Conversations />}
             />
 
-            <Route path="/customers" element={<Customers />} />
+            <Route
+              path="/customers"
+              element={<Customers />}
+            />
 
             <Route
               path="/customers/add"
               element={<AddCustomer />}
             />
-
 
             <Route
               path="/customers/:id"
@@ -307,21 +335,52 @@ function App() {
               element={<CampaignDetails />}
             />
 
+            <Route
+              path="/leads"
+              element={<Leads />}
+            />
 
+            <Route
+              path="/campaigns"
+              element={<Campaigns />}
+            />
 
-            <Route path="/leads" element={<Leads />} />
+            <Route
+              path="/templates"
+              element={<Templates />}
+            />
 
-            <Route path="/campaigns" element={<Campaigns />} />
+            <Route
+              path="/tasks"
+              element={<Tasks />}
+            />
 
-            <Route path="/templates" element={<Templates />} />
+            <Route
+              path="/tickets"
+              element={<TicketsPage />}
+            />
 
-            <Route path="/tasks" element={<Tasks />} />
+            {/* =================================================
+                BACKUP & RESTORE
+            ================================================== */}
 
-            <Route path="/tickets" element={<TicketsPage />} />
+            <Route
+              path="/backup"
+              element={<Backup />}
+            />
+
+            {/* =================================================
+                SETTINGS
+            ================================================== */}
 
             <Route
               path="/settings"
-              element={<Navigate to="/settings/profile" replace />}
+              element={
+                <Navigate
+                  to="/settings/profile"
+                  replace
+                />
+              }
             />
 
             <Route
@@ -349,20 +408,25 @@ function App() {
               element={<ChangePassword />}
             />
 
-            {/* ADMIN ROUTES */}
+            {/* =================================================
+                ADMIN ROUTES
+            ================================================== */}
+
             <Route element={<AdminRoute />}>
               <Route
                 path="/employees"
                 element={<ManageEmployees />}
               />
 
-
               <Route
                 path="/employees/edit/:id"
                 element={<EditEmployee />}
               />
 
-              <Route path="/employees/:id" element={<ViewEmployee />} />
+              <Route
+                path="/employees/:id"
+                element={<ViewEmployee />}
+              />
 
               <Route
                 path="/settings/support"
@@ -378,21 +442,36 @@ function App() {
                 path="/settings/ai-auto-reply"
                 element={<AiAutoReply />}
               />
-
             </Route>
           </Route>
         </Route>
 
-        {/* ROOT */}
+        {/* =====================================================
+            ROOT
+        ====================================================== */}
+
         <Route
           path="/"
-          element={<Navigate to="/dashboard" replace />}
+          element={
+            <Navigate
+              to="/dashboard"
+              replace
+            />
+          }
         />
 
-        {/* FALLBACK */}
+        {/* =====================================================
+            FALLBACK
+        ====================================================== */}
+
         <Route
           path="*"
-          element={<Navigate to="/dashboard" replace />}
+          element={
+            <Navigate
+              to="/dashboard"
+              replace
+            />
+          }
         />
       </Routes>
     </BrowserRouter>
