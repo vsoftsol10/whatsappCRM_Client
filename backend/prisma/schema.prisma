@@ -1473,3 +1473,58 @@ enum BackupStatus {
   COMPLETED
   FAILED
 }
+//////////////////////////////////////////////////////
+// SUPER ADMIN BACKUP
+//////////////////////////////////////////////////////
+
+model SuperAdminBackup {
+  id String @id @default(uuid())
+
+  backupId String @unique
+
+  backupType SuperAdminBackupType @default(MANUAL)
+  status     SuperAdminBackupStatus @default(PENDING)
+
+  fileName    String?
+  storagePath String?
+
+  fileSize BigInt?
+
+  companiesCount             Int @default(0)
+  subscriptionsCount         Int @default(0)
+  subscriptionPlansCount    Int @default(0)
+  subscriptionRemindersCount Int @default(0)
+  upgradeRequestsCount      Int @default(0)
+  employeesCount             Int @default(0)
+  notificationsCount        Int @default(0)
+  supportTicketsCount       Int @default(0)
+  supportTicketNotesCount   Int @default(0)
+  paymentsCount             Int @default(0)
+  testimonialsCount         Int @default(0)
+  auditLogsCount            Int @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  errorMessage String?
+
+  createdById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([createdById])
+}
+
+enum SuperAdminBackupType {
+  MANUAL
+}
+
+enum SuperAdminBackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
