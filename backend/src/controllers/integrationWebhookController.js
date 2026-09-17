@@ -3,36 +3,63 @@ const prisma = require("../config/prisma");
 // ======================================================
 // RECEIVE INTEGRATION WEBHOOK
 // ======================================================
+//
+// External systems call:
+//
+// POST /api/integrations/webhook/:webhookKey
+//
+// Example:
+//
+// POST /api/integrations/webhook/8f7c2a1b9e...
+//
+// The webhookKey identifies the Integration.
+//
+// IMPORTANT:
+// We do NOT trust companyId from the webhook payload.
+// The companyId always comes from the Integration record.
+// ======================================================
 
 const receiveIntegrationWebhook = async (req, res) => {
+    let integrationEventId = null;
+
     try {
         console.log("========================================");
         console.log("INTEGRATION WEBHOOK RECEIVED");
         console.log("========================================");
 
         // --------------------------------------------------
-        // 1. READ INTEGRATION DETAILS
+        // 1. READ WEBHOOK KEY FROM URL
         // --------------------------------------------------
 
-        const integrationId = Number(req.headers["x-integration-id"]);
-        const webhookSecret = req.headers["x-webhook-secret"];
+        const { webhookKey } = req.params;
 
-        console.log("Integration ID:", integrationId);
+        console.log("Webhook Key received:", webhookKey);
 
-        if (!integrationId || !webhookSecret) {
+        if (!webhookKey) {
             return res.status(401).json({
                 success: false,
-                message: "Integration ID and webhook secret are required",
+                message: "Webhook key is required",
             });
         }
 
         // --------------------------------------------------
-        // 2. FIND INTEGRATION
+        // 2. FIND INTEGRATION USING WEBHOOK KEY
+        // --------------------------------------------------
+        //
+        // This identifies:
+        //
+        // webhookKey
+        //      ↓
+        // Integration
+        //      ↓
+        // companyId
+        //
+        // We do NOT take companyId from the external system.
         // --------------------------------------------------
 
         const integration = await prisma.integration.findUnique({
             where: {
-                id: integrationId,
+                webhookKey,
             },
         });
 
@@ -43,8 +70,13 @@ const receiveIntegrationWebhook = async (req, res) => {
             });
         }
 
+        console.log("Integration ID:", integration.id);
+        console.log("Integration Name:", integration.name);
+        console.log("Provider:", integration.provider);
+        console.log("Company ID:", integration.companyId);
+
         // --------------------------------------------------
-        // 3. CHECK STATUS
+        // 3. CHECK INTEGRATION STATUS
         // --------------------------------------------------
 
         if (integration.status !== "ACTIVE") {
@@ -55,32 +87,41 @@ const receiveIntegrationWebhook = async (req, res) => {
         }
 
         // --------------------------------------------------
-        // 4. VERIFY WEBHOOK SECRET
-        // --------------------------------------------------
-
-        if (integration.webhookSecret !== webhookSecret) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid webhook secret",
-            });
-        }
-
-        console.log("Company ID:", integration.companyId);
-
-        // --------------------------------------------------
-        // 5. READ PAYLOAD
+        // 4. READ WEBHOOK PAYLOAD
         // --------------------------------------------------
 
         const payload = req.body;
 
         console.log("Webhook payload:", payload);
 
-        if (!payload || typeof payload !== "object") {
+        if (
+            !payload ||
+            typeof payload !== "object" ||
+            Array.isArray(payload)
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid webhook payload",
             });
         }
+
+        // --------------------------------------------------
+        // 5. READ COMMON EVENT INFORMATION
+        // --------------------------------------------------
+        //
+        // For our generic/custom webhook we expect:
+        //
+        // {
+        //   eventId: "...",
+        //   eventType: "...",
+        //   customer: {...},
+        //   order: {...}
+        // }
+        //
+        // Later, provider adapters will convert
+        // Square / Shopify / other payloads into this
+        // common format.
+        // --------------------------------------------------
 
         const {
             eventId,
@@ -100,25 +141,47 @@ const receiveIntegrationWebhook = async (req, res) => {
             });
         }
 
+        // Convert eventId to string so different providers
+        // can safely send numeric/string IDs.
+        const normalizedEventId = String(eventId);
+
+        const normalizedEventType = String(eventType);
+
         // --------------------------------------------------
         // 7. CHECK DUPLICATE EVENT
         // --------------------------------------------------
+        //
+        // Duplicate protection is scoped to the Integration.
+        //
+        // Integration 1 + EVENT-001
+        //
+        // is different from:
+        //
+        // Integration 2 + EVENT-001
+        // --------------------------------------------------
 
-        const existingEvent = await prisma.integrationEvent.findUnique({
-            where: {
-                integrationId_eventId: {
-                    integrationId,
-                    eventId,
+        const existingEvent =
+            await prisma.integrationEvent.findUnique({
+                where: {
+                    integrationId_eventId: {
+                        integrationId: integration.id,
+                        eventId: normalizedEventId,
+                    },
                 },
-            },
-        });
+            });
 
         if (existingEvent) {
+            console.log(
+                "Duplicate webhook event:",
+                normalizedEventId
+            );
+
             return res.status(200).json({
                 success: true,
                 message: "Webhook already processed",
                 duplicate: true,
-                eventId,
+                eventId: normalizedEventId,
+                integrationEventId: existingEvent.id,
             });
         }
 
@@ -129,13 +192,15 @@ const receiveIntegrationWebhook = async (req, res) => {
         const integrationEvent =
             await prisma.integrationEvent.create({
                 data: {
-                    integrationId,
-                    eventId,
-                    eventType,
+                    integrationId: integration.id,
+                    eventId: normalizedEventId,
+                    eventType: normalizedEventType,
                     payload,
                     status: "RECEIVED",
                 },
             });
+
+        integrationEventId = integrationEvent.id;
 
         console.log(
             "Integration event saved:",
@@ -161,11 +226,40 @@ const receiveIntegrationWebhook = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Customer phone is required",
+                integrationEventId:
+                    integrationEvent.id,
             });
         }
 
         // --------------------------------------------------
-        // 10. FIND ADMIN USER FOR THIS COMPANY
+        // 10. NORMALIZE CUSTOMER DATA
+        // --------------------------------------------------
+
+        const phone = String(customer.phone).trim();
+
+        if (!phone) {
+            await prisma.integrationEvent.update({
+                where: {
+                    id: integrationEvent.id,
+                },
+                data: {
+                    status: "FAILED",
+                    errorMessage:
+                        "Customer phone cannot be empty",
+                },
+            });
+
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Customer phone cannot be empty",
+                integrationEventId:
+                    integrationEvent.id,
+            });
+        }
+
+        // --------------------------------------------------
+        // 11. FIND ADMIN USER FOR THIS COMPANY
         // --------------------------------------------------
 
         const adminUser = await prisma.user.findFirst({
@@ -196,6 +290,8 @@ const receiveIntegrationWebhook = async (req, res) => {
                 success: false,
                 message:
                     "No ADMIN user found for this company",
+                integrationEventId:
+                    integrationEvent.id,
             });
         }
 
@@ -206,10 +302,16 @@ const receiveIntegrationWebhook = async (req, res) => {
         );
 
         // --------------------------------------------------
-        // 11. FIND EXISTING CUSTOMER
+        // 12. FIND EXISTING CUSTOMER
         // --------------------------------------------------
-
-        const phone = String(customer.phone).trim();
+        //
+        // IMPORTANT:
+        // Customer search is always restricted to the
+        // integration's company.
+        //
+        // This prevents one company from accessing another
+        // company's customers.
+        // --------------------------------------------------
 
         let existingCustomer =
             await prisma.customer.findFirst({
@@ -222,7 +324,7 @@ const receiveIntegrationWebhook = async (req, res) => {
         let crmCustomer;
 
         // --------------------------------------------------
-        // 12. UPDATE EXISTING CUSTOMER
+        // 13. UPDATE EXISTING CUSTOMER
         // --------------------------------------------------
 
         if (existingCustomer) {
@@ -258,7 +360,7 @@ const receiveIntegrationWebhook = async (req, res) => {
         }
 
         // --------------------------------------------------
-        // 13. CREATE NEW CUSTOMER
+        // 14. CREATE NEW CUSTOMER
         // --------------------------------------------------
 
         else {
@@ -273,7 +375,8 @@ const receiveIntegrationWebhook = async (req, res) => {
                         userId: adminUser.id,
 
                         name:
-                            customer.name || "Unknown Customer",
+                            customer.name ||
+                            "Unknown Customer",
 
                         phone,
 
@@ -292,9 +395,8 @@ const receiveIntegrationWebhook = async (req, res) => {
             );
         }
 
-
         // --------------------------------------------------
-        // 14. CREATE PURCHASE
+        // 15. CREATE PURCHASE
         // --------------------------------------------------
 
         let purchase = null;
@@ -302,34 +404,53 @@ const receiveIntegrationWebhook = async (req, res) => {
         if (order && order.orderId) {
             console.log("Creating purchase...");
 
-            purchase = await prisma.purchase.create({
-                data: {
-                    companyId: integration.companyId,
-                    customerId: crmCustomer.id,
-                    integrationId: integration.id,
+            purchase =
+                await prisma.purchase.create({
+                    data: {
+                        companyId:
+                            integration.companyId,
 
-                    externalOrderId: String(order.orderId),
+                        customerId:
+                            crmCustomer.id,
 
-                    amount: Number(order.amount) || 0,
+                        integrationId:
+                            integration.id,
 
-                    currency: order.currency || "INR",
+                        externalOrderId:
+                            String(order.orderId),
 
-                    status: "PAID",
+                        amount:
+                            Number(order.amount) || 0,
 
-                    purchaseDate: new Date(),
+                        currency:
+                            order.currency || "INR",
 
-                    source: integration.name,
-                },
-            });
+                        status: "PAID",
+
+                        purchaseDate:
+                            order.purchaseDate
+                                ? new Date(
+                                    order.purchaseDate
+                                )
+                                : new Date(),
+
+                        source:
+                            integration.name,
+                    },
+                });
 
             console.log(
                 "Purchase created:",
                 purchase.id
             );
+        } else {
+            console.log(
+                "No order information. Purchase not created."
+            );
         }
 
         // --------------------------------------------------
-        // 14. UPDATE INTEGRATION EVENT
+        // 16. UPDATE INTEGRATION EVENT
         // --------------------------------------------------
 
         await prisma.integrationEvent.update({
@@ -343,28 +464,43 @@ const receiveIntegrationWebhook = async (req, res) => {
         });
 
         // --------------------------------------------------
-        // 15. UPDATE INTEGRATION
+        // 17. UPDATE INTEGRATION LAST EVENT TIME
         // --------------------------------------------------
 
         await prisma.integration.update({
             where: {
-                id: integrationId,
+                id: integration.id,
             },
             data: {
                 lastEventAt: new Date(),
             },
         });
 
-        console.log("Webhook processing completed");
-        console.log("Customer ID:", crmCustomer.id);
+        console.log(
+            "Webhook processing completed"
+        );
+
+        console.log(
+            "Customer ID:",
+            crmCustomer.id
+        );
+
         console.log("========================================");
+
+        // --------------------------------------------------
+        // 18. SUCCESS RESPONSE
+        // --------------------------------------------------
 
         return res.status(200).json({
             success: true,
             message:
                 "Webhook processed successfully",
 
-            eventId,
+            eventId:
+                normalizedEventId,
+
+            integrationId:
+                integration.id,
 
             integrationEventId:
                 integrationEvent.id,
@@ -379,10 +515,14 @@ const receiveIntegrationWebhook = async (req, res) => {
             purchase: purchase
                 ? {
                     id: purchase.id,
-                    orderId: purchase.externalOrderId,
-                    amount: purchase.amount,
-                    currency: purchase.currency,
-                    status: purchase.status,
+                    orderId:
+                        purchase.externalOrderId,
+                    amount:
+                        purchase.amount,
+                    currency:
+                        purchase.currency,
+                    status:
+                        purchase.status,
                 }
                 : null,
         });
@@ -392,11 +532,39 @@ const receiveIntegrationWebhook = async (req, res) => {
             error
         );
 
+        // --------------------------------------------------
+        // MARK SAVED EVENT AS FAILED
+        // --------------------------------------------------
+
+        if (integrationEventId) {
+            try {
+                await prisma.integrationEvent.update({
+                    where: {
+                        id: integrationEventId,
+                    },
+                    data: {
+                        status: "FAILED",
+                        errorMessage:
+                            error.message ||
+                            "Unknown webhook processing error",
+                    },
+                });
+            } catch (updateError) {
+                console.error(
+                    "Failed to update integration event:",
+                    updateError
+                );
+            }
+        }
+
         return res.status(500).json({
             success: false,
             message:
                 "Failed to process integration webhook",
-            error: error.message,
+            error:
+                process.env.NODE_ENV === "development"
+                    ? error.message
+                    : undefined,
         });
     }
 };

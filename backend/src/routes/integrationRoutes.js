@@ -1,3 +1,5 @@
+
+
 // const express = require("express");
 
 // const router = express.Router();
@@ -10,39 +12,72 @@
 //   deleteIntegration,
 // } = require("../controllers/integrationController");
 
-// // Use the SAME authentication middleware
-// // that your existing CRM routes use.
+// const {
+//   getIntegrationEvents,
+// } = require("../controllers/integrationEventController");
+
 // const authMiddleware = require("../middleware/authMiddleware");
 
 // // ==========================================
 // // GET ALL INTEGRATIONS
 // // ==========================================
 
-// router.get("/", authMiddleware, getIntegrations);
+// router.get(
+//   "/",
+//   authMiddleware,
+//   getIntegrations
+// );
+
+// // ==========================================
+// // GET INTEGRATION EVENTS
+// // IMPORTANT: Keep this BEFORE /:id
+// // ==========================================
+
+// router.get(
+//   "/:id/events",
+//   authMiddleware,
+//   getIntegrationEvents
+// );
 
 // // ==========================================
 // // GET SINGLE INTEGRATION
 // // ==========================================
 
-// router.get("/:id", authMiddleware, getIntegrationById);
+// router.get(
+//   "/:id",
+//   authMiddleware,
+//   getIntegrationById
+// );
 
 // // ==========================================
 // // CREATE INTEGRATION
 // // ==========================================
 
-// router.post("/", authMiddleware, createIntegration);
+// router.post(
+//   "/",
+//   authMiddleware,
+//   createIntegration
+// );
 
 // // ==========================================
 // // UPDATE INTEGRATION STATUS
 // // ==========================================
 
-// router.put("/:id/status", authMiddleware, updateIntegrationStatus);
+// router.put(
+//   "/:id/status",
+//   authMiddleware,
+//   updateIntegrationStatus
+// );
 
 // // ==========================================
 // // DELETE INTEGRATION
 // // ==========================================
 
-// router.delete("/:id", authMiddleware, deleteIntegration);
+// router.delete(
+//   "/:id",
+//   authMiddleware,
+//   deleteIntegration
+// );
 
 // module.exports = router;
 
@@ -62,6 +97,10 @@ const {
 const {
   getIntegrationEvents,
 } = require("../controllers/integrationEventController");
+
+const {
+  receiveIntegrationWebhook,
+} = require("../controllers/integrationWebhookController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -124,6 +163,19 @@ router.delete(
   "/:id",
   authMiddleware,
   deleteIntegration
+);
+
+// ==========================================
+// EXTERNAL WEBHOOK
+// IMPORTANT:
+// - NO authMiddleware here
+// - External billing/e-commerce system calls this
+// - webhookKey identifies the integration
+// ==========================================
+
+router.post(
+  "/webhook/:webhookKey",
+  receiveIntegrationWebhook
 );
 
 module.exports = router;

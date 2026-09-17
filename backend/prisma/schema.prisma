@@ -1550,14 +1550,13 @@ enum IntegrationStatus {
 
 model Integration {
   id Int @id @default(autoincrement())
-
   companyId Int
-
   name String
   provider String?
   type IntegrationType
 
-  webhookSecret String
+  webhookKey String? @unique
+  webhookSecret String?
 
   status IntegrationStatus @default(ACTIVE)
 
@@ -1568,7 +1567,6 @@ model Integration {
   updatedAt DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
   events IntegrationEvent[]
   purchases Purchase[]
 

@@ -47,9 +47,21 @@ const createIntegration = async (req, res) => {
     }
 
     // ------------------------------------------
-    // GENERATE WEBHOOK SECRET
+    // GENERATE WEBHOOK KEY + SECRET
+    // ------------------------------------------
+    //
+    // webhookKey:
+    // Used to uniquely identify this integration.
+    //
+    // webhookSecret:
+    // Used for authentication/verification.
+    //
+    // Different providers may use different
+    // authentication methods later, so secret
+    // remains optional in the database.
     // ------------------------------------------
 
+    const webhookKey = crypto.randomBytes(16).toString("hex");
     const webhookSecret = crypto.randomBytes(32).toString("hex");
 
     // ------------------------------------------
@@ -62,9 +74,14 @@ const createIntegration = async (req, res) => {
         name: name.trim(),
         provider: provider?.trim() || null,
         type,
+        webhookKey,
         webhookSecret,
       },
     });
+
+    // ------------------------------------------
+    // RESPONSE
+    // ------------------------------------------
 
     return res.status(201).json({
       success: true,
@@ -75,7 +92,12 @@ const createIntegration = async (req, res) => {
         provider: integration.provider,
         type: integration.type,
         status: integration.status,
+
+        // Show these when integration is created
+        // so the user can configure the external system.
+        webhookKey: integration.webhookKey,
         webhookSecret: integration.webhookSecret,
+
         lastEventAt: integration.lastEventAt,
         lastSyncAt: integration.lastSyncAt,
         createdAt: integration.createdAt,
@@ -87,7 +109,10 @@ const createIntegration = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to create integration",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
     });
   }
 };
@@ -116,6 +141,9 @@ const getIntegrations = async (req, res) => {
         provider: true,
         type: true,
         status: true,
+
+        // Do not expose secret/key in the list.
+        // They are available in Integration Details.
         lastEventAt: true,
         lastSyncAt: true,
         createdAt: true,
@@ -133,7 +161,10 @@ const getIntegrations = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch integrations",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
     });
   }
 };
@@ -173,7 +204,11 @@ const getIntegrationById = async (req, res) => {
         provider: true,
         type: true,
         status: true,
+
+        // New webhook identification fields
+        webhookKey: true,
         webhookSecret: true,
+
         lastEventAt: true,
         lastSyncAt: true,
         createdAt: true,
@@ -198,7 +233,10 @@ const getIntegrationById = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch integration",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
     });
   }
 };
@@ -281,7 +319,10 @@ const updateIntegrationStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update integration status",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
     });
   }
 };
@@ -344,7 +385,10 @@ const deleteIntegration = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to delete integration",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
     });
   }
 };
