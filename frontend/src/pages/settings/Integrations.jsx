@@ -359,9 +359,9 @@ const Integrations = () => {
   // WEBHOOK URL
   // =========================================================
 
-  const webhookUrl = `${
-    import.meta.env.VITE_API_URL
-  }/integrations/webhook`;
+const webhookUrl = selectedIntegration?.webhookKey
+  ? `${import.meta.env.VITE_API_URL}/integrations/webhook/${selectedIntegration.webhookKey}`
+  : "";
 
   // =========================================================
   // LOADING STATE
