@@ -47,15 +47,14 @@ function EditCustomer({
 
         setFormData({
           name: data.customer.name || "",
-          phone: data.customer.phone || "",
+          phone: data.customer.phone
+            ? String(data.customer.phone).replace(/^91/, "")
+            : "",
           email: data.customer.email || "",
-          company:
-            data.customer.companyName || "",
+          company: data.customer.companyName || "",
           source: data.customer.source || "",
-          requirements:
-            data.customer.requirements || "",
-          status:
-            data.customer.status || "ACTIVE",
+          requirements: data.customer.requirements || "",
+          status: data.customer.status || "ACTIVE",
         });
       } catch (error) {
         console.error(
@@ -285,8 +284,8 @@ function EditCustomer({
               onChange={handleChange}
               disabled={loading}
               className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.name
-                  ? "border-red-500"
-                  : "border-gray-300 focus:border-[#25D366]"
+                ? "border-red-500"
+                : "border-gray-300 focus:border-[#25D366]"
                 }`}
             />
 
@@ -311,8 +310,8 @@ function EditCustomer({
               onChange={handleChange}
               disabled={loading}
               className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.phone
-                  ? "border-red-500"
-                  : "border-gray-300 focus:border-[#25D366]"
+                ? "border-red-500"
+                : "border-gray-300 focus:border-[#25D366]"
                 }`}
             />
 
@@ -339,8 +338,8 @@ function EditCustomer({
               onChange={handleChange}
               disabled={loading}
               className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.email
-                  ? "border-red-500"
-                  : "border-gray-300 focus:border-[#25D366]"
+                ? "border-red-500"
+                : "border-gray-300 focus:border-[#25D366]"
                 }`}
             />
 
@@ -366,8 +365,8 @@ function EditCustomer({
               disabled={loading}
               placeholder="Enter company name"
               className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.company
-                  ? "border-red-500"
-                  : "border-gray-300 focus:border-[#25D366]"
+                ? "border-red-500"
+                : "border-gray-300 focus:border-[#25D366]"
                 }`}
             />
 
@@ -425,8 +424,8 @@ function EditCustomer({
               onChange={handleChange}
               disabled={loading}
               className={`w-full border rounded-lg px-4 py-3 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.status
-                  ? "border-red-500"
-                  : "border-gray-300 focus:border-[#25D366]"
+                ? "border-red-500"
+                : "border-gray-300 focus:border-[#25D366]"
                 }`}
             >
               <option value="ACTIVE">

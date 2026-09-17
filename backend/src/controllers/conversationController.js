@@ -26,14 +26,16 @@ const createConversation = async (req, res) => {
     // Check by phone, not customerId — a conversation may already
     // exist for this phone (e.g. created by an inbound webhook
     // message before this customer record existed / was linked)
-    const existingConversation = await prisma.conversation.findUnique({
-      where: {
-        phone: customer.phone,
-      },
-      include: {
-        customer: true,
-      },
-    });
+    const existingConversation =
+  await prisma.conversation.findFirst({
+    where: {
+      phone,
+      companyId: req.user.companyId,
+    },
+    include: {
+      customer: true,
+    },
+  });
 
     if (existingConversation) {
       // Link it to this customer if it isn't already

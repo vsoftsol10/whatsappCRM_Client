@@ -216,7 +216,7 @@ import { useAuthStore } from "./store/authStore";
 
 import AppLayout from "./layouts/AppLayout";
 import SaasSupportPage from "./pages/settings/SaasSupportPage";
-
+import Integrations from "./pages/settings/Integrations";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ManageEmployees from "./pages/ManageEmployees";
@@ -250,7 +250,6 @@ import ChangePassword from "./pages/settings/ChangePassword";
 
 import ProfileSettings from "./pages/settings/ProfileSettings";
 import SecuritySettings from "./pages/settings/SecuritySettings";
-import BillingSubscription from "./pages/settings/BillingSubscription";
 import Plans from "./pages/settings/Plans";
 
 // BACKUP
@@ -384,6 +383,11 @@ function App() {
             />
 
             <Route
+              path="/settings/integrations"
+              element={<Integrations />}
+            />
+
+            <Route
               path="/settings/profile"
               element={<ProfileSettings />}
             />
@@ -391,11 +395,6 @@ function App() {
             <Route
               path="/settings/security"
               element={<SecuritySettings />}
-            />
-
-            <Route
-              path="/settings/billing"
-              element={<BillingSubscription />}
             />
 
             <Route

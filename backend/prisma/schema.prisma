@@ -69,6 +69,10 @@ model Company {
   employees                    Employee[]
   crmAuditLogs                 CrmAuditLog[]
   subscriptionUpgradeRequests  SubscriptionUpgradeRequest[]
+
+  integrations Integration[]
+  purchases Purchase[]
+
   backups Backup[]
 }
 
@@ -569,6 +573,7 @@ model Customer {
   templateRecipients  TemplateRecipient[]
   deals               Deal[]
   tickets             Ticket[]
+  purchases Purchase[]
 
   ///////////////////////////////////////
 
@@ -1527,4 +1532,107 @@ enum SuperAdminBackupStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
+}
+
+enum IntegrationType {
+  BILLING
+  ECOMMERCE
+  POS
+  ERP
+  PAYMENT
+  CUSTOM
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Integration {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+
+  name String
+  provider String?
+  type IntegrationType
+
+  webhookSecret String
+
+  status IntegrationStatus @default(ACTIVE)
+
+  lastEventAt DateTime?
+  lastSyncAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  events IntegrationEvent[]
+  purchases Purchase[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model IntegrationEvent {
+  id Int @id @default(autoincrement())
+
+  integrationId Int
+
+  eventId String
+  eventType String
+
+  payload Json
+
+  status String @default("RECEIVED")
+  errorMessage String?
+
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, eventId])
+  @@index([integrationId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Purchase {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+  customerId String
+
+  integrationId Int?
+
+  externalOrderId String?
+  invoiceNumber String?
+
+  amount Float
+  currency String @default("INR")
+
+  status String
+
+  purchaseDate DateTime
+
+  source String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(  fields: [companyId], references: [id], onDelete: Cascade )
+
+  customer Customer @relation( fields: [customerId], references: [id], onDelete: Cascade )
+
+  integration Integration? @relation( fields: [integrationId], references: [id],  onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([integrationId])
+  @@index([externalOrderId])
+  @@index([purchaseDate])
 }

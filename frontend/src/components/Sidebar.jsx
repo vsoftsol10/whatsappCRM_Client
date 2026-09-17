@@ -24,6 +24,7 @@ import {
   FaHistory,
   FaRobot,
   FaDatabase,
+  FaPlug,
 } from "react-icons/fa";
 
 
@@ -120,21 +121,21 @@ const sections = [
         icon: FaLock,
         path: "/settings/security",
       },
-      {
-        name: "Billing & Subscription",
-        icon: FaCreditCard,
-        path: "/settings/billing",
-      },
       // {
-      //   name: "Plans",
-      //   icon: FaBox,
-      //   path: "/settings/plans",
+      //   name: "Billing & Subscription",
+      //   icon: FaCreditCard,
+      //   path: "/settings/billing",
       // },
       {
-      name: "Backup & Restore",
-      icon: FaDatabase,
-      path: "/backup",
-    },
+        name: "Integrations",
+        icon: FaPlug,
+        path: "/settings/integrations",
+      },
+      {
+        name: "Backup & Restore",
+        icon: FaDatabase,
+        path: "/backup",
+      },
       {
         name: "SaaS Support",
         icon: FaTicketAlt,
@@ -150,6 +151,7 @@ const sections = [
         icon: FaRobot,
         path: "/settings/ai-auto-reply",
       },
+
     ],
   },
 
