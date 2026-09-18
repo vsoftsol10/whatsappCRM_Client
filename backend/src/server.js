@@ -169,7 +169,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-const integrationWebhookRoutes = require("./routes/integrationWebhookRoutes");
+
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const customerRoutes = require("./routes/customerRoutes");
@@ -254,10 +254,7 @@ app.use("/api/customers", customerRoutes);
 
 app.use("/api/integrations", integrationRoutes);
 
-app.use(
-  "/api/integrations",
-  integrationWebhookRoutes
-);
+
 
 app.use("/api/employees", employeeRoutes);
 
