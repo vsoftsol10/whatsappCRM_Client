@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
-import ConfirmModal from "./common/ConfirmModal";
+
 
 import {
   FaTachometerAlt,
@@ -11,7 +11,6 @@ import {
   FaTasks,
   FaUserTie,
   FaCog,
-  FaSignOutAlt,
   FaUserPlus,
   FaTicketAlt,
   FaBullhorn,
@@ -111,11 +110,11 @@ const sections = [
     id: "settings",
     title: "Settings",
     items: [
-      {
-        name: "Profile",
-        icon: FaUser,
-        path: "/settings/profile",
-      },
+      // {
+      //   name: "Profile",
+      //   icon: FaUser,
+      //   path: "/settings/profile",
+      // },
       {
         name: "Security",
         icon: FaLock,
@@ -165,10 +164,6 @@ export default function Sidebar({
 }) {
 
 
-  const logout = useAuthStore(
-    (state) => state.logout
-  );
-
   const user = useAuthStore(
     (state) => state.user
   );
@@ -178,12 +173,6 @@ export default function Sidebar({
 
 
   const [openSection, setOpenSection] = useState("main");
-
-
-  const [showLogoutConfirm, setShowLogoutConfirm] =
-    useState(false);
-
-
 
   useEffect(() => {
 
@@ -211,26 +200,6 @@ export default function Sidebar({
     );
 
   };
-
-
-
-  const handleLogout = () => {
-
-    setShowLogoutConfirm(true);
-
-  };
-
-
-
-  const confirmLogout = () => {
-
-    setShowLogoutConfirm(false);
-
-    logout();
-
-  };
-
-
 
   const linkClass = ({ isActive }) =>
 
@@ -484,62 +453,7 @@ ${openSection === section.id
         </div>
 
 
-
-
-
-        {/* LOGOUT */}
-
-
-        <div className="border-t border-white/10 pt-7">
-
-
-          <button
-
-            onClick={handleLogout}
-
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 py-3 text-[15px] font-semibold text-[#25D366] hover:bg-[#B91C1C] hover:text-white"
-
-          >
-
-
-            <FaSignOutAlt />
-
-            Logout
-
-
-          </button>
-
-
-        </div>
-
-
-
       </aside>
-
-
-
-
-      <ConfirmModal
-
-        isOpen={showLogoutConfirm}
-
-        title="Logout"
-
-        message="Are you sure you want to logout?"
-
-        confirmText="Logout"
-
-        cancelText="Cancel"
-
-        variant="danger"
-
-        onConfirm={confirmLogout}
-
-        onCancel={() => setShowLogoutConfirm(false)}
-
-      />
-
-
 
     </>
 
