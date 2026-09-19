@@ -7,7 +7,11 @@
 //     const [loading, setLoading] = useState(false);
 //     const [sdkReady, setSdkReady] = useState(false);
 
-//     const signupDataRef = useRef({ wabaId: null, phoneNumberId: null });
+//     // code and waba/phone data can arrive in EITHER order (FB.login's
+//     // callback and the window "message" event are independent async
+//     // channels), so we store both here and only fire the backend call
+//     // once both pieces exist — whichever arrives second triggers it.
+//     const signupDataRef = useRef({ wabaId: null, phoneNumberId: null, code: null, sent: false });
 
 //     useEffect(() => {
 //         loadFacebookSDK()
@@ -22,18 +26,24 @@
 //                 return;
 //             }
 
+//             console.log("[DEBUG] RAW postMessage:", event.origin, event.data);
+
 //             try {
 //                 const data = JSON.parse(event.data);
+//                 console.log("[DEBUG] PARSED postMessage:", data);
 
-//                 if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
-//                     signupDataRef.current = {
-//                         wabaId: data.data?.waba_id || null,
-//                         phoneNumberId: data.data?.phone_number_id || null,
-//                     };
-//                     console.log("Embedded signup session data:", signupDataRef.current);
+//                 if (data.type === "WA_EMBEDDED_SIGNUP") {
+//                     console.log("[DEBUG] WA_EMBEDDED_SIGNUP event name:", data.event, "payload:", data.data);
+
+//                     if (data.event === "FINISH" || data.event === "FINISH_ONLY_WABA" || data.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
+//                         signupDataRef.current.wabaId = data.data?.waba_id || null;
+//                         signupDataRef.current.phoneNumberId = data.data?.phone_number_id || null;
+//                         console.log("Embedded signup session data:", signupDataRef.current);
+//                         tryFinishSignup();
+//                     }
 //                 }
-//             } catch {
-//                 // Not a JSON message from Meta — ignore.
+//             } catch (e) {
+//                 console.log("[DEBUG] postMessage was not JSON:", event.data);
 //             }
 //         };
 
@@ -41,16 +51,19 @@
 //         return () => window.removeEventListener("message", handleMessage);
 //     }, []);
 
-//     const sendCodeToBackend = async (code) => {
+//     const tryFinishSignup = () => {
+//         const { code, wabaId, phoneNumberId, sent } = signupDataRef.current;
+
+//         if (sent) return; // already sent, avoid double-calling backend
+//         if (!code || !wabaId || !phoneNumberId) return; // still waiting on one piece
+
+//         signupDataRef.current.sent = true;
+//         sendCodeToBackend(code, wabaId, phoneNumberId);
+//     };
+
+//     const sendCodeToBackend = async (code, wabaId, phoneNumberId) => {
 //         try {
 //             const token = localStorage.getItem("token");
-//             const { wabaId, phoneNumberId } = signupDataRef.current;
-
-//             if (!wabaId || !phoneNumberId) {
-//                 console.error("Missing WABA ID / Phone Number ID — signup incomplete");
-//                 alert("WhatsApp connection incomplete. Please try again.");
-//                 return;
-//             }
 
 //             const response = await axios.post(
 //                 `${import.meta.env.VITE_API_URL}/api/whatsapp/embedded-signup`,
@@ -89,7 +102,22 @@
 //                 setLoading(false);
 
 //                 if (response.authResponse) {
-//                     sendCodeToBackend(response.authResponse.code);
+//                     signupDataRef.current.code = response.authResponse.code;
+//                     tryFinishSignup();
+
+//                     // Safety net: the "message" event carrying waba_id/
+//                     // phone_number_id usually arrives within a second or two.
+//                     // If it hasn't shown up after 5s, something went wrong
+//                     // (e.g. signup was closed early) — tell the user instead
+//                     // of silently doing nothing.
+//                     setTimeout(() => {
+//                         if (!signupDataRef.current.sent) {
+//                             console.error(
+//                                 "Timed out waiting for WABA ID / Phone Number ID"
+//                             );
+//                             alert("WhatsApp connection incomplete. Please try again.");
+//                         }
+//                     }, 5000);
 //                 } else {
 //                     console.log("WhatsApp signup was cancelled");
 //                 }
@@ -98,7 +126,7 @@
 //                 config_id: configId,
 //                 response_type: "code",
 //                 override_default_response_type: true,
-//                 use_fedcm_for_login: false,   // ⬅️ THE FIX: forces classic popup, not broken FedCM flow
+//                 use_fedcm_for_login: false,   // ⬅️ forces classic popup, not broken FedCM flow
 //                 extras: { feature: "whatsapp_embedded_signup", setup: {} },
 //             }
 //         );
@@ -127,10 +155,6 @@ const ConnectWhatsApp = () => {
     const [loading, setLoading] = useState(false);
     const [sdkReady, setSdkReady] = useState(false);
 
-    // code and waba/phone data can arrive in EITHER order (FB.login's
-    // callback and the window "message" event are independent async
-    // channels), so we store both here and only fire the backend call
-    // once both pieces exist — whichever arrives second triggers it.
     const signupDataRef = useRef({ wabaId: null, phoneNumberId: null, code: null, sent: false });
 
     useEffect(() => {
@@ -174,8 +198,8 @@ const ConnectWhatsApp = () => {
     const tryFinishSignup = () => {
         const { code, wabaId, phoneNumberId, sent } = signupDataRef.current;
 
-        if (sent) return; // already sent, avoid double-calling backend
-        if (!code || !wabaId || !phoneNumberId) return; // still waiting on one piece
+        if (sent) return;
+        if (!code || !wabaId || !phoneNumberId) return;
 
         signupDataRef.current.sent = true;
         sendCodeToBackend(code, wabaId, phoneNumberId);
@@ -225,16 +249,9 @@ const ConnectWhatsApp = () => {
                     signupDataRef.current.code = response.authResponse.code;
                     tryFinishSignup();
 
-                    // Safety net: the "message" event carrying waba_id/
-                    // phone_number_id usually arrives within a second or two.
-                    // If it hasn't shown up after 5s, something went wrong
-                    // (e.g. signup was closed early) — tell the user instead
-                    // of silently doing nothing.
                     setTimeout(() => {
                         if (!signupDataRef.current.sent) {
-                            console.error(
-                                "Timed out waiting for WABA ID / Phone Number ID"
-                            );
+                            console.error("Timed out waiting for WABA ID / Phone Number ID");
                             alert("WhatsApp connection incomplete. Please try again.");
                         }
                     }, 5000);
@@ -246,8 +263,12 @@ const ConnectWhatsApp = () => {
                 config_id: configId,
                 response_type: "code",
                 override_default_response_type: true,
-                use_fedcm_for_login: false,   // ⬅️ forces classic popup, not broken FedCM flow
-                extras: { feature: "whatsapp_embedded_signup", setup: {} },
+                use_fedcm_for_login: false,
+                extras: {
+                    setup: {},
+                    featureType: '',
+                    sessionInfoVersion: '3',
+                },
             }
         );
     };
