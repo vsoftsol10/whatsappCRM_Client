@@ -210,7 +210,7 @@ const ConnectWhatsApp = () => {
             const token = localStorage.getItem("token");
 
             const response = await axios.post(
-                `${import.meta.env.VITE_API_URL}/api/whatsapp/embedded-signup`,
+                `${import.meta.env.VITE_API_URL}/api/whatsapp/accounts/embedded-signup`,
                 { code, wabaId, phoneNumberId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

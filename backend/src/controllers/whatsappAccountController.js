@@ -354,32 +354,39 @@ const embeddedSignup = async (req, res) => {
         // 4. Save or update this WhatsApp account for the company
         const existing = await prisma.whatsAppAccount.findUnique({ where: { phoneNumberId } });
 
+        if (existing && existing.companyId !== companyId) {
+            return res.status(409).json({
+                success: false,
+                message: "This WhatsApp number is already connected to another account",
+            });
+        }
+
         const account = existing
             ? await prisma.whatsAppAccount.update({
-                  where: { phoneNumberId },
-                  data: {
-                      companyId,
-                      wabaId,
-                      whatsappAccessToken: accessToken,
-                      whatsappBusinessName: verified_name || null,
-                      displayPhoneNumber: display_phone_number || null,
-                      status: "CONNECTED",
-                      connectedAt: new Date(),
-                      disconnectedAt: null,
-                  },
-              })
+                where: { phoneNumberId },
+                data: {
+                    companyId,
+                    wabaId,
+                    whatsappAccessToken: accessToken,
+                    whatsappBusinessName: verified_name || null,
+                    displayPhoneNumber: display_phone_number || null,
+                    status: "CONNECTED",
+                    connectedAt: new Date(),
+                    disconnectedAt: null,
+                },
+            })
             : await prisma.whatsAppAccount.create({
-                  data: {
-                      companyId,
-                      wabaId,
-                      phoneNumberId,
-                      whatsappAccessToken: accessToken,
-                      whatsappBusinessName: verified_name || null,
-                      displayPhoneNumber: display_phone_number || null,
-                      status: "CONNECTED",
-                      connectedAt: new Date(),
-                  },
-              });
+                data: {
+                    companyId,
+                    wabaId,
+                    phoneNumberId,
+                    whatsappAccessToken: accessToken,
+                    whatsappBusinessName: verified_name || null,
+                    displayPhoneNumber: display_phone_number || null,
+                    status: "CONNECTED",
+                    connectedAt: new Date(),
+                },
+            });
 
         return res.status(200).json({
             success: true,
