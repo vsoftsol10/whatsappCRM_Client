@@ -881,6 +881,11 @@ model Template {
   headerContent String?
   footerContent String?
 
+  // 👈 NEW: sample values for {{1}}, {{2}}, etc. in `content`.
+  // Stored as a JSON array in the same order as the variable numbers,
+  // e.g. ["Rahul", "ORD1234"] for {{1}} and {{2}}.
+  bodyExamples Json?
+
   status TemplateStatus @default(DRAFT)
 
   purpose  TemplatePurpose @default(CUSTOM)
