@@ -1,19 +1,31 @@
 const prisma = require("../config/prisma");
 
-
+// CREATE CONVERSATION
 const createConversation = async (req, res) => {
   try {
     const {
       customerId,
-      status,
-      channel,
-      lastMessage,
-      unreadCount,
+      status = "OPEN",
+      channel = "WHATSAPP",
+      lastMessage = "",
+      unreadCount = 0,
     } = req.body;
 
-    // Check if customer exists
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
+    if (!customerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer ID is required",
+      });
+    }
+
+    const companyId = req.user.companyId;
+
+    // 1. Check customer belongs to this company
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId,
+      },
     });
 
     if (!customer) {
@@ -23,68 +35,155 @@ const createConversation = async (req, res) => {
       });
     }
 
-    // Check by phone, not customerId — a conversation may already
-    // exist for this phone (e.g. created by an inbound webhook
-    // message before this customer record existed / was linked)
+    // 2. Get connected WhatsApp account for this company
+    const whatsappAccount =
+      await prisma.whatsAppAccount.findFirst({
+        where: {
+          companyId,
+          status: "CONNECTED",
+        },
+      });
+
+    // 3. Check whether this customer already has a conversation
     const existingConversation =
-  await prisma.conversation.findFirst({
-    where: {
-      phone,
-      companyId: req.user.companyId,
-    },
-    include: {
-      customer: true,
-    },
-  });
+      await prisma.conversation.findUnique({
+        where: {
+          customerId,
+        },
+        include: {
+          customer: true,
+          whatsappAccount: true,
+          messages: {
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
 
+    // 4. If conversation already exists, reuse it
     if (existingConversation) {
-      // Link it to this customer if it isn't already
-      if (existingConversation.customerId !== customerId) {
-        const updated = await prisma.conversation.update({
-          where: { id: existingConversation.id },
-          data: { customerId },
-          include: { customer: true },
-        });
+      let conversation = existingConversation;
 
-        return res.status(200).json({
-          success: true,
-          message: "Conversation already existed and was linked to this customer",
-          conversation: updated,
+      // Attach connected WhatsApp account if missing
+      if (
+        !existingConversation.whatsappAccountId &&
+        whatsappAccount
+      ) {
+        conversation = await prisma.conversation.update({
+          where: {
+            id: existingConversation.id,
+          },
+          data: {
+            whatsappAccountId: whatsappAccount.id,
+          },
+          include: {
+            customer: true,
+            whatsappAccount: true,
+            messages: {
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
+          },
         });
       }
 
       return res.status(200).json({
         success: true,
         message: "Conversation already exists",
-        conversation: existingConversation,
+        conversation,
       });
     }
 
+    // 5. Check if an old conversation exists with this phone
+    // but is not linked to a customer yet
+    const phoneConversation =
+      await prisma.conversation.findFirst({
+        where: {
+          phone: customer.phone,
+          companyId,
+          customerId: null,
+        },
+        include: {
+          customer: true,
+          whatsappAccount: true,
+          messages: {
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
+
+    // 6. Link old conversation to this customer
+    if (phoneConversation) {
+      const updatedConversation =
+        await prisma.conversation.update({
+          where: {
+            id: phoneConversation.id,
+          },
+          data: {
+            customerId: customer.id,
+            ...(whatsappAccount && {
+              whatsappAccountId: whatsappAccount.id,
+            }),
+          },
+          include: {
+            customer: true,
+            whatsappAccount: true,
+            messages: {
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
+          },
+        });
+
+      return res.status(200).json({
+        success: true,
+        message: "Existing conversation linked to customer",
+        conversation: updatedConversation,
+      });
+    }
+
+    // 7. Create a brand-new conversation
     const conversation = await prisma.conversation.create({
       data: {
-        customerId,
+        companyId,
+        customerId: customer.id,
         phone: customer.phone,
         status,
         channel,
         lastMessage,
         unreadCount,
+        ...(whatsappAccount && {
+          whatsappAccountId: whatsappAccount.id,
+        }),
       },
       include: {
         customer: true,
+        whatsappAccount: true,
+        messages: {
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
       },
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Conversation created successfully",
       conversation,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create conversation error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to create conversation",
+      error: error.message,
     });
   }
 };
@@ -93,6 +192,9 @@ const createConversation = async (req, res) => {
 const getConversations = async (req, res) => {
   try {
     const conversations = await prisma.conversation.findMany({
+      where: {
+        companyId: req.user.companyId,
+      },
       include: {
         customer: true,
       },
@@ -101,16 +203,69 @@ const getConversations = async (req, res) => {
       },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       conversations,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get conversations error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch conversations",
+    });
+  }
+};
+
+// GET CONVERSATION BY CUSTOMER ID
+const getConversationByCustomerId = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    // Make sure customer belongs to logged-in company
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId: req.user.companyId,
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found",
+      });
+    }
+
+    const conversation =
+      await prisma.conversation.findFirst({
+        where: {
+          customerId,
+          companyId: req.user.companyId,
+        },
+        include: {
+          customer: true,
+          messages: {
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
+
+    return res.status(200).json({
+      success: true,
+      conversation: conversation || null,
+    });
+  } catch (error) {
+    console.error(
+      "Get conversation by customer error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch customer conversation",
     });
   }
 };
@@ -120,12 +275,21 @@ const getConversationById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-      },
-    });
+    const conversation =
+      await prisma.conversation.findFirst({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+        include: {
+          customer: true,
+          messages: {
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+        },
+      });
 
     if (!conversation) {
       return res.status(404).json({
@@ -134,14 +298,17 @@ const getConversationById = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       conversation,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Get conversation by ID error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch conversation",
     });
@@ -154,22 +321,43 @@ const updateConversationStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const conversation = await prisma.conversation.update({
-      where: { id },
-      data: {
-        status,
-      },
-    });
+    const conversation =
+      await prisma.conversation.updateMany({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+        data: {
+          status,
+        },
+      });
 
-    res.status(200).json({
+    if (conversation.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    const updatedConversation =
+      await prisma.conversation.findUnique({
+        where: {
+          id,
+        },
+      });
+
+    return res.status(200).json({
       success: true,
       message: "Conversation updated successfully",
-      conversation,
+      conversation: updatedConversation,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Update conversation status error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to update conversation",
     });
@@ -181,21 +369,35 @@ const markConversationAsRead = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const conversation = await prisma.conversation.update({
-      where: { id },
-      data: {
-        unreadCount: 0,
-      },
-    });
+    const conversation =
+      await prisma.conversation.updateMany({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+        data: {
+          unreadCount: 0,
+        },
+      });
 
-    res.status(200).json({
+    if (conversation.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
-      conversation,
+      message: "Conversation marked as read",
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Mark conversation as read error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to mark conversation as read",
     });
@@ -207,28 +409,42 @@ const markConversationAsUnread = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const conversation = await prisma.conversation.update({
-      where: { id },
-      data: {
-        unreadCount: 1,
-      },
-    });
+    const conversation =
+      await prisma.conversation.updateMany({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+        data: {
+          unreadCount: 1,
+        },
+      });
 
-    res.status(200).json({
+    if (conversation.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
-      conversation,
+      message: "Conversation marked as unread",
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Mark conversation as unread error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to mark conversation as unread",
     });
   }
 };
 
-// TOGGLE BOT (AI AUTO-REPLY) FOR A CONVERSATION
+// TOGGLE BOT
 const toggleConversationBot = async (req, res) => {
   try {
     const { id } = req.params;
@@ -241,30 +457,62 @@ const toggleConversationBot = async (req, res) => {
       });
     }
 
-    const conversation = await prisma.conversation.update({
-      where: { id },
-      data: { botEnabled },
-    });
+    const conversation =
+      await prisma.conversation.updateMany({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+        data: {
+          botEnabled,
+        },
+      });
 
-    res.status(200).json({
+    if (conversation.count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
-      message: `Bot ${botEnabled ? "enabled" : "disabled"} for this conversation`,
-      conversation,
+      message: `Bot ${
+        botEnabled ? "enabled" : "disabled"
+      } for this conversation`,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Toggle conversation bot error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to update bot status",
     });
   }
 };
 
-// CLEAR CHAT (delete all messages in a conversation)
+// CLEAR CHAT
 const clearConversationMessages = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const conversation =
+      await prisma.conversation.findFirst({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+      });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
 
     await prisma.message.deleteMany({
       where: {
@@ -272,22 +520,29 @@ const clearConversationMessages = async (req, res) => {
       },
     });
 
-    const conversation = await prisma.conversation.update({
-      where: { id },
-      data: {
-        lastMessage: "",
-      },
-    });
+    const updatedConversation =
+      await prisma.conversation.update({
+        where: {
+          id,
+        },
+        data: {
+          lastMessage: "",
+          unreadCount: 0,
+        },
+      });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Chat cleared successfully",
-      conversation,
+      conversation: updatedConversation,
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Clear conversation messages error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to clear chat",
     });
@@ -299,18 +554,38 @@ const deleteConversation = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const conversation =
+      await prisma.conversation.findFirst({
+        where: {
+          id,
+          companyId: req.user.companyId,
+        },
+      });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
     await prisma.conversation.delete({
-      where: { id },
+      where: {
+        id,
+      },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Conversation deleted successfully",
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Delete conversation error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to delete conversation",
     });
@@ -320,6 +595,7 @@ const deleteConversation = async (req, res) => {
 module.exports = {
   createConversation,
   getConversations,
+  getConversationByCustomerId,
   getConversationById,
   updateConversationStatus,
   toggleConversationBot,

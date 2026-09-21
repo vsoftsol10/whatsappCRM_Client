@@ -1,5 +1,50 @@
+// const express = require("express");
+// const router = express.Router();
+
+// const authMiddleware = require("../middleware/authMiddleware");
+
+// const {
+//   sendMessage,
+//   getMessagesByConversation,
+//   editMessage,
+//   deleteMessage,
+// } = require("../controllers/messageController");
+
+// // SEND MESSAGE
+// router.post(
+//   "/",
+//   authMiddleware,
+//   sendMessage
+// );
+
+// // GET MESSAGES
+// router.get(
+//   "/:conversationId",
+//   authMiddleware,
+//   getMessagesByConversation
+// );
+
+// // EDIT MESSAGE
+// router.put(
+//   "/:id",
+//   authMiddleware,
+//   editMessage
+// );
+
+// // DELETE MESSAGE
+// router.delete(
+//   "/:id",
+//   authMiddleware,
+//   deleteMessage
+// );
+
+// module.exports = router;
+
+
 const express = require("express");
 const router = express.Router();
+
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
   sendMessage,
@@ -8,16 +53,16 @@ const {
   deleteMessage,
 } = require("../controllers/messageController");
 
-// SEND MESSAGE
-router.post("/", sendMessage);
+router.post("/", authMiddleware, sendMessage);
 
-// GET ALL MESSAGES OF A CONVERSATION
-router.get("/:conversationId", getMessagesByConversation);
+router.get(
+  "/:conversationId",
+  authMiddleware,
+  getMessagesByConversation
+);
 
-// EDIT MESSAGE
-router.put("/:id", editMessage);
+router.put("/:id", authMiddleware, editMessage);
 
-// DELETE MESSAGE
-router.delete("/:id", deleteMessage);
+router.delete("/:id", authMiddleware, deleteMessage);
 
 module.exports = router;

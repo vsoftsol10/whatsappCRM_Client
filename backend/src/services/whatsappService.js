@@ -4,9 +4,13 @@ const axios = require("axios");
 
 const GRAPH_API_VERSION = "v23.0";
 
-const sendTextMessage = async (to, message) => {
+const sendTextMessage = async (to, message, whatsappAccount) => {
   console.log("Sending to:", to);
-  console.log("sendTextMessage called with:", { to, message });
+  console.log("sendTextMessage called with:", {
+    to,
+    message,
+    whatsappAccountId: whatsappAccount?.id,
+  });
 
   if (!to || typeof to !== "string" || !to.trim()) {
     console.error("WhatsApp recipient number is missing");
@@ -19,9 +23,36 @@ const sendTextMessage = async (to, message) => {
     };
   }
 
+  if (!whatsappAccount) {
+    return {
+      success: false,
+      error: {
+        message: "WhatsApp account is not connected",
+      },
+    };
+  }
+
+  if (!whatsappAccount.phoneNumberId) {
+    return {
+      success: false,
+      error: {
+        message: "WhatsApp Phone Number ID is missing",
+      },
+    };
+  }
+
+  if (!whatsappAccount.whatsappAccessToken) {
+    return {
+      success: false,
+      error: {
+        message: "WhatsApp access token is missing",
+      },
+    };
+  }
+
   try {
     const response = await axios.post(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsappAccount.phoneNumberId}/messages`,
       {
         messaging_product: "whatsapp",
         recipient_type: "individual",
@@ -34,14 +65,17 @@ const sendTextMessage = async (to, message) => {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+          Authorization: `Bearer ${whatsappAccount.whatsappAccessToken}`,
           "Content-Type": "application/json",
         },
       }
     );
 
-    console.log("WhatsApp API Response:", JSON.stringify(response.data, null, 2));
-    
+    console.log(
+      "WhatsApp API Response:",
+      JSON.stringify(response.data, null, 2)
+    );
+
     return {
       success: true,
       data: response.data,

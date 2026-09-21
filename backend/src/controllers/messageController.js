@@ -8,16 +8,40 @@ const sendMessage = async (req, res) => {
       conversationId,
       content,
       sender,
-      messageType,
-      status,
+      messageType = "TEXT",
+      status = "SENT",
     } = req.body;
 
-    const conversation = await prisma.conversation.findUnique({
+    if (!conversationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Conversation ID is required",
+      });
+    }
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Message content is required",
+      });
+    }
+
+    if (!sender) {
+      return res.status(400).json({
+        success: false,
+        message: "Sender is required",
+      });
+    }
+
+    // Get conversation only from the logged-in company
+    const conversation = await prisma.conversation.findFirst({
       where: {
         id: conversationId,
+        companyId: req.user.companyId,
       },
       include: {
         customer: true,
+        whatsappAccount: true,
       },
     });
 
@@ -40,9 +64,26 @@ const sendMessage = async (req, res) => {
         });
       }
 
+      if (!conversation.whatsappAccount) {
+        return res.status(400).json({
+          success: false,
+          message: "WhatsApp account is not connected",
+        });
+      }
+
+      if (
+        conversation.whatsappAccount.status !== "CONNECTED"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "WhatsApp account is not connected",
+        });
+      }
+
       const result = await sendTextMessage(
         recipientPhone,
-        content
+        content,
+        conversation.whatsappAccount
       );
 
       if (!result.success) {
@@ -54,30 +95,33 @@ const sendMessage = async (req, res) => {
       }
     }
 
-    // Save message after successful send
+    // Save message after successful WhatsApp send
     const message = await prisma.message.create({
       data: {
         conversationId,
-        content,
+        content: content.trim(),
         sender,
         messageType,
         status,
       },
     });
 
+    // Update conversation
     await prisma.conversation.update({
       where: {
         id: conversationId,
       },
       data: {
-        lastMessage: content,
+        lastMessage: content.trim(),
+
         ...(sender === "CUSTOMER" && {
           unreadCount: {
             increment: 1,
           },
         }),
-        // An agent stepping in manually means the bot should stop
-        // auto-replying on this chat until someone turns it back on.
+
+        // Agent manually replied,
+        // so disable bot auto-reply.
         ...(sender === "AGENT" && {
           botEnabled: false,
         }),
@@ -89,9 +133,8 @@ const sendMessage = async (req, res) => {
       message: "Message sent successfully",
       data: message,
     });
-
   } catch (error) {
-    console.error(error);
+    console.error("Send message error:", error);
 
     return res.status(500).json({
       success: false,

@@ -151,7 +151,7 @@ import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { loadFacebookSDK } from "../../utils/facebookSdk";
 
-const ConnectWhatsApp = () => {
+const ConnectWhatsApp = ({ onConnected }) => {
     const [loading, setLoading] = useState(false);
     const [sdkReady, setSdkReady] = useState(false);
 
@@ -216,6 +216,10 @@ const ConnectWhatsApp = () => {
             );
 
             console.log("Backend response:", response.data);
+
+            if (response.data?.success && onConnected) {
+                onConnected();
+            }
         } catch (error) {
             console.error(
                 "Failed to send WhatsApp signup code:",

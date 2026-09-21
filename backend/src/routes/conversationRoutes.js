@@ -1,9 +1,13 @@
 const express = require("express");
+
 const router = express.Router();
+
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
   createConversation,
   getConversations,
+  getConversationByCustomerId,
   getConversationById,
   updateConversationStatus,
   toggleConversationBot,
@@ -14,30 +18,74 @@ const {
 } = require("../controllers/conversationController");
 
 // CREATE CONVERSATION
-router.post("/", createConversation);
+router.post(
+  "/",
+  authMiddleware,
+  createConversation
+);
 
 // GET ALL CONVERSATIONS
-router.get("/", getConversations);
+router.get(
+  "/",
+  authMiddleware,
+  getConversations
+);
+
+// GET CONVERSATION BY CUSTOMER ID
+// IMPORTANT: Keep this before /:id
+router.get(
+  "/customer/:customerId",
+  authMiddleware,
+  getConversationByCustomerId
+);
 
 // GET CONVERSATION BY ID
-router.get("/:id", getConversationById);
+router.get(
+  "/:id",
+  authMiddleware,
+  getConversationById
+);
 
 // UPDATE CONVERSATION STATUS
-router.patch("/:id", updateConversationStatus);
+router.patch(
+  "/:id",
+  authMiddleware,
+  updateConversationStatus
+);
 
-// TOGGLE BOT (AI AUTO-REPLY)
-router.patch("/:id/bot-toggle", toggleConversationBot);
+// TOGGLE BOT
+router.patch(
+  "/:id/bot-toggle",
+  authMiddleware,
+  toggleConversationBot
+);
 
-// MARK CONVERSATION AS READ
-router.patch("/:id/read", markConversationAsRead);
+// MARK AS READ
+router.patch(
+  "/:id/read",
+  authMiddleware,
+  markConversationAsRead
+);
 
-// MARK CONVERSATION AS UNREAD
-router.patch("/:id/unread", markConversationAsUnread);
+// MARK AS UNREAD
+router.patch(
+  "/:id/unread",
+  authMiddleware,
+  markConversationAsUnread
+);
 
-// CLEAR CHAT (delete all messages)
-router.delete("/:id/messages", clearConversationMessages);
+// CLEAR CHAT
+router.delete(
+  "/:id/messages",
+  authMiddleware,
+  clearConversationMessages
+);
 
 // DELETE CONVERSATION
-router.delete("/:id", deleteConversation);
+router.delete(
+  "/:id",
+  authMiddleware,
+  deleteConversation
+);
 
 module.exports = router;
