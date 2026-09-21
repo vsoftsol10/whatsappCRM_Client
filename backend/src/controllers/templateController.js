@@ -2282,11 +2282,19 @@ const submitTemplateForApproval = async (req, res) => {
       },
     });
 
-    if (!whatsappAccount || !whatsappAccount.wabaId || !whatsappAccount.whatsappAccessToken) {
+        if (!whatsappAccount || !whatsappAccount.wabaId) {
       return res.status(400).json({
         success: false,
         message:
           "No connected WhatsApp Business Account found for your company. Please connect WhatsApp before submitting templates.",
+      });
+    }
+
+    if (!process.env.META_SYSTEM_USER_TOKEN) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "Server is not configured with a WhatsApp system token. Contact support.",
       });
     }
 

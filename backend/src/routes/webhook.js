@@ -124,13 +124,18 @@ const { getAutoReply } = require("../services/grokService");
 const triggerAutoReply = async (conversationId) => {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    include: { customer: true },
+    include: { customer: true, whatsappAccount: true }, // 👈 NEW: was missing
   });
 
   if (!conversation || !conversation.botEnabled) return;
 
   const recipientPhone = conversation.phone || conversation.customer?.phone;
   if (!recipientPhone) return;
+
+  if (!conversation.whatsappAccount) { // 👈 NEW guard
+    console.error("Cannot send Grok auto-reply: no WhatsApp account on this conversation");
+    return;
+  }
 
   const result = await getAutoReply(conversationId);
 
@@ -139,7 +144,11 @@ const triggerAutoReply = async (conversationId) => {
     return;
   }
 
-  const sendResult = await sendTextMessage(recipientPhone, result.reply);
+  const sendResult = await sendTextMessage(
+    recipientPhone,
+    result.reply,
+    conversation.whatsappAccount // 👈 NEW: was missing, causing every auto-reply to fail
+  );
 
   if (!sendResult.success) {
     console.error("Failed to send Grok auto-reply on WhatsApp:", sendResult.error);

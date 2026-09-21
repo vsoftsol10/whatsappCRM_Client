@@ -811,6 +811,23 @@ exports.sendCampaign = async (req, res) => {
 
     const companyId = req.user.companyId;
 
+    // 👈 NEW: fetch this company's own WhatsApp account ONCE,
+    // before the loop, so every recipient sends through the
+    // right phoneNumberId.
+    const whatsappAccount = await prisma.whatsAppAccount.findFirst({
+      where: {
+        companyId,
+        status: "CONNECTED",
+      },
+    });
+
+    if (!whatsappAccount) {
+      return res.status(400).json({
+        success: false,
+        message: "No connected WhatsApp account found for this company.",
+      });
+    }
+
     // =====================================================
     // VALIDATION
     // =====================================================
@@ -1040,7 +1057,9 @@ exports.sendCampaign = async (req, res) => {
               ],
 
               campaign.template.language ||
-                "en_US"
+              "en_US",
+
+              whatsappAccount // 👈 NEW: 6th argument
             );
         } else {
           result =
@@ -1054,8 +1073,7 @@ exports.sendCampaign = async (req, res) => {
                 campaign.messageContent || "",
               ],
 
-              campaign.template.language ||
-                "en_US"
+              whatsappAccount // 👈 NEW: 4th argument, was missing entirely
             );
         }
 

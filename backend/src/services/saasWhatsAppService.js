@@ -100,6 +100,7 @@
 //     headerType,
 //     headerContent,
 //     bodyText,
+//     bodyExamples, // 👈 NEW: array of sample values, e.g. ["Rahul", "ORD1234"]
 //     footerContent,
 //   }
 // ) => {
@@ -136,10 +137,27 @@
 //       }
 //     }
 
-//     components.push({
+//     // ----------------------------------------------------------
+//     // BODY COMPONENT
+//     // ----------------------------------------------------------
+//     // If the body text contains {{1}}, {{2}}, etc., Meta REQUIRES
+//     // a matching example.body_text array or it rejects the submission.
+//     // bodyExamples must be a flat array in variable order, e.g.
+//     // ["Rahul", "ORD1234"] for {{1}} and {{2}}.
+//     // Meta expects it wrapped in one more array level: [[...]].
+
+//     const bodyComponent = {
 //       type: "BODY",
 //       text: bodyText,
-//     });
+//     };
+
+//     if (Array.isArray(bodyExamples) && bodyExamples.length > 0) {
+//       bodyComponent.example = {
+//         body_text: [bodyExamples],
+//       };
+//     }
+
+//     components.push(bodyComponent);
 
 //     if (footerContent && footerContent.trim()) {
 //       components.push({
@@ -257,6 +275,7 @@
 //   sendTemplateMessage,
 // };
 
+
 const axios = require("axios");
 const prisma = require("../config/prisma");
 
@@ -316,7 +335,8 @@ const sendTextMessage = async (
       },
       {
         headers: {
-          Authorization: `Bearer ${account.whatsappAccessToken}`,
+          // 👈 CHANGED: shared tech-provider token, not per-company DB token
+          Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
           "Content-Type": "application/json",
         },
       }
@@ -359,7 +379,7 @@ const createMetaTemplate = async (
     headerType,
     headerContent,
     bodyText,
-    bodyExamples, // 👈 NEW: array of sample values, e.g. ["Rahul", "ORD1234"]
+    bodyExamples,
     footerContent,
   }
 ) => {
@@ -386,24 +406,12 @@ const createMetaTemplate = async (
           text: headerContent,
         });
       } else {
-        // IMAGE / VIDEO / DOCUMENT headers need an uploaded media handle
-        // via Meta's Resumable Upload API, not a plain string.
-        // Skipped for now until that upload flow is built.
         components.push({
           type: "HEADER",
           format: headerType,
         });
       }
     }
-
-    // ----------------------------------------------------------
-    // BODY COMPONENT
-    // ----------------------------------------------------------
-    // If the body text contains {{1}}, {{2}}, etc., Meta REQUIRES
-    // a matching example.body_text array or it rejects the submission.
-    // bodyExamples must be a flat array in variable order, e.g.
-    // ["Rahul", "ORD1234"] for {{1}} and {{2}}.
-    // Meta expects it wrapped in one more array level: [[...]].
 
     const bodyComponent = {
       type: "BODY",
@@ -435,13 +443,13 @@ const createMetaTemplate = async (
       },
       {
         headers: {
-          Authorization: `Bearer ${account.whatsappAccessToken}`,
+          // 👈 CHANGED
+          Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
           "Content-Type": "application/json",
         },
       }
     );
 
-    // Meta responds with: { id, status, category }
     return {
       success: true,
       data: response.data,
@@ -507,7 +515,8 @@ const sendTemplateMessage = async (
       },
       {
         headers: {
-          Authorization: `Bearer ${account.whatsappAccessToken}`,
+          // 👈 CHANGED
+          Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
           "Content-Type": "application/json",
         },
       }
