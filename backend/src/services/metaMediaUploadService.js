@@ -58,17 +58,42 @@ const uploadHeaderMediaToMeta = async (fileUrl) => {
     // STEP 1: DOWNLOAD THE SOURCE FILE
     // --------------------------------------------------------
 
+    // 👈 NEW: be forgiving about how the URL was pasted in — strip
+    // surrounding whitespace/quotes, and add a scheme if someone left
+    // off "https://" (a very common copy-paste slip).
+    let cleanedUrl = fileUrl
+      .trim()
+      .replace(/^['"<]+|['">]+$/g, "");
+
+    if (!/^https?:\/\//i.test(cleanedUrl)) {
+      cleanedUrl = `https://${cleanedUrl}`;
+    }
+
+    try {
+      // Throws if this still isn't a structurally valid URL, so we can
+      // give a precise error instead of letting axios fail generically.
+      // eslint-disable-next-line no-new
+      new URL(cleanedUrl);
+    } catch (urlError) {
+      return {
+        success: false,
+        error: `"${fileUrl}" is not a valid URL. Paste the full public link, including https://, e.g. https://res.cloudinary.com/your-cloud/image/upload/v123/sample.jpg`,
+      };
+    }
+
     let fileResponse;
 
     try {
-      fileResponse = await axios.get(fileUrl.trim(), {
+      fileResponse = await axios.get(cleanedUrl, {
         responseType: "arraybuffer",
       });
     } catch (downloadError) {
       return {
         success: false,
         error: `Could not download the header media from the URL provided: ${
-          downloadError.message
+          downloadError.response?.status
+            ? `Meta/server returned HTTP ${downloadError.response.status}`
+            : downloadError.message
         }`,
       };
     }
