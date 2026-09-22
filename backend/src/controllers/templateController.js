@@ -1,4 +1,3 @@
-
 // const prisma = require("../config/prisma");
 // const { generateTemplate } = require("../services/geminiService");
 // const {
@@ -9,6 +8,18 @@
 //   getOrCreateSaaSConversation,
 // } = require("../helpers/saasConversationHelper");
 // const { logAction } = require("../services/auditLogService");
+
+// // ============================================================
+// // HELPER: extract variable numbers from body text
+// // ============================================================
+// // Finds {{1}}, {{2}}, {{3}}... and returns a sorted, de-duplicated
+// // list of variable numbers as strings, e.g. ["1", "2"]
+
+// const extractVariables = (content) => {
+//   const matches = [...content.matchAll(/\{\{(\d+)\}\}/g)];
+//   const unique = [...new Set(matches.map((m) => m[1]))];
+//   return unique.sort((a, b) => Number(a) - Number(b));
+// };
 
 // // ============================================================
 // // CREATE TEMPLATE
@@ -25,6 +36,7 @@
 //       headerContent,
 //       content,
 //       footerContent,
+//       bodyExamples, // 👈 NEW
 //     } = req.body;
 
 //     // ----------------------------------------------------------
@@ -82,6 +94,28 @@
 //     }
 
 //     // ----------------------------------------------------------
+//     // BODY VARIABLE / EXAMPLE VALIDATION  👈 NEW
+//     // ----------------------------------------------------------
+//     // If the body has {{1}}, {{2}}, etc., every one of them needs
+//     // a matching sample value or Meta will reject the submission
+//     // later. Catch it here, at creation time, instead.
+
+//     const detectedVariables = extractVariables(content);
+
+//     if (detectedVariables.length > 0) {
+//       const examples = Array.isArray(bodyExamples) ? bodyExamples : [];
+
+//       if (examples.length < detectedVariables.length) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Sample values are required for all variables: ${detectedVariables
+//             .map((v) => `{{${v}}}`)
+//             .join(", ")}`,
+//         });
+//       }
+//     }
+
+//     // ----------------------------------------------------------
 //     // CREATE TEMPLATE
 //     // ----------------------------------------------------------
 
@@ -106,6 +140,10 @@
 
 //         footerContent:
 //           footerContent?.trim() || null,
+
+//         // 👈 NEW: store sample values as-is (Prisma Json field).
+//         // undefined if none were sent, so Prisma just skips setting it.
+//         bodyExamples: Array.isArray(bodyExamples) ? bodyExamples : undefined,
 
 //         // IMPORTANT:
 //         // New templates always start as DRAFT.
@@ -325,6 +363,7 @@
 //       headerContent,
 //       content,
 //       footerContent,
+//       bodyExamples, // 👈 NEW
 //     } = req.body;
 
 //     // ----------------------------------------------------------
@@ -414,6 +453,25 @@
 //     }
 
 //     // ----------------------------------------------------------
+//     // BODY VARIABLE / EXAMPLE VALIDATION  👈 NEW
+//     // ----------------------------------------------------------
+
+//     const detectedVariables = extractVariables(content);
+
+//     if (detectedVariables.length > 0) {
+//       const examples = Array.isArray(bodyExamples) ? bodyExamples : [];
+
+//       if (examples.length < detectedVariables.length) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Sample values are required for all variables: ${detectedVariables
+//             .map((v) => `{{${v}}}`)
+//             .join(", ")}`,
+//         });
+//       }
+//     }
+
+//     // ----------------------------------------------------------
 //     // UPDATE
 //     // ----------------------------------------------------------
 
@@ -440,6 +498,9 @@
 
 //         footerContent:
 //           footerContent?.trim() || null,
+
+//         // 👈 NEW
+//         bodyExamples: Array.isArray(bodyExamples) ? bodyExamples : undefined,
 
 //         // Any modification puts the template back into draft.
 //         status: "DRAFT",
@@ -692,9 +753,15 @@
 //         // ------------------------------------------------------
 //         // SEND META TEMPLATE (using this company's own WABA/token)
 //         // ------------------------------------------------------
+      
 
 //         const metaTemplateName = template.name;
-//         const variables = [];
+
+//         const variableCount = (template.content.match(/\{\{\d+\}\}/g) || [])
+//           .length;
+
+//         const variables =
+//           variableCount > 0 ? [customer.name] : [];
 
 //         const result = await sendTemplateMessage(
 //           req.user.companyId,
@@ -977,14 +1044,6 @@
 // };
 
 // // ============================================================
-// // EXPORTS
-// // ============================================================
-
-// // ============================================================
-// // SUBMIT TEMPLATE FOR APPROVAL
-// // ============================================================
-
-// // ============================================================
 // // SUBMIT TEMPLATE FOR APPROVAL  (now actually calls Meta)
 // // ============================================================
 
@@ -1039,6 +1098,31 @@
 //     }
 
 //     // ----------------------------------------------------------
+//     // BODY VARIABLE / EXAMPLE VALIDATION  👈 NEW
+//     // ----------------------------------------------------------
+//     // Belt-and-braces: even though createTemplate/updateTemplate
+//     // already require this, re-check here too, since submit can
+//     // fire on a REJECTED template that might have been edited by
+//     // some other path.
+
+//     const detectedVariables = extractVariables(template.content);
+
+//     if (detectedVariables.length > 0) {
+//       const examples = Array.isArray(template.bodyExamples)
+//         ? template.bodyExamples
+//         : [];
+
+//       if (examples.length < detectedVariables.length) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Sample values are required for all variables: ${detectedVariables
+//             .map((v) => `{{${v}}}`)
+//             .join(", ")} before submitting to Meta.`,
+//         });
+//       }
+//     }
+
+//     // ----------------------------------------------------------
 //     // CONFIRM COMPANY HAS A CONNECTED WHATSAPP ACCOUNT
 //     // ----------------------------------------------------------
 
@@ -1049,11 +1133,19 @@
 //       },
 //     });
 
-//     if (!whatsappAccount || !whatsappAccount.wabaId || !whatsappAccount.whatsappAccessToken) {
+//         if (!whatsappAccount || !whatsappAccount.wabaId) {
 //       return res.status(400).json({
 //         success: false,
 //         message:
 //           "No connected WhatsApp Business Account found for your company. Please connect WhatsApp before submitting templates.",
+//       });
+//     }
+
+//     if (!process.env.META_SYSTEM_USER_TOKEN) {
+//       return res.status(500).json({
+//         success: false,
+//         message:
+//           "Server is not configured with a WhatsApp system token. Contact support.",
 //       });
 //     }
 
@@ -1068,6 +1160,7 @@
 //       headerType: template.headerType,
 //       headerContent: template.headerContent,
 //       bodyText: template.content,
+//       bodyExamples: template.bodyExamples, // 👈 NEW
 //       footerContent: template.footerContent,
 //     });
 
@@ -1134,7 +1227,6 @@
 //   }
 // };
 
-
 // module.exports = {
 //   createTemplate,
 //   getTemplates,
@@ -1146,6 +1238,8 @@
 //   getTemplateRecipients,
 //   submitTemplateForApproval,
 // };
+
+
 
 const prisma = require("../config/prisma");
 const { generateTemplate } = require("../services/geminiService");
@@ -1164,8 +1258,15 @@ const { logAction } = require("../services/auditLogService");
 // Finds {{1}}, {{2}}, {{3}}... and returns a sorted, de-duplicated
 // list of variable numbers as strings, e.g. ["1", "2"]
 
+// 👈 FIXED: allow optional whitespace inside the braces, e.g. "{{ 1 }}".
+// The old regex (\{\{(\d+)\}\}) required zero spaces, which meant a body
+// like "Hi {{ 1 }}, welcome..." was seen as having 0 variables here even
+// though the frontend's own detector (CreateCampaignModal.jsx) DOES allow
+// spaces — that mismatch is what let templates through creation/approval
+// with a variable count of 0 on the backend, causing empty template
+// parameters to be sent to Meta at send time later.
 const extractVariables = (content) => {
-  const matches = [...content.matchAll(/\{\{(\d+)\}\}/g)];
+  const matches = [...content.matchAll(/\{\{\s*(\d+)\s*\}\}/g)];
   const unique = [...new Set(matches.map((m) => m[1]))];
   return unique.sort((a, b) => Number(a) - Number(b));
 };
@@ -1906,8 +2007,12 @@ const sendTemplate = async (req, res) => {
 
         const metaTemplateName = template.name;
 
-        const variableCount = (template.content.match(/\{\{\d+\}\}/g) || [])
-          .length;
+        // 👈 FIXED: use the same permissive regex as extractVariables()
+        // so this always agrees with what was validated at template
+        // creation/approval time.
+        const variableCount = (
+          template.content.match(/\{\{\s*\d+\s*\}\}/g) || []
+        ).length;
 
         const variables =
           variableCount > 0 ? [customer.name] : [];
@@ -2387,3 +2492,4 @@ module.exports = {
   getTemplateRecipients,
   submitTemplateForApproval,
 };
+ 
