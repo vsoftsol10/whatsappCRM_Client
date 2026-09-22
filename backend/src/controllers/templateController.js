@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 // const { generateTemplate } = require("../services/geminiService");
 // const {
@@ -15,8 +16,15 @@
 // // Finds {{1}}, {{2}}, {{3}}... and returns a sorted, de-duplicated
 // // list of variable numbers as strings, e.g. ["1", "2"]
 
+// // 👈 FIXED: allow optional whitespace inside the braces, e.g. "{{ 1 }}".
+// // The old regex (\{\{(\d+)\}\}) required zero spaces, which meant a body
+// // like "Hi {{ 1 }}, welcome..." was seen as having 0 variables here even
+// // though the frontend's own detector (CreateCampaignModal.jsx) DOES allow
+// // spaces — that mismatch is what let templates through creation/approval
+// // with a variable count of 0 on the backend, causing empty template
+// // parameters to be sent to Meta at send time later.
 // const extractVariables = (content) => {
-//   const matches = [...content.matchAll(/\{\{(\d+)\}\}/g)];
+//   const matches = [...content.matchAll(/\{\{\s*(\d+)\s*\}\}/g)];
 //   const unique = [...new Set(matches.map((m) => m[1]))];
 //   return unique.sort((a, b) => Number(a) - Number(b));
 // };
@@ -757,8 +765,12 @@
 
 //         const metaTemplateName = template.name;
 
-//         const variableCount = (template.content.match(/\{\{\d+\}\}/g) || [])
-//           .length;
+//         // 👈 FIXED: use the same permissive regex as extractVariables()
+//         // so this always agrees with what was validated at template
+//         // creation/approval time.
+//         const variableCount = (
+//           template.content.match(/\{\{\s*\d+\s*\}\}/g) || []
+//         ).length;
 
 //         const variables =
 //           variableCount > 0 ? [customer.name] : [];
@@ -1238,7 +1250,7 @@
 //   getTemplateRecipients,
 //   submitTemplateForApproval,
 // };
-
+ 
 
 
 const prisma = require("../config/prisma");
@@ -1247,6 +1259,11 @@ const {
   sendTemplateMessage,
   createMetaTemplate,
 } = require("../services/saasWhatsAppService");
+// 👈 NEW: only used inside submitTemplateForApproval, for IMAGE / VIDEO /
+// DOCUMENT headers — see that function below for why this is needed.
+const {
+  uploadHeaderMediaToMeta,
+} = require("../services/metaMediaUploadService");
 const {
   getOrCreateSaaSConversation,
 } = require("../helpers/saasConversationHelper");
@@ -2404,6 +2421,44 @@ const submitTemplateForApproval = async (req, res) => {
     }
 
     // ----------------------------------------------------------
+    // 👈 NEW: UPLOAD HEADER SAMPLE MEDIA (IMAGE / VIDEO / DOCUMENT ONLY)
+    // ----------------------------------------------------------
+    // Meta requires a sample file uploaded through its Resumable Upload
+    // API for any non-text header, returning a "handle" that must be
+    // included as example.header_handle on the HEADER component.
+    // Without this, Meta rejects the submission with:
+    // "component of type HEADER is missing expected field(s) (example)".
+    // headerContent is expected to be a public URL to the sample file.
+
+    let headerHandle = null;
+
+    if (
+      template.headerType &&
+      template.headerType !== "NONE" &&
+      template.headerType !== "TEXT"
+    ) {
+      if (!template.headerContent?.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: `A public ${template.headerType.toLowerCase()} URL is required in the header content before submitting for approval.`,
+        });
+      }
+
+      const mediaUploadResult = await uploadHeaderMediaToMeta(
+        template.headerContent
+      );
+
+      if (!mediaUploadResult.success) {
+        return res.status(400).json({
+          success: false,
+          message: `Failed to prepare header media for Meta: ${mediaUploadResult.error}`,
+        });
+      }
+
+      headerHandle = mediaUploadResult.handle;
+    }
+
+    // ----------------------------------------------------------
     // CALL META'S GRAPH API (using this company's own WABA + token)
     // ----------------------------------------------------------
 
@@ -2413,6 +2468,7 @@ const submitTemplateForApproval = async (req, res) => {
       language: template.language,
       headerType: template.headerType,
       headerContent: template.headerContent,
+      headerHandle, // 👈 NEW
       bodyText: template.content,
       bodyExamples: template.bodyExamples, // 👈 NEW
       footerContent: template.footerContent,

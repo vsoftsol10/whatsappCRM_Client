@@ -57,7 +57,8 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${account.whatsappAccessToken}`,
+//           // 👈 CHANGED: shared tech-provider token, not per-company DB token
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -100,7 +101,7 @@
 //     headerType,
 //     headerContent,
 //     bodyText,
-//     bodyExamples, // 👈 NEW: array of sample values, e.g. ["Rahul", "ORD1234"]
+//     bodyExamples,
 //     footerContent,
 //   }
 // ) => {
@@ -127,24 +128,12 @@
 //           text: headerContent,
 //         });
 //       } else {
-//         // IMAGE / VIDEO / DOCUMENT headers need an uploaded media handle
-//         // via Meta's Resumable Upload API, not a plain string.
-//         // Skipped for now until that upload flow is built.
 //         components.push({
 //           type: "HEADER",
 //           format: headerType,
 //         });
 //       }
 //     }
-
-//     // ----------------------------------------------------------
-//     // BODY COMPONENT
-//     // ----------------------------------------------------------
-//     // If the body text contains {{1}}, {{2}}, etc., Meta REQUIRES
-//     // a matching example.body_text array or it rejects the submission.
-//     // bodyExamples must be a flat array in variable order, e.g.
-//     // ["Rahul", "ORD1234"] for {{1}} and {{2}}.
-//     // Meta expects it wrapped in one more array level: [[...]].
 
 //     const bodyComponent = {
 //       type: "BODY",
@@ -176,13 +165,13 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${account.whatsappAccessToken}`,
+//           // 👈 CHANGED
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
 //     );
 
-//     // Meta responds with: { id, status, category }
 //     return {
 //       success: true,
 //       data: response.data,
@@ -248,7 +237,8 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${account.whatsappAccessToken}`,
+//           // 👈 CHANGED
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -274,7 +264,6 @@
 //   createMetaTemplate,
 //   sendTemplateMessage,
 // };
-
 
 const axios = require("axios");
 const prisma = require("../config/prisma");
@@ -378,6 +367,11 @@ const createMetaTemplate = async (
     language,
     headerType,
     headerContent,
+    headerHandle, // 👈 NEW: media handle from Meta's Resumable Upload API,
+    // required for IMAGE / VIDEO / DOCUMENT headers (see
+    // metaMediaUploadService.js). Without this, Meta rejects the
+    // submission with "component of type HEADER is missing expected
+    // field(s) (example)".
     bodyText,
     bodyExamples,
     footerContent,
@@ -406,9 +400,24 @@ const createMetaTemplate = async (
           text: headerContent,
         });
       } else {
+        // 👈 CHANGED: IMAGE / VIDEO / DOCUMENT headers must include a
+        // sample media handle or Meta rejects the submission outright.
+        if (!headerHandle) {
+          return {
+            success: false,
+            error: {
+              message:
+                "A sample media handle is required for IMAGE, VIDEO, or DOCUMENT headers. Upload a header sample before submitting.",
+            },
+          };
+        }
+
         components.push({
           type: "HEADER",
           format: headerType,
+          example: {
+            header_handle: [headerHandle],
+          },
         });
       }
     }
