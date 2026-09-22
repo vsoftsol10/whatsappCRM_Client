@@ -1015,17 +1015,25 @@ exports.sendCampaign = async (req, res) => {
         // SEND TEMPLATE
         // =====================================================
 
-        let result;
+             let result;
 
-        /*
-         * Your current template system appears to use:
-         *
-         * {{1}} = Customer name
-         * {{2}} = Campaign/custom message
-         *
-         * Keep this compatible with your existing
-         * WhatsApp service for now.
-         */
+        // 👈 NEW: build the params array to match the template's
+        // ACTUAL number of {{n}} variables instead of always
+        // sending 2. Meta rejects the send outright if the count
+        // doesn't match exactly.
+        const variableCount = (
+          campaign.template.content.match(/\{\{\d+\}\}/g) || []
+        ).length;
+
+        const allPossibleParams = [
+          customer.name,
+          campaign.messageContent || "",
+        ];
+
+        const templateParams = allPossibleParams.slice(
+          0,
+          variableCount
+        );
 
         if (campaign.imageUrl) {
           result =
@@ -1036,15 +1044,12 @@ exports.sendCampaign = async (req, res) => {
 
               campaign.imageUrl,
 
-              [
-                customer.name,
-                campaign.messageContent || "",
-              ],
+              templateParams, // 👈 CHANGED
 
               campaign.template.language ||
               "en_US",
 
-              whatsappAccount // 👈 NEW: 6th argument
+              whatsappAccount
             );
         } else {
           result =
@@ -1053,12 +1058,9 @@ exports.sendCampaign = async (req, res) => {
 
               campaign.template.name,
 
-              [
-                customer.name,
-                campaign.messageContent || "",
-              ],
+              templateParams, // 👈 CHANGED
 
-              whatsappAccount // 👈 NEW: 4th argument, was missing entirely
+              whatsappAccount
             );
         }
 
