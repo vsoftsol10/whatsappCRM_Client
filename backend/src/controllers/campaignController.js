@@ -1,4 +1,3 @@
-
 // const prisma = require("../config/prisma");
 
 // const {
@@ -20,6 +19,27 @@
 
 // const { logAction } = require("../services/auditLogService");
 
+// // =====================================================
+// // 👈 NEW: build the text that was ACTUALLY sent, for local display
+// // =====================================================
+// // templateParams is the same array already sent to Meta
+// // ([customer.name, campaign.messageContent].slice(0, variableCount)).
+// // This replaces {{1}}, {{2}}, etc. in the raw template body with
+// // those same values, so the CRM conversation shows exactly what the
+// // recipient received — instead of the raw unfilled template text,
+// // and instead of campaign.messageContent alone (which is only ever
+// // a value for {{2}}, not the whole message).
+// const buildSentMessageContent = (templateContent, templateParams) => {
+//   let result = templateContent || "";
+
+//   templateParams.forEach((value, index) => {
+//     const variableNumber = index + 1;
+//     const pattern = new RegExp(`\\{\\{\\s*${variableNumber}\\s*\\}\\}`, "g");
+//     result = result.replace(pattern, value || "");
+//   });
+
+//   return result;
+// };
 
 // // =====================================================
 // // CREATE CAMPAIGN
@@ -1102,9 +1122,15 @@
 
 //               sender: "AGENT",
 
-//               content:
-//                 campaign.messageContent ||
+//               // 👈 CHANGED: show the template body with {{1}}, {{2}}
+//               // etc. actually filled in with templateParams — the
+//               // same values just sent to Meta — instead of the raw
+//               // messageContent field (which only ever supplies {{2}}
+//               // when present, not the whole message).
+//               content: buildSentMessageContent(
 //                 campaign.template.content,
+//                 templateParams
+//               ),
 
 //               imageUrl:
 //                 campaign.imageUrl,
@@ -1130,9 +1156,11 @@
 //             },
 
 //             data: {
-//               lastMessage:
-//                 campaign.messageContent ||
+//               // 👈 CHANGED: same fix as the message content above.
+//               lastMessage: buildSentMessageContent(
 //                 campaign.template.content,
+//                 templateParams
+//               ),
 //             },
 //           });
 
@@ -1351,7 +1379,6 @@
 //   }
 // };
 
-
 const prisma = require("../config/prisma");
 
 const {
@@ -1373,6 +1400,170 @@ const {
 
 const { logAction } = require("../services/auditLogService");
 
+// =====================================================
+// build the text that was ACTUALLY sent, for local display
+// =====================================================
+// templateParams is the same array already sent to Meta
+// ([customer.name, campaign.messageContent].slice(0, variableCount)).
+// This replaces {{1}}, {{2}}, etc. in the raw template body with
+// those same values, so the CRM conversation shows exactly what the
+// recipient received — instead of the raw unfilled template text,
+// and instead of campaign.messageContent alone (which is only ever
+// a value for {{2}}, not the whole message).
+const buildSentMessageContent = (templateContent, templateParams) => {
+  let result = templateContent || "";
+
+  templateParams.forEach((value, index) => {
+    const variableNumber = index + 1;
+    const pattern = new RegExp(`\\{\\{\\s*${variableNumber}\\s*\\}\\}`, "g");
+    result = result.replace(pattern, value || "");
+  });
+
+  return result;
+};
+
+// =====================================================
+// CORE SEND LOOP (shared by sendCampaign & resendCampaign)
+// =====================================================
+// Sends the template to exactly the recipients passed in
+// (`recipientsToSend`), and returns how many succeeded/failed.
+// Does NOT touch campaign.status or counts — the caller decides
+// how to persist that, since a full send vs. a partial/targeted
+// send need different bookkeeping (reset vs. increment).
+const sendToRecipients = async (
+  campaign,
+  recipientsToSend,
+  whatsappAccount,
+  companyId
+) => {
+  let sentCount = 0;
+  let failedCount = 0;
+
+  const variableCount = (
+    campaign.template.content.match(/\{\{\d+\}\}/g) || []
+  ).length;
+
+  for (const recipient of recipientsToSend) {
+    const customer = recipient.customer;
+
+    if (!customer || !customer.phone) {
+      failedCount++;
+
+      await prisma.campaignRecipient.update({
+        where: { id: recipient.id },
+        data: { status: "FAILED" },
+      });
+
+      continue;
+    }
+
+    try {
+      // =====================================================
+      // CONVERSATION
+      // =====================================================
+
+      let conversation = await getOrCreateSaaSConversation(
+        companyId,
+        whatsappAccount.id,
+        customer.phone
+      );
+
+      // =====================================================
+      // SEND TEMPLATE
+      // =====================================================
+
+      let result;
+
+      const allPossibleParams = [
+        customer.name,
+        campaign.messageContent || "",
+      ];
+
+      const templateParams = allPossibleParams.slice(0, variableCount);
+
+      if (campaign.imageUrl) {
+        result = await sendCampaignImageTemplate(
+          customer.phone,
+          campaign.template.name,
+          campaign.imageUrl,
+          templateParams,
+          campaign.template.language || "en_US",
+          whatsappAccount
+        );
+      } else {
+        result = await sendTemplateMessage(
+          customer.phone,
+          campaign.template.name,
+          templateParams,
+          whatsappAccount
+        );
+      }
+
+      console.log("WhatsApp Result:", result);
+
+      // =====================================================
+      // SUCCESS
+      // =====================================================
+
+      if (result?.success) {
+        const metaMessageId = result.data?.messages?.[0]?.id || null;
+
+        sentCount++;
+
+        await prisma.campaignRecipient.update({
+          where: { id: recipient.id },
+          data: {
+            status: "SENT",
+            sentAt: new Date(),
+          },
+        });
+
+        // Show the template body with {{1}}, {{2}} etc. actually
+        // filled in with templateParams — the same values just sent
+        // to Meta — instead of the raw messageContent field.
+        const sentContent = buildSentMessageContent(
+          campaign.template.content,
+          templateParams
+        );
+
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            sender: "AGENT",
+            content: sentContent,
+            imageUrl: campaign.imageUrl,
+            messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+            status: "SENT",
+            metaMessageId,
+          },
+        });
+
+        await prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { lastMessage: sentContent },
+        });
+      } else {
+        failedCount++;
+
+        await prisma.campaignRecipient.update({
+          where: { id: recipient.id },
+          data: { status: "FAILED" },
+        });
+      }
+    } catch (error) {
+      console.error(`Campaign send failed for ${customer.phone}:`, error);
+
+      failedCount++;
+
+      await prisma.campaignRecipient.update({
+        where: { id: recipient.id },
+        data: { status: "FAILED" },
+      });
+    }
+  }
+
+  return { sentCount, failedCount };
+};
 
 // =====================================================
 // CREATE CAMPAIGN
@@ -1380,21 +1571,11 @@ const { logAction } = require("../services/auditLogService");
 
 exports.createCampaign = async (req, res) => {
   try {
-    let {
-      name,
-      type,
-      templateId,
-      messageContent,
-      scheduledAt,
-      customerIds,
-    } = req.body;
+    let { name, type, templateId, messageContent, scheduledAt, customerIds } =
+      req.body;
 
     const companyId = req.user.companyId;
     const createdById = req.user.userId;
-
-    // =====================================================
-    // NORMALIZE CUSTOMER IDS
-    // =====================================================
 
     if (!customerIds) {
       customerIds = [];
@@ -1402,16 +1583,8 @@ exports.createCampaign = async (req, res) => {
       customerIds = [customerIds];
     }
 
-    customerIds = customerIds
-      .filter(Boolean)
-      .map((id) => String(id));
-
-    // Remove duplicates
+    customerIds = customerIds.filter(Boolean).map((id) => String(id));
     customerIds = [...new Set(customerIds)];
-
-    // =====================================================
-    // BASIC VALIDATION
-    // =====================================================
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -1427,18 +1600,11 @@ exports.createCampaign = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // TEMPLATE VALIDATION
-    // =====================================================
-
     let template = null;
 
     if (templateId) {
       template = await prisma.template.findFirst({
-        where: {
-          id: String(templateId),
-          companyId,
-        },
+        where: { id: String(templateId), companyId },
       });
 
       if (!template) {
@@ -1448,39 +1614,23 @@ exports.createCampaign = async (req, res) => {
         });
       }
 
-      // Campaigns are business initiated WhatsApp messages.
-      // Only approved templates should be used for sending.
       if (template.status !== "APPROVED") {
         return res.status(400).json({
           success: false,
-          message:
-            "Only approved WhatsApp templates can be used for campaigns.",
+          message: "Only approved WhatsApp templates can be used for campaigns.",
         });
       }
     }
-
-    // =====================================================
-    // CUSTOMER VALIDATION
-    // =====================================================
 
     let validCustomerIds = [];
 
     if (customerIds.length > 0) {
       const customers = await prisma.customer.findMany({
-        where: {
-          id: {
-            in: customerIds,
-          },
-          companyId,
-        },
-        select: {
-          id: true,
-        },
+        where: { id: { in: customerIds }, companyId },
+        select: { id: true },
       });
 
-      validCustomerIds = customers.map((customer) =>
-        String(customer.id)
-      );
+      validCustomerIds = customers.map((customer) => String(customer.id));
 
       const invalidCustomerIds = customerIds.filter(
         (id) => !validCustomerIds.includes(id)
@@ -1489,55 +1639,18 @@ exports.createCampaign = async (req, res) => {
       if (invalidCustomerIds.length > 0) {
         return res.status(400).json({
           success: false,
-          message:
-            "One or more selected customers do not belong to your company.",
+          message: "One or more selected customers do not belong to your company.",
           invalidCustomerIds,
         });
       }
     }
 
-    // =====================================================
-    // TEMPLATE <-> IMAGE CONSISTENCY CHECK
-    // =====================================================
-    // 👈 NEW: the template module and the campaign module were out of
-    // sync — this modal let you attach an image to ANY template, even
-    // one that was never approved with an IMAGE header on Meta (and vice
-    // versa). Sending that mismatch is what made image campaigns fail
-    // outright. Catch it here, at creation time, with a clear message.
-
-    if (template) {
-      if (req.file && template.headerType !== "IMAGE") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This template does not have an approved IMAGE header, so it can't be sent with a campaign image. Choose a template that was approved with an IMAGE header, or remove the image.",
-        });
-      }
-
-      if (!req.file && template.headerType === "IMAGE") {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This template requires an IMAGE header. Please upload a campaign image before saving.",
-        });
-      }
-    }
-
-    // =====================================================
-    // UPLOAD CAMPAIGN IMAGE
-    // =====================================================
-
     let imageUrl = null;
 
     if (req.file) {
       const uploadResult = await uploadCampaignImage(req.file);
-
       imageUrl = uploadResult?.imageUrl || null;
     }
-
-    // =====================================================
-    // DETERMINE STATUS
-    // =====================================================
 
     let campaignStatus = "DRAFT";
 
@@ -1561,55 +1674,25 @@ exports.createCampaign = async (req, res) => {
       campaignStatus = "SCHEDULED";
     }
 
-    // =====================================================
-    // CREATE CAMPAIGN
-    // =====================================================
-
     const campaign = await prisma.campaign.create({
       data: {
         companyId,
-
         name: name.trim(),
-
         type,
-
-        templateId: template
-          ? template.id
-          : null,
-
-        messageContent:
-          messageContent?.trim() || null,
-
+        templateId: template ? template.id : null,
+        messageContent: messageContent?.trim() || null,
         status: campaignStatus,
-
-        scheduledAt: scheduledAt
-          ? new Date(scheduledAt)
-          : null,
-
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         audienceCount: validCustomerIds.length,
-
         totalRecipients: validCustomerIds.length,
-
         imageUrl,
-
         createdById,
-
         recipients: {
-          create: validCustomerIds.map((customerId) => ({
-            customerId,
-          })),
+          create: validCustomerIds.map((customerId) => ({ customerId })),
         },
       },
-
       include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-
+        createdBy: { select: { id: true, name: true, email: true } },
         template: {
           select: {
             id: true,
@@ -1618,32 +1701,18 @@ exports.createCampaign = async (req, res) => {
             category: true,
             messageType: true,
             content: true,
-                        headerType: true,
             status: true,
           },
         },
-
-        recipients: {
-          include: {
-            customer: true,
-          },
-        },
+        recipients: { include: { customer: true } },
       },
     });
-
-    // =====================================================
-    // NOTIFICATION
-    // =====================================================
 
     notifyAdmins({
       title: "New Campaign",
       message: `${campaign.name} has been created.`,
       type: "CAMPAIGN",
     }).catch(console.error);
-
-    // =====================================================
-    // AUDIT LOG
-    // =====================================================
 
     logAction({
       req,
@@ -1653,10 +1722,6 @@ exports.createCampaign = async (req, res) => {
       entityName: campaign.name,
     });
 
-    // =====================================================
-    // RESPONSE
-    // =====================================================
-
     return res.status(201).json({
       success: true,
       message: scheduledAt
@@ -1664,7 +1729,6 @@ exports.createCampaign = async (req, res) => {
         : "Campaign created successfully.",
       data: campaign,
     });
-
   } catch (error) {
     console.error("Create Campaign Error:", error);
 
@@ -1676,7 +1740,6 @@ exports.createCampaign = async (req, res) => {
   }
 };
 
-
 // =====================================================
 // GET ALL CAMPAIGNS
 // =====================================================
@@ -1686,19 +1749,9 @@ exports.getCampaigns = async (req, res) => {
     const companyId = req.user.companyId;
 
     const campaigns = await prisma.campaign.findMany({
-      where: {
-        companyId,
-      },
-
+      where: { companyId },
       include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-
+        createdBy: { select: { id: true, name: true, email: true } },
         template: {
           select: {
             id: true,
@@ -1707,23 +1760,12 @@ exports.getCampaigns = async (req, res) => {
             category: true,
             messageType: true,
             content: true,
-                        headerType: true,
             status: true,
           },
         },
-
-        // Don't load every customer for the campaign list.
-        // SaaS CRM campaign tables should use statistics instead.
-        _count: {
-          select: {
-            recipients: true,
-          },
-        },
+        _count: { select: { recipients: true } },
       },
-
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
 
     return res.status(200).json({
@@ -1731,7 +1773,6 @@ exports.getCampaigns = async (req, res) => {
       count: campaigns.length,
       data: campaigns,
     });
-
   } catch (error) {
     console.error("Get Campaigns Error:", error);
 
@@ -1743,7 +1784,6 @@ exports.getCampaigns = async (req, res) => {
   }
 };
 
-
 // =====================================================
 // GET CAMPAIGN BY ID
 // =====================================================
@@ -1754,20 +1794,9 @@ exports.getCampaignById = async (req, res) => {
     const companyId = req.user.companyId;
 
     const campaign = await prisma.campaign.findFirst({
-      where: {
-        id,
-        companyId,
-      },
-
+      where: { id, companyId },
       include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-
+        createdBy: { select: { id: true, name: true, email: true } },
         template: {
           select: {
             id: true,
@@ -1776,18 +1805,12 @@ exports.getCampaignById = async (req, res) => {
             category: true,
             messageType: true,
             content: true,
-                        headerType: true,
             status: true,
           },
         },
-
         recipients: {
-          include: {
-            customer: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
+          include: { customer: true },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
@@ -1799,11 +1822,7 @@ exports.getCampaignById = async (req, res) => {
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      data: campaign,
-    });
-
+    return res.status(200).json({ success: true, data: campaign });
   } catch (error) {
     console.error("Get Campaign Error:", error);
 
@@ -1815,7 +1834,6 @@ exports.getCampaignById = async (req, res) => {
   }
 };
 
-
 // =====================================================
 // UPDATE CAMPAIGN
 // =====================================================
@@ -1823,29 +1841,14 @@ exports.getCampaignById = async (req, res) => {
 exports.updateCampaign = async (req, res) => {
   try {
     const { id } = req.params;
-
     const companyId = req.user.companyId;
 
-    const {
-      name,
-      type,
-      templateId,
-      messageContent,
-      status,
-      scheduledAt,
-    } = req.body;
+    const { name, type, templateId, messageContent, status, scheduledAt } =
+      req.body;
 
-    // =====================================================
-    // FIND CAMPAIGN
-    // =====================================================
-
-    const existingCampaign =
-      await prisma.campaign.findFirst({
-        where: {
-          id,
-          companyId,
-        },
-      });
+    const existingCampaign = await prisma.campaign.findFirst({
+      where: { id, companyId },
+    });
 
     if (!existingCampaign) {
       return res.status(404).json({
@@ -1854,39 +1857,25 @@ exports.updateCampaign = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // DON'T MODIFY COMPLETED CAMPAIGNS
-    // =====================================================
-
     if (
       existingCampaign.status === "COMPLETED" ||
       existingCampaign.status === "SENDING"
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Completed or currently sending campaigns cannot be edited.",
+        message: "Completed or currently sending campaigns cannot be edited.",
       });
     }
 
-    // =====================================================
-    // TEMPLATE VALIDATION
-    // =====================================================
-
-    let validatedTemplateId =
-      existingCampaign.templateId;
+    let validatedTemplateId = existingCampaign.templateId;
 
     if (templateId !== undefined) {
       if (!templateId) {
         validatedTemplateId = null;
       } else {
-        const template =
-          await prisma.template.findFirst({
-            where: {
-              id: String(templateId),
-              companyId,
-            },
-          });
+        const template = await prisma.template.findFirst({
+          where: { id: String(templateId), companyId },
+        });
 
         if (!template) {
           return res.status(404).json({
@@ -1898,8 +1887,7 @@ exports.updateCampaign = async (req, res) => {
         if (template.status !== "APPROVED") {
           return res.status(400).json({
             success: false,
-            message:
-              "Only approved templates can be used for campaigns.",
+            message: "Only approved templates can be used for campaigns.",
           });
         }
 
@@ -1907,67 +1895,19 @@ exports.updateCampaign = async (req, res) => {
       }
     }
 
-    // =====================================================
-    // IMAGE
-    // =====================================================
-
     let imageUrl = existingCampaign.imageUrl;
 
     if (req.file) {
-      const uploadResult =
-        await uploadCampaignImage(req.file);
-
-      imageUrl =
-        uploadResult?.imageUrl ||
-        existingCampaign.imageUrl;
+      const uploadResult = await uploadCampaignImage(req.file);
+      imageUrl = uploadResult?.imageUrl || existingCampaign.imageUrl;
     }
 
-    // =====================================================
-    // TEMPLATE <-> IMAGE CONSISTENCY CHECK
-    // =====================================================
-    // 👈 NEW: same check as createCampaign — keep the template's approved
-    // header format and the campaign's image in sync so a send can't go
-    // out with a mismatched header component.
-
-    if (validatedTemplateId) {
-      const effectiveTemplate = await prisma.template.findFirst({
-        where: { id: validatedTemplateId, companyId },
-        select: { headerType: true },
-      });
-
-      if (effectiveTemplate) {
-        if (imageUrl && effectiveTemplate.headerType !== "IMAGE") {
-          return res.status(400).json({
-            success: false,
-            message:
-              "This template does not have an approved IMAGE header, so it can't be sent with a campaign image. Choose a template that was approved with an IMAGE header, or remove the image.",
-          });
-        }
-
-        if (!imageUrl && effectiveTemplate.headerType === "IMAGE") {
-          return res.status(400).json({
-            success: false,
-            message:
-              "This template requires an IMAGE header. Please upload a campaign image before saving.",
-          });
-        }
-      }
-    }
-
-    // =====================================================
-    // SCHEDULE
-    // =====================================================
-
-    let finalScheduledAt =
-      existingCampaign.scheduledAt;
-
-    let finalStatus =
-      status || existingCampaign.status;
+    let finalScheduledAt = existingCampaign.scheduledAt;
+    let finalStatus = status || existingCampaign.status;
 
     if (scheduledAt !== undefined) {
       if (scheduledAt) {
-        const scheduleDate =
-          new Date(scheduledAt);
+        const scheduleDate = new Date(scheduledAt);
 
         if (isNaN(scheduleDate.getTime())) {
           return res.status(400).json({
@@ -1979,8 +1919,7 @@ exports.updateCampaign = async (req, res) => {
         if (scheduleDate <= new Date()) {
           return res.status(400).json({
             success: false,
-            message:
-              "Scheduled time must be in the future.",
+            message: "Scheduled time must be in the future.",
           });
         }
 
@@ -1995,73 +1934,35 @@ exports.updateCampaign = async (req, res) => {
       }
     }
 
-    // =====================================================
-    // UPDATE
-    // =====================================================
-
-    const campaign =
-      await prisma.campaign.update({
-        where: {
-          id,
-        },
-
-        data: {
-          ...(name !== undefined && {
-            name: name.trim(),
-          }),
-
-          ...(type !== undefined && {
-            type,
-          }),
-
-          templateId: validatedTemplateId,
-
-          ...(messageContent !== undefined && {
-            messageContent:
-              messageContent?.trim() || null,
-          }),
-
-          status: finalStatus,
-
-          scheduledAt:
-            finalScheduledAt,
-
-          imageUrl,
-        },
-
-        include: {
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-
-          template: {
-            select: {
-              id: true,
-              name: true,
-              language: true,
-              category: true,
-              messageType: true,
-              content: true,
-                          headerType: true,
-              status: true,
-            },
-          },
-
-          _count: {
-            select: {
-              recipients: true,
-            },
+    const campaign = await prisma.campaign.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(type !== undefined && { type }),
+        templateId: validatedTemplateId,
+        ...(messageContent !== undefined && {
+          messageContent: messageContent?.trim() || null,
+        }),
+        status: finalStatus,
+        scheduledAt: finalScheduledAt,
+        imageUrl,
+      },
+      include: {
+        createdBy: { select: { id: true, name: true, email: true } },
+        template: {
+          select: {
+            id: true,
+            name: true,
+            language: true,
+            category: true,
+            messageType: true,
+            content: true,
+            status: true,
           },
         },
-      });
-
-    // =====================================================
-    // AUDIT
-    // =====================================================
+        _count: { select: { recipients: true } },
+      },
+    });
 
     logAction({
       req,
@@ -2069,22 +1970,16 @@ exports.updateCampaign = async (req, res) => {
       module: "CAMPAIGN",
       entityId: campaign.id,
       entityName: campaign.name,
-
       changes: {
         before: {
           status: existingCampaign.status,
-          templateId:
-            existingCampaign.templateId,
-          scheduledAt:
-            existingCampaign.scheduledAt,
+          templateId: existingCampaign.templateId,
+          scheduledAt: existingCampaign.scheduledAt,
         },
-
         after: {
           status: campaign.status,
-          templateId:
-            campaign.templateId,
-          scheduledAt:
-            campaign.scheduledAt,
+          templateId: campaign.templateId,
+          scheduledAt: campaign.scheduledAt,
         },
       },
     });
@@ -2094,7 +1989,6 @@ exports.updateCampaign = async (req, res) => {
       message: "Campaign updated successfully.",
       data: campaign,
     });
-
   } catch (error) {
     console.error("Update Campaign Error:", error);
 
@@ -2106,7 +2000,6 @@ exports.updateCampaign = async (req, res) => {
   }
 };
 
-
 // =====================================================
 // DELETE CAMPAIGN
 // =====================================================
@@ -2114,16 +2007,11 @@ exports.updateCampaign = async (req, res) => {
 exports.deleteCampaign = async (req, res) => {
   try {
     const { id } = req.params;
-
     const companyId = req.user.companyId;
 
-    const campaign =
-      await prisma.campaign.findFirst({
-        where: {
-          id,
-          companyId,
-        },
-      });
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, companyId },
+    });
 
     if (!campaign) {
       return res.status(404).json({
@@ -2132,20 +2020,14 @@ exports.deleteCampaign = async (req, res) => {
       });
     }
 
-    // Don't delete campaigns that are currently sending
     if (campaign.status === "SENDING") {
       return res.status(400).json({
         success: false,
-        message:
-          "A campaign that is currently sending cannot be deleted.",
+        message: "A campaign that is currently sending cannot be deleted.",
       });
     }
 
-    await prisma.campaign.delete({
-      where: {
-        id,
-      },
-    });
+    await prisma.campaign.delete({ where: { id } });
 
     logAction({
       req,
@@ -2159,7 +2041,6 @@ exports.deleteCampaign = async (req, res) => {
       success: true,
       message: "Campaign deleted successfully.",
     });
-
   } catch (error) {
     console.error("Delete Campaign Error:", error);
 
@@ -2170,7 +2051,6 @@ exports.deleteCampaign = async (req, res) => {
     });
   }
 };
-
 
 // =====================================================
 // GENERATE AI CAMPAIGN
@@ -2187,54 +2067,55 @@ exports.generateAICampaign = async (req, res) => {
       });
     }
 
-    const campaign =
-      await generateCampaign(prompt);
+    const campaign = await generateCampaign(prompt);
 
     return res.status(200).json({
       success: true,
-      message:
-        "AI campaign generated successfully.",
+      message: "AI campaign generated successfully.",
       data: campaign,
     });
-
   } catch (error) {
-    console.error(
-      "Generate AI Campaign Error:",
-      error
-    );
+    console.error("Generate AI Campaign Error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to generate campaign.",
+      message: "Failed to generate campaign.",
       error: error.message,
     });
   }
 };
 
-
 // =====================================================
-// SEND CAMPAIGN
+// SEND CAMPAIGN  (unrestricted — any campaign, any time,
+// optionally targeted at specific recipients)
 // =====================================================
+//
+// Body:
+//   campaignId   (required)
+//   recipientIds (optional array of customerIds) — if provided,
+//                only those recipients on this campaign are sent
+//                to this run. If omitted, every recipient attached
+//                to the campaign is sent to.
+//
+// There is NO status check here anymore. DRAFT, SCHEDULED,
+// COMPLETED, FAILED, or even mid-SENDING — this will always run.
+// That also means nothing stops you from firing two sends for the
+// same campaign back-to-back; if that ever becomes a problem later,
+// a lightweight lock can be added, but per your request nothing is
+// blocked today.
+//
 
 exports.sendCampaign = async (req, res) => {
   try {
-    console.log(
-      "========== SEND CAMPAIGN =========="
-    );
+    console.log("========== SEND CAMPAIGN ==========");
 
     const { campaignId } = req.body;
+    const recipientIds = req.body.recipientIds || req.body.customerIds || null;
 
     const companyId = req.user.companyId;
 
-    // 👈 NEW: fetch this company's own WhatsApp account ONCE,
-    // before the loop, so every recipient sends through the
-    // right phoneNumberId.
     const whatsappAccount = await prisma.whatsAppAccount.findFirst({
-      where: {
-        companyId,
-        status: "CONNECTED",
-      },
+      where: { companyId, status: "CONNECTED" },
     });
 
     if (!whatsappAccount) {
@@ -2244,10 +2125,6 @@ exports.sendCampaign = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // VALIDATION
-    // =====================================================
-
     if (!campaignId) {
       return res.status(400).json({
         success: false,
@@ -2255,27 +2132,13 @@ exports.sendCampaign = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // GET CAMPAIGN
-    // =====================================================
-
-    const campaign =
-      await prisma.campaign.findFirst({
-        where: {
-          id: String(campaignId),
-          companyId,
-        },
-
-        include: {
-          template: true,
-
-          recipients: {
-            include: {
-              customer: true,
-            },
-          },
-        },
-      });
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: String(campaignId), companyId },
+      include: {
+        template: true,
+        recipients: { include: { customer: true } },
+      },
+    });
 
     if (!campaign) {
       return res.status(404).json({
@@ -2284,15 +2147,10 @@ exports.sendCampaign = async (req, res) => {
       });
     }
 
-    // =====================================================
-    // VALIDATE TEMPLATE
-    // =====================================================
-
     if (!campaign.templateId) {
       return res.status(400).json({
         success: false,
-        message:
-          "This campaign does not have a WhatsApp template selected.",
+        message: "This campaign does not have a WhatsApp template selected.",
       });
     }
 
@@ -2306,423 +2164,153 @@ exports.sendCampaign = async (req, res) => {
     if (campaign.template.status !== "APPROVED") {
       return res.status(400).json({
         success: false,
-        message:
-          "The selected WhatsApp template is not approved.",
+        message: "The selected WhatsApp template is not approved.",
+      });
+    }
+
+    if (!campaign.recipients || campaign.recipients.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one customer.",
       });
     }
 
     // =====================================================
-    // VALIDATE STATUS
+    // TARGET RECIPIENTS
     // =====================================================
+    // No filter => everyone already on the campaign (a "full" send).
+    // Filter given => only those customerIds (a "targeted" send).
+    //
+    // Important: a targeted customerId does NOT have to already be a
+    // campaign recipient. If it isn't yet, we attach it now — this is
+    // what lets SendCampaignModal pick from ALL customers, not just
+    // ones originally added when the campaign was created.
 
-    if (
-      campaign.status === "COMPLETED"
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "This campaign has already been completed.",
-      });
+    const isTargeted = Array.isArray(recipientIds) && recipientIds.length > 0;
+
+    let targetRecipients;
+
+    if (isTargeted) {
+      const requestedIds = [...new Set(recipientIds.map(String))];
+
+      const existingRecipients = campaign.recipients.filter((r) =>
+        requestedIds.includes(String(r.customerId))
+      );
+
+      const existingCustomerIds = existingRecipients.map((r) =>
+        String(r.customerId)
+      );
+
+      const newCustomerIds = requestedIds.filter(
+        (id) => !existingCustomerIds.includes(id)
+      );
+
+      let newlyAttachedRecipients = [];
+
+      if (newCustomerIds.length > 0) {
+        // Make sure these customers actually belong to this company
+        // before attaching them to the campaign.
+        const validCustomers = await prisma.customer.findMany({
+          where: { id: { in: newCustomerIds }, companyId },
+        });
+
+        if (validCustomers.length > 0) {
+          await prisma.campaignRecipient.createMany({
+            data: validCustomers.map((customer) => ({
+              campaignId: campaign.id,
+              customerId: customer.id,
+            })),
+            skipDuplicates: true,
+          });
+
+          newlyAttachedRecipients = await prisma.campaignRecipient.findMany({
+            where: {
+              campaignId: campaign.id,
+              customerId: { in: validCustomers.map((c) => c.id) },
+            },
+            include: { customer: true },
+          });
+        }
+      }
+
+      targetRecipients = [...existingRecipients, ...newlyAttachedRecipients];
+    } else {
+      targetRecipients = campaign.recipients;
     }
 
-    if (
-      campaign.status === "SENDING"
-    ) {
+    if (targetRecipients.length === 0) {
       return res.status(400).json({
         success: false,
         message:
-          "This campaign is already being sent.",
-      });
-    }
-
-    // =====================================================
-    // CHECK RECIPIENTS
-    // =====================================================
-
-    if (
-      !campaign.recipients ||
-      campaign.recipients.length === 0
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Please select at least one customer.",
+          "None of the given recipients could be found for your company.",
       });
     }
 
     // =====================================================
     // MARK CAMPAIGN AS SENDING
     // =====================================================
+    // Full send: reset counters, this run's numbers are the whole story.
+    // Targeted send: leave existing counters alone, we'll increment after.
 
     await prisma.campaign.update({
-      where: {
-        id: campaign.id,
-      },
-
-      data: {
-        status: "SENDING",
-        startedAt: new Date(),
-        totalRecipients:
-          campaign.recipients.length,
-        audienceCount:
-          campaign.recipients.length,
-        sentCount: 0,
-        deliveredCount: 0,
-        readCount: 0,
-        failedCount: 0,
-      },
+      where: { id: campaign.id },
+      data: isTargeted
+        ? { status: "SENDING" }
+        : {
+            status: "SENDING",
+            startedAt: new Date(),
+            totalRecipients: campaign.recipients.length,
+            audienceCount: campaign.recipients.length,
+            sentCount: 0,
+            deliveredCount: 0,
+            readCount: 0,
+            failedCount: 0,
+          },
     });
 
     // =====================================================
-    // SEND TO RECIPIENTS
+    // SEND
     // =====================================================
 
-    let sentCount = 0;
-    let failedCount = 0;
-
-    for (const recipient of campaign.recipients) {
-      const customer = recipient.customer;
-
-      if (!customer) {
-        failedCount++;
-
-        await prisma.campaignRecipient.update({
-          where: {
-            id: recipient.id,
-          },
-
-          data: {
-            status: "FAILED",
-          },
-        });
-
-        continue;
-      }
-
-      if (!customer.phone) {
-        failedCount++;
-
-        await prisma.campaignRecipient.update({
-          where: {
-            id: recipient.id,
-          },
-
-          data: {
-            status: "FAILED",
-          },
-        });
-
-        continue;
-      }
-
-      try {
-        // =====================================================
-        // CONVERSATION
-        // =====================================================
-
-        let conversation =
-          await getOrCreateSaaSConversation(
-            companyId,
-            whatsappAccount.id,
-            customer.phone
-          );
-
-        // =====================================================
-        // SEND TEMPLATE
-        // =====================================================
-
-             let result;
-
-        // 👈 NEW: build the params array to match the template's
-        // ACTUAL number of {{n}} variables instead of always
-        // sending 2. Meta rejects the send outright if the count
-        // doesn't match exactly.
-        // 👈 FIXED: this regex now allows optional whitespace inside the
-        // braces ("{{ 1 }}"), matching templateController.js's
-        // extractVariables(). Previously this regex was stricter than the
-        // one used in the campaign builder UI, so a template body with
-        // spaced-out braces was counted as having 0 variables here even
-        // though the UI showed the variable correctly mapped — the send
-        // then went out with an empty parameters array, which is why the
-        // customer could receive the raw "{{1}}" placeholder instead of
-        // their name.
-        const variableCount = (
-          campaign.template.content.match(/\{\{\s*\d+\s*\}\}/g) || []
-        ).length;
-
-        const allPossibleParams = [
-          customer.name,
-          campaign.messageContent || "",
-        ];
-
-        const templateParams = allPossibleParams.slice(
-          0,
-          variableCount
-        );
-
-        // 👈 NEW: never send a template call with a blank/whitespace-only
-        // parameter — Meta either rejects it or (worse) delivers the
-        // message with the placeholder left unresolved for the customer
-        // to see. Fail this recipient clearly instead, so it shows up as
-        // FAILED with a real reason rather than a silently broken send.
-        const hasEmptyParam = templateParams
-          .slice(0, variableCount)
-          .some((p) => !p || !String(p).trim());
-
-        if (
-          templateParams.length < variableCount ||
-          hasEmptyParam
-        ) {
-          failedCount++;
-
-          await prisma.campaignRecipient.update({
-            where: { id: recipient.id },
-            data: {
-              status: "FAILED",
-              failureReason: `Template requires ${variableCount} variable(s) but only ${templateParams.filter(
-                (p) => p && String(p).trim()
-              ).length} usable value(s) were available (check customer.name and campaign message).`,
-            },
-          });
-
-          continue;
-        }
-
-        // 👈 NEW: a template can only carry an IMAGE header component if
-        // it was actually approved with an IMAGE header on Meta. Before
-        // this, the campaign module attached an image header to ANY
-        // template that happened to have a campaign image uploaded,
-        // regardless of the template's real headerType — Meta then
-        // rejects the whole send because the template has no header
-        // component to fill. This is the "template module and campaign
-        // module are not in sync" issue.
-        if (campaign.imageUrl && campaign.template.headerType !== "IMAGE") {
-          failedCount++;
-
-          await prisma.campaignRecipient.update({
-            where: { id: recipient.id },
-            data: {
-              status: "FAILED",
-              failureReason:
-                "Campaign has an image attached, but the selected template was not approved with an IMAGE header. Select a template with an IMAGE header, or remove the campaign image.",
-            },
-          });
-
-          continue;
-        }
-
-        if (
-          !campaign.imageUrl &&
-          campaign.template.headerType === "IMAGE"
-        ) {
-          failedCount++;
-
-          await prisma.campaignRecipient.update({
-            where: { id: recipient.id },
-            data: {
-              status: "FAILED",
-              failureReason:
-                "The selected template requires an IMAGE header, but no campaign image was uploaded.",
-            },
-          });
-
-          continue;
-        }
-
-        if (campaign.imageUrl) {
-          result =
-            await sendCampaignImageTemplate(
-              customer.phone,
-
-              campaign.template.name,
-
-              campaign.imageUrl,
-
-              templateParams, // 👈 CHANGED
-
-              campaign.template.language ||
-              "en_US",
-
-              whatsappAccount
-            );
-        } else {
-          result =
-            await sendTemplateMessage(
-              customer.phone,
-
-              campaign.template.name,
-
-              templateParams, // 👈 CHANGED
-
-              whatsappAccount
-            );
-        }
-
-        console.log(
-          "WhatsApp Result:",
-          result
-        );
-
-        // =====================================================
-        // SUCCESS
-        // =====================================================
-
-        if (result?.success) {
-          const metaMessageId =
-            result.data?.messages?.[0]?.id ||
-            null;
-
-          sentCount++;
-
-          await prisma.campaignRecipient.update({
-            where: {
-              id: recipient.id,
-            },
-
-            data: {
-              status: "SENT",
-              sentAt: new Date(),
-            },
-          });
-
-          // =====================================================
-          // SAVE MESSAGE
-          // =====================================================
-
-          await prisma.message.create({
-            data: {
-              conversationId:
-                conversation.id,
-
-              sender: "AGENT",
-
-              content:
-                campaign.messageContent ||
-                campaign.template.content,
-
-              imageUrl:
-                campaign.imageUrl,
-
-              messageType:
-                campaign.imageUrl
-                  ? "IMAGE"
-                  : "TEXT",
-
-              status: "SENT",
-
-              metaMessageId,
-            },
-          });
-
-          // =====================================================
-          // UPDATE CONVERSATION
-          // =====================================================
-
-          await prisma.conversation.update({
-            where: {
-              id: conversation.id,
-            },
-
-            data: {
-              lastMessage:
-                campaign.messageContent ||
-                campaign.template.content,
-            },
-          });
-
-        } else {
-          failedCount++;
-
-          // 👈 NEW: persist Meta's actual error instead of just "FAILED"
-          // with no detail. The schema already has failureReason — it was
-          // just never being written to, which is why failed sends (like
-          // the image campaigns) gave no clue as to why.
-          const metaError = result?.error;
-          const failureReason =
-            (typeof metaError === "string" && metaError) ||
-            metaError?.error?.error_user_msg ||
-            metaError?.error?.message ||
-            metaError?.message ||
-            (metaError ? JSON.stringify(metaError) : "Unknown send failure");
-
-          console.error(
-            `Campaign send failed for ${customer.phone}:`,
-            metaError
-          );
-
-          await prisma.campaignRecipient.update({
-            where: {
-              id: recipient.id,
-            },
-
-            data: {
-              status: "FAILED",
-              failureReason: String(failureReason).slice(0, 500),
-            },
-          });
-        }
-
-      } catch (error) {
-        console.error(
-          `Campaign send failed for ${customer.phone}:`,
-          error
-        );
-
-        failedCount++;
-
-        await prisma.campaignRecipient.update({
-          where: {
-            id: recipient.id,
-          },
-
-          data: {
-            status: "FAILED",
-            failureReason: String(error.message || error).slice(0, 500),
-          },
-        });
-      }
-    }
+    const { sentCount, failedCount } = await sendToRecipients(
+      campaign,
+      targetRecipients,
+      whatsappAccount,
+      companyId
+    );
 
     // =====================================================
-    // FINAL CAMPAIGN STATUS
+    // FINAL CAMPAIGN STATUS / COUNTS
     // =====================================================
 
-    let finalStatus = "COMPLETED";
+    // In case new customers were attached to the campaign above,
+    // recount from the DB so totals stay accurate either way.
+    const currentRecipientCount = await prisma.campaignRecipient.count({
+      where: { campaignId: campaign.id },
+    });
 
-    if (
-      sentCount === 0 &&
-      failedCount > 0
-    ) {
-      finalStatus = "FAILED";
-    }
-
-    const completedCampaign =
-      await prisma.campaign.update({
-        where: {
-          id: campaign.id,
-        },
-
-        data: {
-          status: finalStatus,
-
-          completedAt:
-            new Date(),
-
-          sentCount,
-
-          failedCount,
-
-          totalRecipients:
-            campaign.recipients.length,
-
-          audienceCount:
-            campaign.recipients.length,
-        },
-      });
-
-    // =====================================================
-    // AUDIT
-    // =====================================================
+    const completedCampaign = await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: isTargeted
+        ? {
+            // targeted: add this run's results on top of whatever was there
+            sentCount: { increment: sentCount },
+            failedCount: { increment: failedCount },
+            totalRecipients: currentRecipientCount,
+            audienceCount: currentRecipientCount,
+            status: "COMPLETED",
+            completedAt: new Date(),
+          }
+        : {
+            // full send: this run's numbers are the whole campaign's numbers
+            status: sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED",
+            completedAt: new Date(),
+            sentCount,
+            failedCount,
+            totalRecipients: campaign.recipients.length,
+            audienceCount: campaign.recipients.length,
+          },
+    });
 
     logAction({
       req,
@@ -2730,135 +2318,227 @@ exports.sendCampaign = async (req, res) => {
       module: "CAMPAIGN",
       entityId: campaign.id,
       entityName: campaign.name,
-
       changes: {
         after: {
-          status: finalStatus,
-          totalRecipients:
-            campaign.recipients.length,
+          status: completedCampaign.status,
+          targeted: isTargeted,
+          recipientsThisRun: targetRecipients.length,
           sentCount,
           failedCount,
         },
       },
     });
 
-    // =====================================================
-    // RESPONSE
-    // =====================================================
-
     return res.status(200).json({
       success: true,
-
       message:
-        finalStatus === "COMPLETED"
-          ? "Campaign sent successfully."
-          : "Campaign sending failed.",
-
+        failedCount > 0 && sentCount === 0
+          ? "Campaign sending failed."
+          : "Campaign sent successfully.",
       data: {
-        campaignId:
-          completedCampaign.id,
-
-        status:
-          completedCampaign.status,
-
-        totalRecipients:
-          campaign.recipients.length,
-
+        campaignId: completedCampaign.id,
+        status: completedCampaign.status,
+        recipientsThisRun: targetRecipients.length,
         sentCount,
-
         failedCount,
       },
     });
-
   } catch (error) {
-    console.error(
-      "Send Campaign Error:",
-      error
-    );
+    console.error("Send Campaign Error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to send campaign.",
+      message: "Failed to send campaign.",
       error: error.message,
     });
   }
 };
 
+// =====================================================
+// RESEND CAMPAIGN
+// =====================================================
+// Kept for your existing frontend button/API call. Now it's just
+// a full send (every recipient again) with no status restriction —
+// there's nothing left for it to guard against, since sendCampaign
+// itself no longer blocks. It resets counters the same way a full
+// sendCampaign run does.
+//
+
+exports.resendCampaign = async (req, res) => {
+  try {
+    console.log("========== RESEND CAMPAIGN ==========");
+
+    const { campaignId } = req.body;
+    const companyId = req.user.companyId;
+
+    const whatsappAccount = await prisma.whatsAppAccount.findFirst({
+      where: { companyId, status: "CONNECTED" },
+    });
+
+    if (!whatsappAccount) {
+      return res.status(400).json({
+        success: false,
+        message: "No connected WhatsApp account found for this company.",
+      });
+    }
+
+    if (!campaignId) {
+      return res.status(400).json({
+        success: false,
+        message: "Campaign ID is required.",
+      });
+    }
+
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: String(campaignId), companyId },
+      include: {
+        template: true,
+        recipients: { include: { customer: true } },
+      },
+    });
+
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        message: "Campaign not found.",
+      });
+    }
+
+    if (!campaign.templateId || !campaign.template) {
+      return res.status(400).json({
+        success: false,
+        message: "This campaign does not have a WhatsApp template selected.",
+      });
+    }
+
+    if (campaign.template.status !== "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message: "The selected WhatsApp template is not approved.",
+      });
+    }
+
+    if (!campaign.recipients || campaign.recipients.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one customer.",
+      });
+    }
+
+    await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: {
+        status: "SENDING",
+        startedAt: new Date(),
+        totalRecipients: campaign.recipients.length,
+        audienceCount: campaign.recipients.length,
+        sentCount: 0,
+        deliveredCount: 0,
+        readCount: 0,
+        failedCount: 0,
+      },
+    });
+
+    const { sentCount, failedCount } = await sendToRecipients(
+      campaign,
+      campaign.recipients,
+      whatsappAccount,
+      companyId
+    );
+
+    const finalStatus = sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED";
+
+    const completedCampaign = await prisma.campaign.update({
+      where: { id: campaign.id },
+      data: {
+        status: finalStatus,
+        completedAt: new Date(),
+        sentCount,
+        failedCount,
+        totalRecipients: campaign.recipients.length,
+        audienceCount: campaign.recipients.length,
+      },
+    });
+
+    logAction({
+      req,
+      action: "UPDATE",
+      module: "CAMPAIGN",
+      entityId: campaign.id,
+      entityName: campaign.name,
+      changes: {
+        after: {
+          status: finalStatus,
+          totalRecipients: campaign.recipients.length,
+          sentCount,
+          failedCount,
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        finalStatus === "COMPLETED"
+          ? "Campaign resent successfully."
+          : "Campaign resend failed.",
+      data: {
+        campaignId: completedCampaign.id,
+        status: completedCampaign.status,
+        totalRecipients: campaign.recipients.length,
+        sentCount,
+        failedCount,
+      },
+    });
+  } catch (error) {
+    console.error("Resend Campaign Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to resend campaign.",
+      error: error.message,
+    });
+  }
+};
 
 // =====================================================
 // GET CAMPAIGN RECIPIENTS
 // =====================================================
 
-exports.getCampaignRecipients = async (
-  req,
-  res
-) => {
+exports.getCampaignRecipients = async (req, res) => {
   try {
     const { id } = req.params;
+    const companyId = req.user.companyId;
 
-    const companyId =
-      req.user.companyId;
-
-    // =====================================================
-    // MAKE SURE CAMPAIGN BELONGS TO COMPANY
-    // =====================================================
-
-    const campaign =
-      await prisma.campaign.findFirst({
-        where: {
-          id,
-          companyId,
-        },
-
-        select: {
-          id: true,
-        },
-      });
+    const campaign = await prisma.campaign.findFirst({
+      where: { id, companyId },
+      select: { id: true },
+    });
 
     if (!campaign) {
       return res.status(404).json({
         success: false,
-        message:
-          "Campaign not found.",
+        message: "Campaign not found.",
       });
     }
 
-    // =====================================================
-    // GET RECIPIENTS
-    // =====================================================
-
-    const recipients =
-      await prisma.campaignRecipient.findMany({
-        where: {
-          campaignId: id,
-        },
-
-        include: {
-          customer: true,
-        },
-
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+    const recipients = await prisma.campaignRecipient.findMany({
+      where: { campaignId: id },
+      include: { customer: true },
+      orderBy: { createdAt: "desc" },
+    });
 
     return res.status(200).json({
       success: true,
       count: recipients.length,
       data: recipients,
     });
-
   } catch (error) {
-    console.error(
-      "Get Campaign Recipients Error:",
-      error
-    );
+    console.error("Get Campaign Recipients Error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch campaign recipients.",
+      message: "Failed to fetch campaign recipients.",
       error: error.message,
     });
   }
