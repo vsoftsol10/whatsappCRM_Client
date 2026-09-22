@@ -15,8 +15,8 @@ const {
 } = require("../services/cloudinaryService");
 
 const {
-  getOrCreateConversation,
-} = require("../helpers/conversationHelper");
+  getOrCreateSaaSConversation,
+} = require("../helpers/saasConversationHelper");
 
 const { logAction } = require("../services/auditLogService");
 
@@ -1005,26 +1005,11 @@ exports.sendCampaign = async (req, res) => {
         // =====================================================
 
         let conversation =
-          await getOrCreateConversation(
+          await getOrCreateSaaSConversation(
+            companyId,
+            whatsappAccount.id,
             customer.phone
           );
-
-        if (
-          conversation.customerId !==
-          customer.id
-        ) {
-          conversation =
-            await prisma.conversation.update({
-              where: {
-                id: conversation.id,
-              },
-
-              data: {
-                customerId:
-                  customer.id,
-              },
-            });
-        }
 
         // =====================================================
         // SEND TEMPLATE
