@@ -359,6 +359,109 @@ const mapToMetaCategory = (category) => {
   return allowed.includes(category) ? category : "UTILITY";
 };
 
+// ============================================
+// 👈 NEW: UPLOAD HEADER SAMPLE MEDIA TO META, GET A HANDLE BACK
+// ============================================
+// A Cloudinary URL is enough for Meta's Resumable Upload API to
+// accept as the *source*, but Meta does not accept that URL itself
+// as the template's header sample — it needs its own "handle",
+// obtained by:
+//   1. Starting an upload session on Meta's Graph API (needs the
+//      file's byte length + mime type + your Meta App ID).
+//   2. Uploading the actual file bytes to that session.
+//   3. Reading back the "h" (handle) value from the response.
+// That handle then goes into the HEADER component as
+// example.header_handle when creating the template — this is what
+// was missing, which is why Meta returned:
+// "A sample media handle is required for IMAGE, VIDEO, or DOCUMENT
+// headers."
+const uploadHeaderMediaToMeta = async (mediaUrl) => {
+  try {
+    if (!process.env.META_APP_ID) {
+      return {
+        success: false,
+        error:
+          "META_APP_ID is not configured on the server. Contact support.",
+      };
+    }
+
+    // Step 1: download the actual file bytes from Cloudinary so we
+    // know their exact length/type and can forward them to Meta.
+    const fileResponse = await axios.get(mediaUrl, {
+      responseType: "arraybuffer",
+    });
+
+    const fileBuffer = Buffer.from(fileResponse.data);
+    const fileType =
+      fileResponse.headers["content-type"] || "image/jpeg";
+
+    // Step 2: start an upload session with Meta.
+    const sessionResponse = await axios.post(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${process.env.META_APP_ID}/uploads`,
+      null,
+      {
+        params: {
+          file_length: fileBuffer.length,
+          file_type: fileType,
+          access_token: process.env.META_SYSTEM_USER_TOKEN,
+        },
+      }
+    );
+
+    const uploadSessionId = sessionResponse.data?.id;
+
+    if (!uploadSessionId) {
+      return {
+        success: false,
+        error: "Meta did not return an upload session ID.",
+      };
+    }
+
+    // Step 3: upload the actual bytes to that session.
+    // NOTE: this call uses "OAuth" in the Authorization header, not
+    // "Bearer" — that's what Meta's Resumable Upload API expects,
+    // unlike the rest of the Graph API calls in this file.
+    const uploadResponse = await axios.post(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${uploadSessionId}`,
+      fileBuffer,
+      {
+        headers: {
+          Authorization: `OAuth ${process.env.META_SYSTEM_USER_TOKEN}`,
+          "Content-Type": fileType,
+          "file_offset": 0,
+        },
+      }
+    );
+
+    const handle = uploadResponse.data?.h;
+
+    if (!handle) {
+      return {
+        success: false,
+        error: "Meta did not return a media handle after upload.",
+      };
+    }
+
+    return {
+      success: true,
+      handle,
+    };
+  } catch (error) {
+    console.error(
+      "META HEADER MEDIA UPLOAD ERROR:",
+      error.response?.data || error.message
+    );
+
+    return {
+      success: false,
+      error:
+        error.response?.data?.error?.error_user_msg ||
+        error.response?.data?.error?.message ||
+        error.message,
+    };
+  }
+};
+
 const createMetaTemplate = async (
   companyId,
   {
@@ -367,11 +470,6 @@ const createMetaTemplate = async (
     language,
     headerType,
     headerContent,
-    headerHandle, // 👈 NEW: media handle from Meta's Resumable Upload API,
-    // required for IMAGE / VIDEO / DOCUMENT headers (see
-    // metaMediaUploadService.js). Without this, Meta rejects the
-    // submission with "component of type HEADER is missing expected
-    // field(s) (example)".
     bodyText,
     bodyExamples,
     footerContent,
@@ -400,15 +498,26 @@ const createMetaTemplate = async (
           text: headerContent,
         });
       } else {
-        // 👈 CHANGED: IMAGE / VIDEO / DOCUMENT headers must include a
-        // sample media handle or Meta rejects the submission outright.
-        if (!headerHandle) {
+        // 👈 NEW: IMAGE / VIDEO / DOCUMENT headers require a Meta
+        // media "handle" in example.header_handle — a Cloudinary
+        // URL alone is not accepted here. headerContent is expected
+        // to be that public URL; we upload its bytes to Meta first
+        // to get the handle Meta actually wants.
+        if (!headerContent || !headerContent.trim()) {
           return {
             success: false,
-            error: {
-              message:
-                "A sample media handle is required for IMAGE, VIDEO, or DOCUMENT headers. Upload a header sample before submitting.",
-            },
+            error: `A sample ${headerType.toLowerCase()} URL is required before submitting.`,
+          };
+        }
+
+        const mediaUploadResult = await uploadHeaderMediaToMeta(
+          headerContent
+        );
+
+        if (!mediaUploadResult.success) {
+          return {
+            success: false,
+            error: `Failed to prepare header media for Meta: ${mediaUploadResult.error}`,
           };
         }
 
@@ -416,7 +525,7 @@ const createMetaTemplate = async (
           type: "HEADER",
           format: headerType,
           example: {
-            header_handle: [headerHandle],
+            header_handle: [mediaUploadResult.handle],
           },
         });
       }

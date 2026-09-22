@@ -6,8 +6,7 @@
 //     if (!file || !file.buffer) {
 //       return resolve(null);
 //     }
-// console.log(cloudinary);
-// console.log(cloudinary.uploader);
+
 //     const stream = cloudinary.uploader.upload_stream(
 //       {
 //         folder: "campaign-images",
@@ -39,10 +38,14 @@
 //   uploadCampaignImage,
 // };
 
+
 const cloudinary = require("../config/cloudinary");
 const streamifier = require("streamifier");
 
-const uploadCampaignImage = (file) => {
+// 👈 CHANGED: folder is now an optional second argument, defaulting to
+// "campaign-images" so every existing call site (campaignController)
+// behaves exactly as before with no changes needed there.
+const uploadCampaignImage = (file, folder = "campaign-images") => {
   return new Promise((resolve, reject) => {
     if (!file || !file.buffer) {
       return resolve(null);
@@ -50,7 +53,7 @@ const uploadCampaignImage = (file) => {
 
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "campaign-images",
+        folder,
         resource_type: "image",
         // Cap dimensions and let Cloudinary auto-optimize quality/format.
         // This keeps large Canva exports well under WhatsApp's 5MB

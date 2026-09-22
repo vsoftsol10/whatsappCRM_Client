@@ -1151,8 +1151,6 @@
 //   );
 // }
 
-
-
 import { useState, useMemo } from "react";
 import {
   X,
@@ -1166,9 +1164,11 @@ import {
   Gift,
   HeartHandshake,
   Headset,
+  ImagePlus,
 } from "lucide-react";
 
 import useTemplateStore from "../../store/templateStore";
+import { uploadTemplateHeaderImage } from "../../api/templateApi"; // 👈 NEW
 import toast from "react-hot-toast";
 
 export default function CreateTemplateModal({ isOpen, onClose }) {
@@ -1186,7 +1186,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
     content: "",
     footerContent: "",
 
-    variableSamples: {}, // 👈 NEW: { "1": "Rahul", "2": "ORD1234" }
+    variableSamples: {},
   });
 
   const [aiPrompt, setAiPrompt] = useState("");
@@ -1194,14 +1194,13 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
 
   const [generating, setGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingHeader, setUploadingHeader] = useState(false); // 👈 NEW
 
   const [errors, setErrors] = useState({});
 
   // ==================================================
-  // DETECT VARIABLES IN BODY  👈 NEW
+  // DETECT VARIABLES IN BODY
   // ==================================================
-  // Finds {{1}}, {{2}}, {{3}}... in the content text
-  // and returns a sorted, de-duplicated list like ["1","2"]
 
   const detectedVariables = useMemo(() => {
     const matches = [...formData.content.matchAll(/\{\{(\d+)\}\}/g)];
@@ -1293,11 +1292,18 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
       newErrors.language = "Language is required";
     }
 
+    // 👈 CHANGED: header validation is now type-aware
+    if (formData.headerType === "TEXT" && !formData.headerContent.trim()) {
+      newErrors.headerContent = "Header text is required";
+    }
+
     if (
-      formData.headerType !== "NONE" &&
+      (formData.headerType === "IMAGE" ||
+        formData.headerType === "VIDEO" ||
+        formData.headerType === "DOCUMENT") &&
       !formData.headerContent.trim()
     ) {
-      newErrors.headerContent = "Header content is required";
+      newErrors.headerContent = `Please upload a sample ${formData.headerType.toLowerCase()} before saving`;
     }
 
     if (!formData.content.trim()) {
@@ -1306,7 +1312,6 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
       newErrors.content = "Template body must be at least 10 characters";
     }
 
-    // 👈 NEW: every detected {{n}} must have a sample value
     detectedVariables.forEach((varNum) => {
       const sample = formData.variableSamples[varNum];
       if (!sample || !sample.trim()) {
@@ -1333,9 +1338,61 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
     }));
   };
 
-  // ==================================================
-  // HANDLE SAMPLE VALUE CHANGE  👈 NEW
-  // ==================================================
+  // 👈 NEW: when switching header type, clear whatever was in
+  // headerContent — a text heading and an uploaded image URL are
+  // never valid for each other's type, so don't let stale data
+  // silently carry over.
+  const handleHeaderTypeChange = (e) => {
+    setFormData((prev) => ({
+      ...prev,
+      headerType: e.target.value,
+      headerContent: "",
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      headerContent: "",
+    }));
+  };
+
+  // 👈 NEW: actual file upload handler for IMAGE headers
+  const handleHeaderImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5MB (Meta's limit for header images).");
+      return;
+    }
+
+    try {
+      setUploadingHeader(true);
+
+      const result = await uploadTemplateHeaderImage(file);
+
+      setFormData((prev) => ({
+        ...prev,
+        headerContent: result.data.imageUrl,
+      }));
+
+      setErrors((prev) => ({
+        ...prev,
+        headerContent: "",
+      }));
+
+      toast.success("Sample image uploaded.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to upload sample image.");
+    } finally {
+      setUploadingHeader(false);
+    }
+  };
 
   const handleSampleChange = (varNum, value) => {
     setFormData((prev) => ({
@@ -1426,6 +1483,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
 
     setGenerating(false);
     setIsSubmitting(false);
+    setUploadingHeader(false);
   };
 
   const handleSubmit = async (e) => {
@@ -1438,20 +1496,23 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
       return;
     }
 
+    if (uploadingHeader) {
+      toast.error("Please wait for the header image to finish uploading.");
+      return;
+    }
+
     if (!validateForm()) return;
 
     try {
       setIsSubmitting(true);
 
-      // 👈 NEW: convert variableSamples object into an ordered array
-      // e.g. { "1": "Rahul", "2": "ORD1234" } -> ["Rahul", "ORD1234"]
       const bodyExamples = detectedVariables.map(
         (varNum) => formData.variableSamples[varNum]
       );
 
       await addTemplate({
         ...formData,
-        bodyExamples, // sent alongside the rest of the form data
+        bodyExamples,
       });
 
       toast.success("Template saved as draft successfully!");
@@ -1478,6 +1539,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
   const handleClose = () => {
     if (isSubmitting) return;
     if (generating) return;
+    if (uploadingHeader) return;
     onClose();
   };
 
@@ -1499,9 +1561,9 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
             <button
               type="button"
               onClick={handleClose}
-              disabled={isSubmitting || generating}
+              disabled={isSubmitting || generating || uploadingHeader}
               className={`rounded-full p-2 transition ${
-                isSubmitting || generating
+                isSubmitting || generating || uploadingHeader
                   ? "cursor-not-allowed opacity-50"
                   : "hover:bg-[#128C7E]"
               }`}
@@ -1514,7 +1576,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
             onSubmit={handleSubmit}
             className="max-h-[78vh] space-y-6 overflow-y-auto p-5 sm:p-6"
           >
-            {/* BASIC INFORMATION — unchanged from your original */}
+            {/* BASIC INFORMATION — unchanged */}
             <div>
               <h3 className="mb-4 text-lg font-semibold text-gray-800">
                 Basic Information
@@ -1640,7 +1702,9 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* HEADER — unchanged */}
+            {/* ==================================================
+                HEADER — now fully type-aware
+            ================================================== */}
             <div className="border-t pt-5">
               <h3 className="mb-4 text-lg font-semibold text-gray-800">Header</h3>
 
@@ -1652,7 +1716,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
                 <select
                   name="headerType"
                   value={formData.headerType}
-                  onChange={handleChange}
+                  onChange={handleHeaderTypeChange} // 👈 CHANGED: clears headerContent on switch
                   disabled={isSubmitting}
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366]"
                 >
@@ -1662,12 +1726,19 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
                   <option value="VIDEO">Video</option>
                   <option value="DOCUMENT">Document</option>
                 </select>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Meta locks this in permanently once approved — a template
+                  approved with an image header can never later be sent with
+                  text or video instead.
+                </p>
               </div>
 
-              {formData.headerType !== "NONE" && (
+              {/* TEXT header — plain text input */}
+              {formData.headerType === "TEXT" && (
                 <div className="mt-4">
                   <label className="mb-2 block font-medium text-gray-700">
-                    Header Content <span className="text-red-500">*</span>
+                    Header Text <span className="text-red-500">*</span>
                   </label>
 
                   <input
@@ -1676,11 +1747,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
                     value={formData.headerContent}
                     onChange={handleChange}
                     disabled={isSubmitting}
-                    placeholder={
-                      formData.headerType === "TEXT"
-                        ? "Enter header text"
-                        : `Enter ${formData.headerType.toLowerCase()} reference`
-                    }
+                    placeholder="Enter header text"
                     className={`w-full rounded-lg border px-4 py-3 outline-none ${
                       errors.headerContent
                         ? "border-red-500"
@@ -1693,6 +1760,96 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
                       {errors.headerContent}
                     </p>
                   )}
+                </div>
+              )}
+
+              {/* IMAGE header — real file upload, not a text field */}
+              {formData.headerType === "IMAGE" && (
+                <div className="mt-4">
+                  <label className="mb-2 block font-medium text-gray-700">
+                    Sample Image <span className="text-red-500">*</span>
+                  </label>
+
+                  <p className="mb-2 text-xs text-gray-500">
+                    Upload a real sample image (JPEG/PNG, under 5MB). This is
+                    what Meta's reviewers see, and what gets referenced when
+                    the template is approved.
+                  </p>
+
+                  {!formData.headerContent ? (
+                    <label
+                      className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition ${
+                        isSubmitting || uploadingHeader
+                          ? "cursor-not-allowed opacity-50 border-gray-300"
+                          : "cursor-pointer border-[#25D366] bg-green-50 hover:bg-green-100"
+                      } ${errors.headerContent ? "border-red-500" : ""}`}
+                    >
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleHeaderImageUpload}
+                        disabled={isSubmitting || uploadingHeader}
+                        className="hidden"
+                      />
+
+                      {uploadingHeader ? (
+                        <>
+                          <Loader2 size={24} className="animate-spin text-[#25D366]" />
+                          <span className="mt-2 text-sm text-gray-600">
+                            Uploading...
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <ImagePlus size={24} className="text-[#25D366]" />
+                          <span className="mt-2 text-sm text-gray-600">
+                            Click to upload sample image
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-4 rounded-lg border border-gray-200 p-3">
+                      <img
+                        src={formData.headerContent}
+                        alt="Header sample"
+                        className="h-20 w-20 rounded-lg object-cover"
+                      />
+
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            headerContent: "",
+                          }))
+                        }
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Change Image
+                      </button>
+                    </div>
+                  )}
+
+                  {errors.headerContent && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {errors.headerContent}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* VIDEO / DOCUMENT — not built yet, clearly say so instead of accepting bad input */}
+              {(formData.headerType === "VIDEO" ||
+                formData.headerType === "DOCUMENT") && (
+                <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                  <p className="text-sm text-yellow-800">
+                    {formData.headerType === "VIDEO" ? "Video" : "Document"}{" "}
+                    header uploads aren't supported yet in this form. Use
+                    Image or Text for now, or ask your developer to add
+                    upload support for this type.
+                  </p>
                 </div>
               )}
             </div>
@@ -1787,12 +1944,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
               )}
             </div>
 
-            {/* ==================================================
-                VARIABLE SAMPLES  👈 ENTIRELY NEW SECTION
-                Only shows up once you've typed {{1}}, {{2}} etc.
-                into the body above.
-            ================================================== */}
-
+            {/* VARIABLE SAMPLES — unchanged */}
             {detectedVariables.length > 0 && (
               <div className="border-t pt-5">
                 <h3 className="mb-2 text-lg font-semibold text-gray-800">
@@ -1862,7 +2014,7 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
               />
             </div>
 
-            {/* AI GENERATOR — unchanged, with Welcome Message quick template added */}
+            {/* AI GENERATOR — unchanged */}
             <div className="border-t pt-5">
               <div className="rounded-xl border bg-green-50 p-4">
                 <div className="mb-3 flex items-center gap-2">
@@ -1979,9 +2131,11 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
               <button
                 type="button"
                 onClick={handleClose}
-                disabled={isSubmitting || generating}
+                disabled={isSubmitting || generating || uploadingHeader}
                 className={`crm-secondary-button ${
-                  isSubmitting || generating ? "cursor-not-allowed opacity-50" : ""
+                  isSubmitting || generating || uploadingHeader
+                    ? "cursor-not-allowed opacity-50"
+                    : ""
                 }`}
               >
                 Cancel
@@ -1989,9 +2143,11 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
 
               <button
                 type="submit"
-                disabled={isSubmitting || generating}
+                disabled={isSubmitting || generating || uploadingHeader}
                 className={`crm-primary-button flex min-w-[160px] items-center justify-center gap-2 ${
-                  isSubmitting || generating ? "cursor-not-allowed opacity-70" : ""
+                  isSubmitting || generating || uploadingHeader
+                    ? "cursor-not-allowed opacity-70"
+                    : ""
                 }`}
               >
                 {isSubmitting ? (
