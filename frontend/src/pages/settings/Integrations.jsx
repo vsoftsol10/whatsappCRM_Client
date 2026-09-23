@@ -1034,7 +1034,7 @@ const Integrations = () => {
   // =========================================================
 
 const webhookUrl = selectedIntegration?.webhookKey
-  ? `${import.meta.env.VITE_API_URL}/integrations/webhook/${selectedIntegration.webhookKey}`
+  ? `${import.meta.env.VITE_API_URL}/api/integrations/webhook/${selectedIntegration.webhookKey}`
   : "";
 
   // =========================================================
