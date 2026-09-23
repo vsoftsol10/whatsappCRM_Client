@@ -22,6 +22,11 @@ function verifySignature({ rawBody, headers, secret, notificationUrl }) {
   const signatureHeader = headers["x-square-hmacsha256-signature"];
 
   if (!signatureHeader || !secret || !notificationUrl) {
+    console.log("SQUARE SIGNATURE CHECK: missing input", {
+      hasSignatureHeader: !!signatureHeader,
+      hasSecret: !!secret,
+      hasNotificationUrl: !!notificationUrl,
+    });
     return false;
   }
 
@@ -30,14 +35,30 @@ function verifySignature({ rawBody, headers, secret, notificationUrl }) {
     .update(notificationUrl + rawBody.toString("utf8"))
     .digest("base64");
 
+  // TEMPORARY DEBUG LOGGING - remove once verified working.
+  // Does not log the secret itself, only what's needed to
+  // spot a mismatch: the URL used, and both signatures.
+  console.log("SQUARE SIGNATURE CHECK");
+  console.log("  notificationUrl used:", notificationUrl);
+  console.log("  expected (computed):", expected);
+  console.log("  received (header):  ", signatureHeader);
+
   const expectedBuffer = Buffer.from(expected, "utf8");
   const receivedBuffer = Buffer.from(String(signatureHeader), "utf8");
 
   if (expectedBuffer.length !== receivedBuffer.length) {
+    console.log(
+      "  MISMATCH: different lengths -",
+      expectedBuffer.length,
+      "vs",
+      receivedBuffer.length
+    );
     return false;
   }
 
-  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  const matches = crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  console.log("  matches:", matches);
+  return matches;
 }
 
 // ------------------------------------------------------

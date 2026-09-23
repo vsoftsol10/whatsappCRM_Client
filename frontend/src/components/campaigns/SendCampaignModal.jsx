@@ -1,3 +1,4 @@
+
 // import { useEffect, useState } from "react";
 // import toast from "react-hot-toast";
 // import {
@@ -21,7 +22,8 @@
 //   const [selectedCustomers, setSelectedCustomers] =
 //     useState([]);
 
-//   // Already sent customers
+//   // Already sent customers — just the customerId strings, so
+//   // `.includes(id)` actually works against customer.id below.
 //   const [sentCustomers, setSentCustomers] =
 //     useState([]);
 
@@ -68,32 +70,37 @@
 //   // ===========================
 //   // GET ALREADY SENT CUSTOMERS
 //   // ===========================
-// const fetchSentCustomers = async () => {
-//   try {
+//   // getCampaignRecipients returns an array of CampaignRecipient rows,
+//   // e.g. { id, campaignId, customerId, status, customer: {...}, ... }
+//   // — NOT an array of plain customer IDs. We only care about the
+//   // ones that were actually SENT, and we need their customerId,
+//   // not the recipient row's own id, so the later
+//   // sentCustomers.includes(customer.id) check actually matches.
+//   const fetchSentCustomers = async () => {
+//     try {
+//       const response = await getCampaignRecipients(campaign.id);
 
-//     const response =
-//       await getCampaignRecipients(campaign.id);
+//       console.log("Campaign ID:", campaign.id);
+//       console.log("Recipients Response:", response);
+//       console.log("Recipients Data:", response.data);
 
-//     console.log("Campaign ID:", campaign.id);
-//     console.log("Recipients Response:", response);
-//     console.log("Recipients Data:", response.data);
+//       if (Array.isArray(response.data)) {
+//         const sentCustomerIds = response.data
+//           .filter((recipient) => recipient.status === "SENT")
+//           .map((recipient) => recipient.customerId);
 
-//     if (Array.isArray(response.data)) {
-//       setSentCustomers(response.data);
+//         setSentCustomers(sentCustomerIds);
 
-//       console.log("Saved IDs:", response.data);
-//     } else {
+//         console.log("Sent Customer IDs:", sentCustomerIds);
+//       } else {
+//         setSentCustomers([]);
+//       }
+//     } catch (error) {
+//       console.log("Recipients Error:", error);
+
 //       setSentCustomers([]);
 //     }
-
-//   } catch (error) {
-
-//     console.log("Recipients Error:", error);
-
-//     setSentCustomers([]);
-
-//   }
-// };
+//   };
 
 //   if (!isOpen || !campaign) return null;
 
@@ -145,24 +152,24 @@
 //   };
 
 //   // ===========================
-// // SELECT ALL
-// // ===========================
-// const handleSelectAll = () => {
-//   const availableCustomers = filteredCustomers
-//     .filter(
-//       (customer) => !sentCustomers.includes(customer.id)
-//     )
-//     .map((customer) => customer.id);
+//   // SELECT ALL
+//   // ===========================
+//   const handleSelectAll = () => {
+//     const availableCustomers = filteredCustomers
+//       .filter(
+//         (customer) => !sentCustomers.includes(customer.id)
+//       )
+//       .map((customer) => customer.id);
 
-//   setSelectedCustomers(availableCustomers);
-// };
+//     setSelectedCustomers(availableCustomers);
+//   };
 
-// // ===========================
-// // CLEAR ALL
-// // ===========================
-// const handleClearAll = () => {
-//   setSelectedCustomers([]);
-// };
+//   // ===========================
+//   // CLEAR ALL
+//   // ===========================
+//   const handleClearAll = () => {
+//     setSelectedCustomers([]);
+//   };
 
 //   // ===========================
 //   // SEND CAMPAIGN
@@ -247,40 +254,39 @@
 
 //         {/* Search */}
 
-// {/* Search */}
+//         <div className="p-5 space-y-3">
 
-// <div className="p-5 space-y-3">
+//           <input
+//             type="text"
+//             placeholder="Search customer..."
+//             value={search}
+//             onChange={(e) => setSearch(e.target.value)}
+//             className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none"
+//           />
 
-//   <input
-//     type="text"
-//     placeholder="Search customer..."
-//     value={search}
-//     onChange={(e) => setSearch(e.target.value)}
-//     className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none"
-//   />
+//           <div className="flex gap-3">
 
-//   <div className="flex gap-3">
+//             <button
+//               type="button"
+//               onClick={handleSelectAll}
+//               className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+//             >
+//               Select All
+//             </button>
 
-//     <button
-//       type="button"
-//       onClick={handleSelectAll}
-//       className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
-//     >
-//       Select All
-//     </button>
+//             <button
+//               type="button"
+//               onClick={handleClearAll}
+//               className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+//             >
+//               Clear All
+//             </button>
 
-//     <button
-//       type="button"
-//       onClick={handleClearAll}
-//       className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
-//     >
-//       Clear All
-//     </button>
+//           </div>
 
-//   </div>
+//         </div>
 
-// </div>
-//                 {/* Customer List */}
+//         {/* Customer List */}
 
 //         <div className="flex-1 overflow-y-auto px-5">
 
@@ -377,7 +383,8 @@
 //           )}
 
 //         </div>
-//                 {/* Footer */}
+
+//         {/* Footer */}
 
 //         <div className="border-t p-5 flex justify-between items-center">
 
@@ -449,13 +456,12 @@ export default function SendCampaignModal({
   const { sendCampaign } = useCampaignStore();
 
   const [customers, setCustomers] = useState([]);
-  const [selectedCustomers, setSelectedCustomers] =
-    useState([]);
+  const [selectedCustomers, setSelectedCustomers] = useState([]);
 
-  // Already sent customers — just the customerId strings, so
-  // `.includes(id)` actually works against customer.id below.
-  const [sentCustomers, setSentCustomers] =
-    useState([]);
+  // Customers who received this campaign before.
+  // This is now ONLY used to display "Already Sent".
+  // It does NOT block selection.
+  const [sentCustomers, setSentCustomers] = useState([]);
 
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -492,7 +498,7 @@ export default function SendCampaignModal({
         setCustomers([]);
       }
     } catch (error) {
-      console.log(error);
+      console.log("Customers Error:", error);
       setCustomers([]);
     }
   };
@@ -500,12 +506,6 @@ export default function SendCampaignModal({
   // ===========================
   // GET ALREADY SENT CUSTOMERS
   // ===========================
-  // getCampaignRecipients returns an array of CampaignRecipient rows,
-  // e.g. { id, campaignId, customerId, status, customer: {...}, ... }
-  // — NOT an array of plain customer IDs. We only care about the
-  // ones that were actually SENT, and we need their customerId,
-  // not the recipient row's own id, so the later
-  // sentCustomers.includes(customer.id) check actually matches.
   const fetchSentCustomers = async () => {
     try {
       const response = await getCampaignRecipients(campaign.id);
@@ -521,13 +521,15 @@ export default function SendCampaignModal({
 
         setSentCustomers(sentCustomerIds);
 
-        console.log("Sent Customer IDs:", sentCustomerIds);
+        console.log(
+          "Already Sent Customer IDs:",
+          sentCustomerIds
+        );
       } else {
         setSentCustomers([]);
       }
     } catch (error) {
       console.log("Recipients Error:", error);
-
       setSentCustomers([]);
     }
   };
@@ -535,49 +537,38 @@ export default function SendCampaignModal({
   if (!isOpen || !campaign) return null;
 
   // ===========================
-  // FILTER
+  // FILTER CUSTOMERS
   // ===========================
-  const filteredCustomers = customers.filter(
-    (customer) => {
-      const keyword = search.toLowerCase();
+  const filteredCustomers = customers.filter((customer) => {
+    const keyword = search.toLowerCase();
 
-      return (
-        customer.name
-          ?.toLowerCase()
-          .includes(keyword) ||
-        customer.phone
-          ?.toLowerCase()
-          .includes(keyword)
-      );
-    }
-  );
+    return (
+      customer.name
+        ?.toLowerCase()
+        .includes(keyword) ||
+      customer.phone
+        ?.toLowerCase()
+        .includes(keyword)
+    );
+  });
 
   // ===========================
   // SELECT CUSTOMER
   // ===========================
   const toggleCustomer = (id) => {
-
-    // Don't allow selecting
-    // already sent customers
-    if (sentCustomers.includes(id)) {
-      return;
-    }
+    // IMPORTANT:
+    // Do NOT block already-sent customers.
+    // They can be selected and sent again.
 
     if (selectedCustomers.includes(id)) {
-
       setSelectedCustomers((prev) =>
-        prev.filter(
-          (item) => item !== id
-        )
+        prev.filter((item) => item !== id)
       );
-
     } else {
-
       setSelectedCustomers((prev) => [
         ...prev,
         id,
       ]);
-
     }
   };
 
@@ -585,13 +576,13 @@ export default function SendCampaignModal({
   // SELECT ALL
   // ===========================
   const handleSelectAll = () => {
-    const availableCustomers = filteredCustomers
-      .filter(
-        (customer) => !sentCustomers.includes(customer.id)
-      )
-      .map((customer) => customer.id);
+    // Select ALL customers, including
+    // customers who were already sent this campaign.
+    const allCustomerIds = filteredCustomers.map(
+      (customer) => customer.id
+    );
 
-    setSelectedCustomers(availableCustomers);
+    setSelectedCustomers(allCustomerIds);
   };
 
   // ===========================
@@ -605,50 +596,53 @@ export default function SendCampaignModal({
   // SEND CAMPAIGN
   // ===========================
   const handleSend = async () => {
-
     if (selectedCustomers.length === 0) {
-
       return toast.error(
         "Please select at least one customer."
       );
-
     }
 
     try {
-
       setLoading(true);
 
-      const response =
-        await sendCampaign(
-          campaign.id,
-          selectedCustomers
-        );
+      console.log(
+        "Sending campaign:",
+        campaign.id
+      );
+
+      console.log(
+        "Selected customers:",
+        selectedCustomers
+      );
+
+      const response = await sendCampaign(
+        campaign.id,
+        selectedCustomers
+      );
 
       toast.success(
         response.message ||
           "Campaign sent successfully"
       );
 
-      // Refresh recipients
+      // Refresh "Already Sent" status
+      // after sending.
       await fetchSentCustomers();
 
+      // Clear selection.
       setSelectedCustomers([]);
 
       onClose();
 
     } catch (error) {
-
-      console.log(error);
+      console.log("Campaign Send Error:", error);
 
       toast.error(
         error?.response?.data?.message ||
           "Unable to send campaign."
       );
-
     } finally {
-
       setLoading(false);
-
     }
   };
 
@@ -657,12 +651,13 @@ export default function SendCampaignModal({
 
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col">
 
-        {/* Header */}
+        {/* ===========================
+            HEADER
+        =========================== */}
 
         <div className="border-b px-6 py-4 flex justify-between items-center">
 
           <div>
-
             <h2 className="text-2xl font-bold">
               Send Campaign
             </h2>
@@ -670,7 +665,6 @@ export default function SendCampaignModal({
             <p className="text-gray-500 text-sm mt-1">
               {campaign.name}
             </p>
-
           </div>
 
           <button
@@ -682,7 +676,9 @@ export default function SendCampaignModal({
 
         </div>
 
-        {/* Search */}
+        {/* ===========================
+            SEARCH
+        =========================== */}
 
         <div className="p-5 space-y-3">
 
@@ -690,7 +686,9 @@ export default function SendCampaignModal({
             type="text"
             placeholder="Search customer..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
             className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none"
           />
 
@@ -716,7 +714,9 @@ export default function SendCampaignModal({
 
         </div>
 
-        {/* Customer List */}
+        {/* ===========================
+            CUSTOMER LIST
+        =========================== */}
 
         <div className="flex-1 overflow-y-auto px-5">
 
@@ -730,31 +730,29 @@ export default function SendCampaignModal({
 
             filteredCustomers.map((customer) => {
 
+              // This is ONLY for displaying
+              // the "Already Sent" label.
               const alreadySent =
                 sentCustomers.includes(customer.id);
 
               const selected =
-                selectedCustomers.includes(customer.id);
+                selectedCustomers.includes(
+                  customer.id
+                );
 
               return (
 
                 <div
                   key={customer.id}
-                  onClick={() => {
-                    if (!alreadySent) {
-                      toggleCustomer(customer.id);
-                    }
-                  }}
+                  onClick={() =>
+                    toggleCustomer(customer.id)
+                  }
                   className={`
                     flex justify-between items-center
                     border rounded-xl p-4 mb-3
                     transition-all duration-200
-
-                    ${
-                      alreadySent
-                        ? "opacity-50 bg-gray-100 cursor-not-allowed"
-                        : "hover:bg-gray-50 cursor-pointer"
-                    }
+                    cursor-pointer
+                    hover:bg-gray-50
 
                     ${
                       selected
@@ -763,6 +761,8 @@ export default function SendCampaignModal({
                     }
                   `}
                 >
+
+                  {/* CUSTOMER INFORMATION */}
 
                   <div>
 
@@ -774,6 +774,8 @@ export default function SendCampaignModal({
                       {customer.phone}
                     </p>
 
+                    {/* ALREADY SENT LABEL */}
+
                     {alreadySent && (
                       <span className="inline-flex items-center mt-2 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
                         ✓ Already Sent
@@ -782,10 +784,14 @@ export default function SendCampaignModal({
 
                   </div>
 
+                  {/* CHECKBOX */}
+
                   <input
                     type="checkbox"
 
-                    disabled={alreadySent}
+                    // IMPORTANT:
+                    // Never disable the checkbox.
+                    disabled={false}
 
                     checked={selected}
 
@@ -797,24 +803,21 @@ export default function SendCampaignModal({
                       toggleCustomer(customer.id)
                     }
 
-                    className={`w-5 h-5 ${
-                      alreadySent
-                        ? "cursor-not-allowed opacity-40"
-                        : "cursor-pointer"
-                    }`}
+                    className="w-5 h-5 cursor-pointer"
                   />
 
                 </div>
 
               );
-
             })
 
           )}
 
         </div>
 
-        {/* Footer */}
+        {/* ===========================
+            FOOTER
+        =========================== */}
 
         <div className="border-t p-5 flex justify-between items-center">
 
@@ -840,20 +843,24 @@ export default function SendCampaignModal({
               }
               className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl px-6 py-2 flex items-center gap-2 transition"
             >
+
               {loading ? (
                 <>
                   <Loader2
                     size={18}
                     className="animate-spin"
                   />
+
                   Sending...
                 </>
               ) : (
                 <>
                   <Send size={18} />
+
                   Send Campaign
                 </>
               )}
+
             </button>
 
           </div>
