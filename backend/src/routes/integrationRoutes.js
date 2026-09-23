@@ -1,5 +1,3 @@
-
-
 // const express = require("express");
 
 // const router = express.Router();
@@ -15,6 +13,10 @@
 // const {
 //   getIntegrationEvents,
 // } = require("../controllers/integrationEventController");
+
+// const {
+//   receiveIntegrationWebhook,
+// } = require("../controllers/integrationWebhookController");
 
 // const authMiddleware = require("../middleware/authMiddleware");
 
@@ -79,6 +81,19 @@
 //   deleteIntegration
 // );
 
+// // ==========================================
+// // EXTERNAL WEBHOOK
+// // IMPORTANT:
+// // - NO authMiddleware here
+// // - External billing/e-commerce system calls this
+// // - webhookKey identifies the integration
+// // ==========================================
+
+// router.post(
+//   "/webhook/:webhookKey",
+//   receiveIntegrationWebhook
+// );
+
 // module.exports = router;
 
 
@@ -91,7 +106,10 @@ const {
   getIntegrations,
   getIntegrationById,
   updateIntegrationStatus,
+  updateIntegrationSecret,
+  updateIntegrationSettings,
   deleteIntegration,
+  getSupportedProviders,
 } = require("../controllers/integrationController");
 
 const {
@@ -112,6 +130,18 @@ router.get(
   "/",
   authMiddleware,
   getIntegrations
+);
+
+// ==========================================
+// GET SUPPORTED PROVIDERS
+// IMPORTANT: Keep this BEFORE /:id, otherwise
+// Express matches "providers" as an :id param.
+// ==========================================
+
+router.get(
+  "/providers",
+  authMiddleware,
+  getSupportedProviders
 );
 
 // ==========================================
@@ -153,6 +183,28 @@ router.put(
   "/:id/status",
   authMiddleware,
   updateIntegrationStatus
+);
+
+// ==========================================
+// UPDATE WEBHOOK SECRET
+// Paste the provider's real signing secret here
+// (Stripe/Razorpay dashboard) after creating the integration.
+// ==========================================
+
+router.put(
+  "/:id/secret",
+  authMiddleware,
+  updateIntegrationSecret
+);
+
+// ==========================================
+// UPDATE AUTOMATION SETTINGS
+// ==========================================
+
+router.put(
+  "/:id/settings",
+  authMiddleware,
+  updateIntegrationSettings
 );
 
 // ==========================================

@@ -1563,6 +1563,22 @@ model Integration {
   webhookKey String? @unique
   webhookSecret String?
 
+  // ------------------------------------------
+  // AUTOMATION SETTINGS
+  // ------------------------------------------
+  // Controls what happens automatically when a
+  // webhook event is received. Shape:
+  // {
+  //   autoCreateCustomer: boolean,   // create a NEW customer if phone not found
+  //   autoCreatePurchase: boolean,   // record a Purchase row
+  //   allowedEventTypes: string[]    // [] = allow all event types
+  // }
+  // Always read through getIntegrationSettings()
+  // helper so missing/partial settings fall back
+  // to safe defaults.
+  // ------------------------------------------
+  settings Json?
+
   status IntegrationStatus @default(ACTIVE)
 
   lastEventAt DateTime?
