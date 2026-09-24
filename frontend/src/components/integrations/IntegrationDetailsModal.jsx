@@ -387,6 +387,10 @@
 
 
 
+
+
+
+
 import React, { useEffect, useState } from "react";
 import {
   X,
@@ -626,17 +630,18 @@ const IntegrationDetailsModal = ({
                     Webhook Secret
                   </label>
 
-                  {integration.provider &&
-                    integration.provider !== "GENERIC" &&
-                    !editingSecret && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingSecret(true)}
-                        className="text-xs font-medium text-green-700 hover:text-green-800"
-                      >
-                        Paste {integration.provider} signing secret
-                      </button>
-                    )}
+                  {!editingSecret && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingSecret(true)}
+                      className="text-xs font-medium text-green-700 hover:text-green-800"
+                    >
+                      {integration.provider &&
+                      integration.provider !== "GENERIC"
+                        ? `Paste ${integration.provider} signing secret`
+                        : "TEST123"}
+                    </button>
+                  )}
                 </div>
 
                 {editingSecret ? (
