@@ -2304,6 +2304,9 @@ const getTemplateRecipients = async (
   }
 };
 
+
+
+
 // ============================================================
 // SUBMIT TEMPLATE FOR APPROVAL  (now actually calls Meta)
 // ============================================================
@@ -2359,12 +2362,8 @@ const submitTemplateForApproval = async (req, res) => {
     }
 
     // ----------------------------------------------------------
-    // BODY VARIABLE / EXAMPLE VALIDATION  👈 NEW
+    // BODY VARIABLE / EXAMPLE VALIDATION
     // ----------------------------------------------------------
-    // Belt-and-braces: even though createTemplate/updateTemplate
-    // already require this, re-check here too, since submit can
-    // fire on a REJECTED template that might have been edited by
-    // some other path.
 
     const detectedVariables = extractVariables(template.content);
 
@@ -2394,7 +2393,7 @@ const submitTemplateForApproval = async (req, res) => {
       },
     });
 
-        if (!whatsappAccount || !whatsappAccount.wabaId) {
+    if (!whatsappAccount || !whatsappAccount.wabaId) {
       return res.status(400).json({
         success: false,
         message:
@@ -2410,6 +2409,26 @@ const submitTemplateForApproval = async (req, res) => {
       });
     }
 
+    // 👈 DEBUG — print exactly what we're about to send to Meta
+    console.log("\n========== SUBMIT TEMPLATE DEBUG ==========");
+    console.log("req.user.companyId:", req.user.companyId);
+    console.log("template.id:", template.id);
+    console.log("template.name:", template.name);
+    console.log("template.category:", template.category);
+    console.log("template.language:", template.language);
+    console.log("template.headerType:", template.headerType);
+    console.log("template.headerContent:", template.headerContent);
+    console.log("template.content:", template.content);
+    console.log("template.bodyExamples:", template.bodyExamples);
+    console.log("whatsappAccount being used:", {
+      id: whatsappAccount.id,
+      companyId: whatsappAccount.companyId,
+      wabaId: whatsappAccount.wabaId,
+      phoneNumberId: whatsappAccount.phoneNumberId,
+      status: whatsappAccount.status,
+    });
+    console.log("=============================================\n");
+
     // ----------------------------------------------------------
     // CALL META'S GRAPH API (using this company's own WABA + token)
     // ----------------------------------------------------------
@@ -2421,9 +2440,14 @@ const submitTemplateForApproval = async (req, res) => {
       headerType: template.headerType,
       headerContent: template.headerContent,
       bodyText: template.content,
-      bodyExamples: template.bodyExamples, // 👈 NEW
+      bodyExamples: template.bodyExamples,
       footerContent: template.footerContent,
     });
+
+    // 👈 DEBUG — print exactly what Meta (or our own catch block) returned
+    console.log("\n========== META RESULT DEBUG ==========");
+    console.log(JSON.stringify(metaResult, null, 2));
+    console.log("==========================================\n");
 
     if (!metaResult.success) {
       const metaErrorMessage =
@@ -2440,8 +2464,6 @@ const submitTemplateForApproval = async (req, res) => {
     // ----------------------------------------------------------
     // UPDATE LOCAL RECORD WITH META'S RESPONSE
     // ----------------------------------------------------------
-    // Meta's create-template response includes: { id, status, category }
-    // status here is usually "PENDING" immediately after creation.
 
     const updatedTemplate = await prisma.template.update({
       where: { id: template.id },

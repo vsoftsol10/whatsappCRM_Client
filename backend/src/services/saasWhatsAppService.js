@@ -281,6 +281,10 @@ const getWhatsAppAccount = async (companyId) => {
     },
   });
 
+  // 👈 DEBUG
+  console.log("getWhatsAppAccount() called with companyId:", companyId);
+  console.log("getWhatsAppAccount() found:", account);
+
   if (!account) {
     throw new Error(
       "No connected WhatsApp account found for this company"
@@ -550,6 +554,13 @@ const createMetaTemplate = async (
         text: footerContent.trim(),
       });
     }
+
+     // 👈 DEBUG — print the exact request we're about to send to Meta
+    console.log("createMetaTemplate() sending to Meta:", {
+      url: `https://graph.facebook.com/${GRAPH_API_VERSION}/${account.wabaId}/message_templates`,
+      wabaId: account.wabaId,
+      body: { name, category: mapToMetaCategory(category), language, components },
+    });
 
     const response = await axios.post(
       `https://graph.facebook.com/${GRAPH_API_VERSION}/${account.wabaId}/message_templates`,
