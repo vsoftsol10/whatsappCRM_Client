@@ -5,3 +5,11 @@ export const getDashboardStats = async () => {
 
   return response.data;
 };
+
+export const getRecentConversations = async (limit = 5) => {
+  const response = await apiClient.get(
+    `/api/dashboard/recent-conversations?limit=${limit}`
+  );
+
+  return response.data;
+};

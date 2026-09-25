@@ -125,7 +125,7 @@ export default function Dashboard() {
       {/* RECENT CONVERSATIONS + TASK OVERVIEW */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3 xl:gap-6">
 
-        <div className="xl:col-span-2">
+        <div className="xl:col-span-2 flex">
           <RecentConversations />
         </div>
 
