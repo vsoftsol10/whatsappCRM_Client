@@ -1,3 +1,4 @@
+
 // import apiClient from "./apiClient";
 
 // // FORGOT PASSWORD
@@ -33,7 +34,35 @@
 //   return response.data;
 // };
 
+// // UPDATE MY PROFILE (self-service — admin or employee, own profile only)
+// export const updateProfile = async (profileData) => {
+//   const formData = new FormData();
+
+//   Object.entries(profileData).forEach(([key, value]) => {
+//     if (value !== undefined && value !== null) {
+//       formData.append(key, value);
+//     }
+//   });
+
+//   const response = await apiClient.put(
+//     "/api/auth/update-profile",
+//     formData,
+//     {
+//       headers: { "Content-Type": "multipart/form-data" },
+//     }
+//   );
+
+//   return response.data;
+// };
+
 import apiClient from "./apiClient";
+
+// GET LOGGED-IN USER (with company info)
+export const getMe = async () => {
+  const response = await apiClient.get("/api/auth/me");
+
+  return response.data;
+};
 
 // FORGOT PASSWORD
 export const forgotPassword = async (email) => {

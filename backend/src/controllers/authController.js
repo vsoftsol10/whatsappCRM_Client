@@ -4,6 +4,7 @@
 // const crypto = require("crypto");
 // const sendPasswordResetEmail = require("../services/passwordResetEmail");
 // const { logAction, logDirect } = require("../services/auditLogService");
+// const uploadToCloudinary = require("../utils/cloudinaryUplode");
 
 // // ========================
 // // REGISTER USER
@@ -223,18 +224,113 @@
 //       });
 //     }
 
-
-
-//     if (!company) {
-//       return res.status(404).json({
-//         message: "Company not found",
-//       });
-//     }
-
 //     return res.status(200).json(user);
 //   } catch (error) {
 //     return res.status(500).json({
 //       message: error.message,
+//     });
+//   }
+// };
+
+// // ========================
+// // UPDATE MY PROFILE
+// // (Self-service — the logged-in user, admin or employee,
+// //  editing their own profile only. Email, role, company
+// //  and password are intentionally NOT editable here.)
+// // ========================
+// const updateProfile = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       phone,
+//       address,
+//       department,
+//       designation,
+//     } = req.body;
+
+//     if (!name || !name.trim()) {
+//       return res.status(400).json({
+//         message: "Name is required",
+//       });
+//     }
+
+//     const existingUser = await prisma.user.findUnique({
+//       where: {
+//         id: req.user.userId,
+//       },
+//     });
+
+//     if (!existingUser) {
+//       return res.status(404).json({
+//         message: "User not found",
+//       });
+//     }
+
+//     const data = {
+//       name: name.trim(),
+//       phone: phone !== undefined ? phone : existingUser.phone,
+//       address: address !== undefined ? address : existingUser.address,
+//       department:
+//         department !== undefined ? department : existingUser.department,
+//       designation:
+//         designation !== undefined ? designation : existingUser.designation,
+//     };
+
+//     // Optional profile picture upload
+//     if (req.file) {
+//       const result = await uploadToCloudinary(
+//         req.file.buffer,
+//         "profile-images"
+//       );
+
+//       data.profileImage = result.secure_url;
+//     }
+
+//     const updatedUser = await prisma.user.update({
+//       where: {
+//         id: existingUser.id,
+//       },
+//       data,
+//     });
+
+//     logAction({
+//       req,
+//       action: "UPDATE",
+//       module: "USER",
+//       entityId: updatedUser.id,
+//       entityName: updatedUser.name,
+//       changes: {
+//         before: {
+//           name: existingUser.name,
+//           phone: existingUser.phone,
+//           address: existingUser.address,
+//           department: existingUser.department,
+//           designation: existingUser.designation,
+//           profileImage: existingUser.profileImage,
+//         },
+//         after: {
+//           name: updatedUser.name,
+//           phone: updatedUser.phone,
+//           address: updatedUser.address,
+//           department: updatedUser.department,
+//           designation: updatedUser.designation,
+//           profileImage: updatedUser.profileImage,
+//         },
+//       },
+//     });
+
+//     const { password: _password, ...safeUser } = updatedUser;
+
+//     return res.status(200).json({
+//       message: "Profile updated successfully",
+//       user: safeUser,
+//     });
+//   } catch (error) {
+//     console.error("UPDATE PROFILE ERROR:");
+//     console.error(error);
+
+//     return res.status(500).json({
+//       message: "Failed to update profile",
 //     });
 //   }
 // };
@@ -487,15 +583,11 @@
 //   registerUser,
 //   loginUser,
 //   getMe,
+//   updateProfile,
 //   changePassword,
 //   forgotPassword,
 //   resetPassword,
 // };
-
-
-
-
-
 
 const prisma = require("../config/prisma");
 const bcrypt = require("bcrypt");
@@ -646,6 +738,7 @@ const loginUser = async (req, res) => {
           email: user.email,
           role: user.role,
           companyId: user.companyId,
+          companyName: user.company?.companyName,
           companyStatus: user.company?.status,
           expiryDate: user.company?.expiryDate,
         },
@@ -676,6 +769,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         companyId: user.companyId,
+        companyName: user.company?.companyName,
         companyStatus: user.company?.status,
         expiryDate: user.company?.expiryDate,
       },
@@ -697,25 +791,14 @@ const loginUser = async (req, res) => {
 // ========================
 const getMe = async (req, res) => {
   try {
-    const users = await prisma.user.findMany();
-
-    console.log("========== ALL USERS ==========");
-    console.table(
-      users.map((u) => ({
-        email: u.email,
-        role: u.role,
-      }))
-    );
-
     const user = await prisma.user.findUnique({
       where: {
         id: req.user.userId,
       },
+      include: {
+        company: true,
+      },
     });
-
-    console.log("FOUND USER:", user);
-    console.log("FOUND USER:", user);
-
 
     if (!user) {
       return res.status(404).json({
@@ -723,7 +806,21 @@ const getMe = async (req, res) => {
       });
     }
 
-    return res.status(200).json(user);
+    return res.status(200).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      address: user.address,
+      department: user.department,
+      designation: user.designation,
+      profileImage: user.profileImage,
+      companyId: user.companyId,
+      companyName: user.company?.companyName,
+      companyStatus: user.company?.status,
+      expiryDate: user.company?.expiryDate,
+    });
   } catch (error) {
     return res.status(500).json({
       message: error.message,

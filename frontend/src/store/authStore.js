@@ -1,10 +1,10 @@
-
 // import { create } from 'zustand';
 // import apiClient from '../api/apiClient';
 // import {
 //   forgotPassword,
 //   resetPassword,
 //   changePassword,
+//   updateProfile,
 // } from "../api/authApi";
 
 // // ======================================================
@@ -392,6 +392,57 @@
 
 
 //   // ====================================================
+//   // UPDATE MY PROFILE
+//   // ====================================================
+
+//   updateProfileAction: async (profileData) => {
+//     set({
+//       isLoading: true,
+//       error: null,
+//     });
+
+//     try {
+//       const data = await updateProfile(profileData);
+
+//       const updatedUser = {
+//         ...get().user,
+//         ...data.user,
+//       };
+
+//       localStorage.setItem(
+//         "user",
+//         JSON.stringify(updatedUser)
+//       );
+
+//       set({
+//         user: updatedUser,
+//         isLoading: false,
+//         error: null,
+//       });
+
+//       return {
+//         success: true,
+//         message: data.message,
+//       };
+//     } catch (error) {
+//       const message =
+//         error.response?.data?.message ||
+//         "Failed to update profile";
+
+//       set({
+//         error: message,
+//         isLoading: false,
+//       });
+
+//       return {
+//         success: false,
+//         message,
+//       };
+//     }
+//   },
+
+
+//   // ====================================================
 //   // CHANGE PASSWORD
 //   // ====================================================
 
@@ -451,8 +502,6 @@
 // }));
 
 
-
-
 import { create } from 'zustand';
 import apiClient from '../api/apiClient';
 import {
@@ -460,6 +509,7 @@ import {
   resetPassword,
   changePassword,
   updateProfile,
+  getMe,
 } from "../api/authApi";
 
 // ======================================================
@@ -842,6 +892,37 @@ export const useAuthStore = create((set, get) => ({
 
         message,
       };
+    }
+  },
+
+
+  // ====================================================
+  // REFRESH LOGGED-IN USER (e.g. company name, latest info)
+  // Silent — used to top up data (like companyName) for
+  // sessions that were logged in before it was added,
+  // without forcing a re-login.
+  // ====================================================
+
+  fetchMe: async () => {
+    if (!get().isAuthenticated) return;
+
+    try {
+      const data = await getMe();
+
+      const updatedUser = {
+        ...get().user,
+        ...data,
+      };
+
+      localStorage.setItem(
+        "user",
+        JSON.stringify(updatedUser)
+      );
+
+      set({ user: updatedUser });
+    } catch (error) {
+      // Non-critical — keep whatever we already have in state.
+      console.error("Failed to refresh user:", error);
     }
   },
 
