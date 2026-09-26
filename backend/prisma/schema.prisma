@@ -109,6 +109,32 @@ model WhatsAppAccount {
 
   status WhatsAppStatus @default(NOT_CONNECTED)
 
+  // ============================================
+  // COEXISTENCE (WhatsApp Business App + Cloud API)
+  // ============================================
+  // true when this number was onboarded via the
+  // "Connect a WhatsApp Business App" path in Embedded
+  // Signup, instead of a brand-new Cloud API-only number.
+  isCoexistence Boolean @default(false)
+
+  // Mirrors Meta's is_on_biz_app / platform_type fields
+  // (GET /{phone_number_id}?fields=is_on_biz_app,platform_type)
+  isOnBizApp   Boolean @default(false)
+  platformType String?
+
+  // Progress of the one-time 24h post-onboarding sync.
+  // Values used: NOT_STARTED | REQUESTED | IN_PROGRESS | COMPLETED | DECLINED | FAILED
+  contactsSyncStatus String @default("NOT_STARTED")
+  historySyncStatus  String @default("NOT_STARTED")
+
+  contactsSyncRequestId String?
+  historySyncRequestId  String?
+
+  // Business must keep the WhatsApp Business App open until this
+  // deadline, or Meta requires a full re-onboarding (24h window
+  // from the moment Coexistence is connected).
+  syncDeadline DateTime?
+
   connectedAt    DateTime?
   disconnectedAt DateTime?
 
