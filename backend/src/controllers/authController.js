@@ -739,6 +739,7 @@ const loginUser = async (req, res) => {
           role: user.role,
           companyId: user.companyId,
           companyName: user.company?.companyName,
+          companyLogo: user.company?.logo,
           companyStatus: user.company?.status,
           expiryDate: user.company?.expiryDate,
         },
@@ -770,6 +771,7 @@ const loginUser = async (req, res) => {
         role: user.role,
         companyId: user.companyId,
         companyName: user.company?.companyName,
+        companyLogo: user.company?.logo,
         companyStatus: user.company?.status,
         expiryDate: user.company?.expiryDate,
       },
@@ -818,6 +820,7 @@ const getMe = async (req, res) => {
       profileImage: user.profileImage,
       companyId: user.companyId,
       companyName: user.company?.companyName,
+      companyLogo: user.company?.logo,
       companyStatus: user.company?.status,
       expiryDate: user.company?.expiryDate,
     });

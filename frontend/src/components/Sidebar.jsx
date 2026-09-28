@@ -462,6 +462,7 @@
 // }
 
 
+
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
@@ -633,6 +634,8 @@ export default function Sidebar({
 
   const companyName = user?.companyName || "Your Company";
   const companyInitial = companyName.charAt(0).toUpperCase();
+  const companyLogo = user?.companyLogo;
+  const [logoError, setLogoError] = useState(false);
 
 
   const location = useLocation();
@@ -720,8 +723,17 @@ ${isOpen ? "translate-x-0" : "-translate-x-full"}
 
           <div className="flex items-center gap-3">
 
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#25D366] to-[#128C7E] text-lg font-bold text-black shadow-md shadow-black/20">
-              {companyInitial}
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#25D366] to-[#128C7E] text-lg font-bold text-black shadow-md shadow-black/20">
+              {companyLogo && !logoError ? (
+                <img
+                  src={companyLogo}
+                  alt={companyName}
+                  onError={() => setLogoError(true)}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                companyInitial
+              )}
             </span>
 
             <div className="min-w-0">

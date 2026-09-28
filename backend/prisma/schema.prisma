@@ -35,6 +35,7 @@ model Company {
   id          Int    @id @default(autoincrement())
   companyId   String @unique
   companyName String
+  logo        String?
   ownerName   String
 
   email   String @unique
@@ -1404,6 +1405,7 @@ enum CrmAuditModule {
   CAMPAIGN
   TEMPLATE
   USER
+  COMPANY
 
   @@map("CrmAuditModule")
 }

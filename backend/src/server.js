@@ -254,6 +254,7 @@ const supportTicketRoutes = require("./routes/supportTicketRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
 const aiSettingsRoutes = require("./routes/aiSettingsRoutes");
+const companyRoutes = require("./routes/companyRoutes");
 const backupRoutes = require("./routes/backupRoutes");
  
 const saasWebhookRoutes = require("./routes/saasWebhook");
@@ -386,6 +387,8 @@ app.use(
   "/api/ai-settings",
   aiSettingsRoutes
 );
+
+app.use("/api/company", companyRoutes);
  
 app.use(
   "/api/whatsapp/accounts",

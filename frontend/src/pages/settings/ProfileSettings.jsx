@@ -153,7 +153,8 @@
 
 // export default ProfileSettings;
 
-import { useState } from "react";
+
+import { useEffect, useState } from "react";
 import { useAuthStore } from "../../store/authStore";
 import {
   User,
@@ -167,10 +168,242 @@ import {
   X,
   Check,
   Camera,
+  ImageIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import BillingSubscriptionCard from "./BillingSubscriptionCard";
+import {
+  getCompanySettings,
+  updateCompanySettings,
+} from "../../api/companyApi";
+
+// ============================================================
+// COMPANY BRANDING CARD
+// (Admin only — the section is mounted only when user.role is
+//  ADMIN, see the bottom of this file. Lets the admin change the
+//  company display name and logo. Saving refreshes the logged-in
+//  user via authStore.fetchMe(), which is how the new name/logo
+//  reach the Sidebar without a page reload.)
+// ============================================================
+function CompanyBrandingCard() {
+  const { fetchMe } = useAuthStore();
+
+  const [company, setCompany] = useState(null);
+  const [isFetching, setIsFetching] = useState(true);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [companyName, setCompanyName] = useState("");
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCompany = async () => {
+      try {
+        const data = await getCompanySettings();
+
+        if (isMounted) {
+          setCompany(data.company);
+          setCompanyName(data.company?.companyName || "");
+        }
+      } catch (error) {
+        console.error("Failed to load company settings:", error);
+      } finally {
+        if (isMounted) setIsFetching(false);
+      }
+    };
+
+    loadCompany();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const startEditing = () => {
+    setCompanyName(company?.companyName || "");
+    setLogoFile(null);
+    setLogoPreview(null);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setLogoFile(null);
+    setLogoPreview(null);
+  };
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSave = async () => {
+    if (!companyName.trim()) {
+      toast.error("Company name is required.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const payload = { companyName: companyName.trim() };
+      if (logoFile) payload.logo = logoFile;
+
+      const data = await updateCompanySettings(payload);
+
+      setCompany(data.company);
+      setIsEditing(false);
+      setLogoFile(null);
+      setLogoPreview(null);
+
+      toast.success(data.message || "Company branding updated successfully.");
+
+      // Pulls the fresh companyName/companyLogo into the auth store
+      // (and localStorage), so the Sidebar re-renders immediately.
+      fetchMe();
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Failed to update company branding."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const logoSrc = logoPreview || company?.logo;
+  const companyInitial = (company?.companyName || "C").charAt(0).toUpperCase();
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl bg-[#DCF8C6] p-3">
+            <Building2 size={22} className="text-[#128C7E]" />
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              Company Branding
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {isEditing
+                ? "Update your company name and logo."
+                : "This name and logo appear in the sidebar for your whole team."}
+            </p>
+          </div>
+        </div>
+
+        {!isEditing && !isFetching && (
+          <button
+            type="button"
+            onClick={startEditing}
+            className="crm-primary-button self-start sm:self-auto"
+          >
+            <Pencil size={16} />
+            Edit Branding
+          </button>
+        )}
+      </div>
+
+      {isFetching ? (
+        <div className="flex items-center justify-center py-10 text-sm text-slate-400">
+          Loading company branding...
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+          {/* Logo */}
+          <div className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-slate-100 bg-[#25D366] text-3xl font-bold text-black shadow-md">
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt={companyName || "Company logo"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              companyInitial
+            )}
+
+            {isEditing && (
+              <label
+                htmlFor="company-logo-input"
+                className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 text-white opacity-0 transition group-hover:opacity-100"
+              >
+                <ImageIcon size={20} />
+                <input
+                  id="company-logo-input"
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Name + actions */}
+          <div className="w-full flex-1">
+            <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-600">
+              <Building2 size={16} />
+              Company Name
+            </label>
+
+            {isEditing ? (
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 font-medium focus:border-[#25D366] focus:outline-none focus:ring-1 focus:ring-[#25D366]"
+                placeholder="Enter your company name"
+              />
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium">
+                {company?.companyName || "-"}
+              </div>
+            )}
+
+            {isEditing && (
+              <p className="mt-2 text-xs text-slate-400">
+                PNG, JPG or WEBP. Hover the logo on the left to change it.
+              </p>
+            )}
+
+            {isEditing && (
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <X size={16} />
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="crm-primary-button"
+                >
+                  <Check size={16} />
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ProfileSettings() {
   const { user, updateProfileAction, isLoading } = useAuthStore();
@@ -533,6 +766,16 @@ function ProfileSettings() {
         </div>
 
       </div>
+
+      {/* ==========================================
+          COMPANY BRANDING (admin only)
+      ========================================== */}
+
+      {user?.role === "ADMIN" && (
+        <div className="mt-8">
+          <CompanyBrandingCard />
+        </div>
+      )}
 
       {/* ==========================================
           BILLING & SUBSCRIPTION
