@@ -1,3 +1,4 @@
+// import { useState } from "react";
 // import {
 //   X,
 //   Calendar,
@@ -5,14 +6,22 @@
 //   FileText,
 //   Megaphone,
 //   CheckCircle2,
+//   RotateCcw,
+//   Loader2,
 // } from "lucide-react";
+// import toast from "react-hot-toast";
+
+// import { resendCampaign } from "../../api/campaignApi"; // 👈 NEW
 
 // export default function ViewCampaignModal({
 //   isOpen,
 //   onClose,
 //   campaign,
+//   onResendSuccess, // 👈 NEW — optional callback so the parent list/page can refresh
 // }) {
-  
+
+//   const [resending, setResending] = useState(false); // 👈 NEW
+
 //   if (!isOpen || !campaign) return null;
 
 //   const getStatusColor = (status) => {
@@ -53,6 +62,44 @@
 //     }
 //   };
 
+//   // ==================================================
+//   // RESEND CAMPAIGN  👈 NEW
+//   // ==================================================
+//   // Only meaningful for a campaign that already finished — the
+//   // backend itself blocks resending anything still SENDING, or
+//   // anything that was never sent at all (DRAFT/SCHEDULED should
+//   // use the normal "Send Campaign" flow instead).
+
+//   const canResend =
+//     campaign.status === "COMPLETED" ||
+//     campaign.status === "FAILED";
+
+//   const handleResend = async () => {
+//     if (resending) return;
+
+//     try {
+//       setResending(true);
+
+//       const response = await resendCampaign(campaign.id);
+
+//       toast.success("Campaign resent successfully!");
+
+//       if (onResendSuccess) {
+//         onResendSuccess(response?.data);
+//       }
+
+//       onClose();
+//     } catch (error) {
+//       console.error("Failed to resend campaign:", error);
+
+//       toast.error(
+//         error?.response?.data?.message || "Failed to resend campaign."
+//       );
+//     } finally {
+//       setResending(false);
+//     }
+//   };
+
 //   return (
 //     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
 
@@ -89,7 +136,12 @@
 
 //           <button
 //             onClick={onClose}
-//             className="p-2 rounded-xl hover:bg-white/50 transition"
+//             disabled={resending}
+//             className={`p-2 rounded-xl transition ${
+//               resending
+//                 ? "cursor-not-allowed opacity-50"
+//                 : "hover:bg-white/50"
+//             }`}
 //           >
 //             <X size={24} />
 //           </button>
@@ -263,11 +315,42 @@
 
 //         {/* Footer */}
 
-//         <div className="bg-white px-8 py-5 flex justify-end shadow-inner">
+//         <div className="bg-white px-8 py-5 flex items-center justify-end gap-3 shadow-inner">
+
+//           {/* 👈 NEW: Resend button — only shown once the campaign has
+//               actually finished (COMPLETED or FAILED). The backend
+//               enforces this too, so this is just keeping the button
+//               from appearing somewhere it would immediately error. */}
+//           {canResend && (
+//             <button
+//               onClick={handleResend}
+//               disabled={resending}
+//               className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-white transition ${
+//                 resending
+//                   ? "cursor-not-allowed bg-[#128C7E]/60"
+//                   : "bg-[#128C7E] hover:bg-[#0e6b5e]"
+//               }`}
+//             >
+//               {resending ? (
+//                 <>
+//                   <Loader2 size={18} className="animate-spin" />
+//                   Resending...
+//                 </>
+//               ) : (
+//                 <>
+//                   <RotateCcw size={18} />
+//                   Resend Campaign
+//                 </>
+//               )}
+//             </button>
+//           )}
 
 //           <button
 //             onClick={onClose}
-//             className="px-6 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#128C7E] transition font-semibold text-gray-800"
+//             disabled={resending}
+//             className={`px-6 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#128C7E] transition font-semibold text-gray-800 ${
+//               resending ? "cursor-not-allowed opacity-50" : ""
+//             }`}
 //           >
 //             Close
 //           </button>
@@ -279,6 +362,8 @@
 //     </div>
 //   );
 // }
+
+
 
 import { useState } from "react";
 import {
@@ -294,6 +379,7 @@ import {
 import toast from "react-hot-toast";
 
 import { resendCampaign } from "../../api/campaignApi"; // 👈 NEW
+import { getCampaignMessageText } from "../../utils/campaignMessage";
 
 export default function ViewCampaignModal({
   isOpen,
@@ -587,7 +673,7 @@ export default function ViewCampaignModal({
             </div>
 
             <div className="p-6 whitespace-pre-wrap leading-8 text-gray-700">
-              {campaign.messageContent ||
+              {getCampaignMessageText(campaign) ||
                 "No message available."}
             </div>
 

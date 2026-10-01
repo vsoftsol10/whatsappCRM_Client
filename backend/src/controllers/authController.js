@@ -596,6 +596,7 @@ const crypto = require("crypto");
 const sendPasswordResetEmail = require("../services/passwordResetEmail");
 const { logAction, logDirect } = require("../services/auditLogService");
 const uploadToCloudinary = require("../utils/cloudinaryUplode");
+const { buildFrontendUrl } = require("../utils/frontendUrl");
 
 // ========================
 // REGISTER USER
@@ -1099,8 +1100,7 @@ const forgotPassword = async (req, res) => {
       },
     });
 
-    const resetLink =
-      `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+        const resetLink = buildFrontendUrl(`/reset-password/${resetToken}`);
 
     console.log("========== RESET PASSWORD ==========");
     console.log("FRONTEND_URL:", process.env.FRONTEND_URL);

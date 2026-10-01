@@ -22,6 +22,7 @@
 //   onSend,
 //   onEdit,
 //   onDelete,
+//   onStatusChange,
 // }) {
 //   const navigate = useNavigate();
 
@@ -117,13 +118,22 @@
 //               {campaign.type}
 //             </span>
 
-//             <span
-//               className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
+//             <select
+//               value={campaign.status}
+//               onChange={(e) =>
+//                 onStatusChange?.(campaign.id, e.target.value)
+//               }
+//               onClick={(e) => e.stopPropagation()}
+//               className={`px-3 py-1 rounded-full text-xs font-medium border-none outline-none cursor-pointer ${getStatusColor(
 //                 campaign.status
 //               )}`}
 //             >
-//               {campaign.status}
-//             </span>
+//               <option value="DRAFT">DRAFT</option>
+//               <option value="SCHEDULED">SCHEDULED</option>
+//               <option value="SENDING">SENDING</option>
+//               <option value="COMPLETED">COMPLETED</option>
+//               <option value="FAILED">FAILED</option>
+//             </select>
 //           </div>
 //         </div>
 
@@ -236,6 +246,7 @@
 //   );
 // }
 
+
 import {
   Calendar,
   Users,
@@ -253,6 +264,7 @@ import {
 } from "react";
 
 import { useNavigate } from "react-router-dom";
+import { getCampaignMessageText } from "../../utils/campaignMessage";
 
 export default function CampaignCard({
   campaign,
@@ -444,8 +456,13 @@ export default function CampaignCard({
 
       <div className="mt-5">
         <p className="text-gray-600 line-clamp-3">
-          {campaign.messageContent}
+          {getCampaignMessageText(campaign)}
         </p>
+        {campaign.template?.name && (
+          <p className="mt-2 text-xs text-gray-400">
+            Template: {campaign.template.name}
+          </p>
+        )}
       </div>
 
       {/* Audience */}

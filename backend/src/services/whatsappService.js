@@ -1,9 +1,10 @@
-
-
 // const axios = require("axios");
 
 // const GRAPH_API_VERSION = "v23.0";
 
+// // ============================================
+// // SEND TEXT MESSAGE
+// // ============================================
 // const sendTextMessage = async (to, message, whatsappAccount) => {
 //   console.log("Sending to:", to);
 //   console.log("sendTextMessage called with:", {
@@ -41,11 +42,13 @@
 //     };
 //   }
 
-//   if (!whatsappAccount.whatsappAccessToken) {
+//   // 👈 CHANGED: no longer checks whatsappAccount.whatsappAccessToken —
+//   // the token is shared across every company now, not stored per-account.
+//   if (!process.env.META_SYSTEM_USER_TOKEN) {
 //     return {
 //       success: false,
 //       error: {
-//         message: "WhatsApp access token is missing",
+//         message: "META_SYSTEM_USER_TOKEN is not configured on the server",
 //       },
 //     };
 //   }
@@ -65,7 +68,8 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${whatsappAccount.whatsappAccessToken}`,
+//           // 👈 CHANGED
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -96,12 +100,25 @@
 //   }
 // };
 
-// const sendImageMessage = async (to, imageUrl, caption = "") => {
+// // ============================================
+// // SEND IMAGE MESSAGE
+// // ============================================
+// // 👈 CHANGED: now takes whatsappAccount instead of relying on
+// // process.env.WHATSAPP_PHONE_NUMBER_ID — that env var pointed to ONE
+// // hardcoded number for every company, which is wrong for multi-tenant.
+// const sendImageMessage = async (to, imageUrl, caption = "", whatsappAccount) => {
 //   console.log("Sending Image to:", to);
+
+//   if (!whatsappAccount?.phoneNumberId) {
+//     return {
+//       success: false,
+//       error: { message: "WhatsApp account or Phone Number ID is missing" },
+//     };
+//   }
 
 //   try {
 //     const response = await axios.post(
-//       `https://graph.facebook.com/${GRAPH_API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+//       `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsappAccount.phoneNumberId}/messages`,
 //       {
 //         messaging_product: "whatsapp",
 //         recipient_type: "individual",
@@ -114,7 +131,8 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//           // 👈 CHANGED
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -148,7 +166,11 @@
 //     .replace(/ {2,}/g, " ")     // collapse repeated spaces
 //     .trim();
 
-// const sendTemplateMessage = async (to, templateName, params = []) => {
+// // ============================================
+// // SEND TEMPLATE MESSAGE
+// // ============================================
+// // 👈 CHANGED: now takes whatsappAccount instead of process.env.WHATSAPP_PHONE_NUMBER_ID
+// const sendTemplateMessage = async (to, templateName, params = [], whatsappAccount) => {
 
 //   if (!to || typeof to !== "string" || !to.trim()) {
 //     return {
@@ -159,9 +181,16 @@
 //     };
 //   }
 
+//   if (!whatsappAccount?.phoneNumberId) {
+//     return {
+//       success: false,
+//       error: { message: "WhatsApp account or Phone Number ID is missing" },
+//     };
+//   }
+
 //   try {
 //     const response = await axios.post(
-//       `https://graph.facebook.com/${GRAPH_API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+//       `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsappAccount.phoneNumberId}/messages`,
 //       {
 //         messaging_product: "whatsapp",
 //         to : to.trim(),
@@ -179,7 +208,8 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//           // 👈 CHANGED
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -191,11 +221,11 @@
 //   }
 // };
 
-// // Template message with an Image header + body text variables.
-// // Requires a Meta-approved template whose Header format is set to "Image"
-// // (e.g. "custom_campaign_image_message"). imageUrl must be a publicly
-// // accessible URL (your Cloudinary link works fine).
-// const sendCampaignImageTemplate = async (to, templateName, imageUrl, params = [], languageCode = "en_US") => {
+// // ============================================
+// // SEND CAMPAIGN IMAGE TEMPLATE
+// // ============================================
+// // 👈 CHANGED: now takes whatsappAccount instead of process.env.WHATSAPP_PHONE_NUMBER_ID
+// const sendCampaignImageTemplate = async (to, templateName, imageUrl, params = [], languageCode = "en_US", whatsappAccount) => {
 
 //   if (!to || typeof to !== "string" || !to.trim()) {
 //     return {
@@ -215,9 +245,16 @@
 //     };
 //   }
 
+//   if (!whatsappAccount?.phoneNumberId) {
+//     return {
+//       success: false,
+//       error: { message: "WhatsApp account or Phone Number ID is missing" },
+//     };
+//   }
+
 //   try {
 //     const response = await axios.post(
-//       `https://graph.facebook.com/${GRAPH_API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+//       `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsappAccount.phoneNumberId}/messages`,
 //       {
 //         messaging_product: "whatsapp",
 //         to: to.trim(),
@@ -247,7 +284,8 @@
 //       },
 //       {
 //         headers: {
-//           Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//           // 👈 CHANGED
+//           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
 //           "Content-Type": "application/json",
 //         },
 //       }
@@ -440,7 +478,16 @@ const sanitizeTemplateParam = (text) =>
 // SEND TEMPLATE MESSAGE
 // ============================================
 // 👈 CHANGED: now takes whatsappAccount instead of process.env.WHATSAPP_PHONE_NUMBER_ID
-const sendTemplateMessage = async (to, templateName, params = [], whatsappAccount) => {
+// FIX: added optional `languageCode` as the LAST argument (default "en_US") so existing
+// callers keep working. Before this, every non-image campaign was sent as en_US,
+// so Tamil (ta) / Hindi (hi) templates failed with "template does not exist".
+const sendTemplateMessage = async (
+  to,
+  templateName,
+  params = [],
+  whatsappAccount,
+  languageCode = "en_US"
+) => {
 
   if (!to || typeof to !== "string" || !to.trim()) {
     return {
@@ -467,7 +514,7 @@ const sendTemplateMessage = async (to, templateName, params = [], whatsappAccoun
         type: "template",
         template: {
           name: templateName,
-          language: { code: "en_US" },
+          language: { code: languageCode || "en_US" },
           components: params.length > 0 ? [
             {
               type: "body",
