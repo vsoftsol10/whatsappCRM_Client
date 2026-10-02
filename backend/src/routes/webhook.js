@@ -1,279 +1,3 @@
-// // const express = require("express");
-// // const router = express.Router();
-// // const prisma = require("../config/prisma");
-
-// // const {
-// //   getOrCreateConversation,
-// // } = require("../helpers/conversationHelper");
-
-// // const {
-// //   saveIncomingMessage,
-// // } = require("../helpers/messageHelper");
-
-// // router.get("/", (req, res) => {
-// //   const mode = req.query["hub.mode"];
-// //   const token = req.query["hub.verify_token"];
-// //   const challenge = req.query["hub.challenge"];
-
-// //   if (
-// //     mode === "subscribe" &&
-// //     token === process.env.VERIFY_TOKEN
-// //   ) {
-// //     console.log("Webhook Verified");
-// //     return res.status(200).send(challenge);
-// //   }
-
-// //   return res.sendStatus(403);
-// // });
-
-// // router.post("/", async (req, res) => {
-// //   try {
-// //     const value = req.body.entry?.[0]?.changes?.[0]?.value;
-// //     const message = value?.messages?.[0];
-// //     const statuses = value?.statuses;
-
-// //     if (message) {
-// //       const phone = message.from;
-
-// //       // Fall back for non-text messages (image/sticker/voice/location/
-// //       // button or interactive replies) so the incoming message still
-// //       // gets saved instead of throwing on a required "content" field.
-// //       const text =
-// //         message.text?.body ||
-// //         message.button?.text ||
-// //         message.interactive?.button_reply?.title ||
-// //         message.interactive?.list_reply?.title ||
-// //         `[${message.type || "unsupported"} message]`;
-
-// //       console.log("Phone :", phone);
-// //       console.log("Message :", text);
-
-// //       const conversation = await getOrCreateConversation(phone);
-
-// //       console.log("Conversation ID :",conversation.id);
-// //       if (conversation.customer) {
-// //         console.log("Customer :", conversation.customer.name);
-// //         } else {
-// //         console.log("Customer : Not linked yet");
-// //         }
-    
-// //       await saveIncomingMessage(conversation.id, text);
-// //         console.log("Message saved successfully");
-// //     }
-
-// //     // Delivery status updates (sent/delivered/read/failed) for messages
-// //     // we sent out. Matched back to our Message row via metaMessageId so
-// //     // failures are visible instead of silently disappearing.
-// //     if (statuses && statuses.length > 0) {
-// //       for (const statusEvent of statuses) {
-// //         const metaMessageId = statusEvent.id;
-// //         const newStatus = statusEvent.status; // sent | delivered | read | failed
-// //         const failureReason =
-// //           statusEvent.errors?.[0]?.title ||
-// //           statusEvent.errors?.[0]?.message ||
-// //           null;
-
-// //         console.log("Status update:", metaMessageId, newStatus, failureReason || "");
-
-// //         if (!metaMessageId) continue;
-
-// //         try {
-// //           await prisma.message.updateMany({
-// //             where: { metaMessageId },
-// //             data: {
-// //               status: newStatus ? newStatus.toUpperCase() : undefined,
-// //               failureReason,
-// //             },
-// //           });
-// //         } catch (err) {
-// //           console.error("Failed to update message status:", err);
-// //         }
-// //       }
-// //     }
-
-// //     return res.sendStatus(200);
-// //   } catch (error) {
-// //     console.error(error);
-// //     return res.sendStatus(500);
-// //   }
-// // });
-
-
-
-// // module.exports = router;
-
-// const express = require("express");
-// const router = express.Router();
-// const prisma = require("../config/prisma");
-
-// const {
-//   getOrCreateConversation,
-// } = require("../helpers/conversationHelper");
-
-// const {
-//   saveIncomingMessage,
-// } = require("../helpers/messageHelper");
-
-// const { sendTextMessage } = require("../services/whatsappService");
-// const { getAutoReply } = require("../services/grokService");
-
-// // Fetches Grok's reply, sends it to the customer on WhatsApp, and
-// // saves it as a BOT message. Runs after the webhook has already
-// // responded 200 to Meta, so a slow/failed Grok call never delays or
-// // breaks message delivery for the customer's inbound message.
-// const triggerAutoReply = async (conversationId) => {
-//   const conversation = await prisma.conversation.findUnique({
-//     where: { id: conversationId },
-//     include: { customer: true, whatsappAccount: true }, // 👈 NEW: was missing
-//   });
-
-//   if (!conversation || !conversation.botEnabled) return;
-
-//   const recipientPhone = conversation.phone || conversation.customer?.phone;
-//   if (!recipientPhone) return;
-
-//   if (!conversation.whatsappAccount) { // 👈 NEW guard
-//     console.error("Cannot send Grok auto-reply: no WhatsApp account on this conversation");
-//     return;
-//   }
-
-//   const result = await getAutoReply(conversationId);
-
-//   if (!result.success) {
-//     console.error("Grok did not return a reply:", result.error);
-//     return;
-//   }
-
-//   const sendResult = await sendTextMessage(
-//     recipientPhone,
-//     result.reply,
-//     conversation.whatsappAccount // 👈 NEW: was missing, causing every auto-reply to fail
-//   );
-
-//   if (!sendResult.success) {
-//     console.error("Failed to send Grok auto-reply on WhatsApp:", sendResult.error);
-//     return;
-//   }
-
-//   const botMessage = await prisma.message.create({
-//     data: {
-//       conversationId,
-//       content: result.reply,
-//       sender: "BOT",
-//       messageType: "TEXT",
-//       status: "SENT",
-//     },
-//   });
-
-//   await prisma.conversation.update({
-//     where: { id: conversationId },
-//     data: { lastMessage: result.reply },
-//   });
-
-//   console.log("Auto-reply sent:", botMessage.id);
-// };
-
-// router.get("/", (req, res) => {
-//   const mode = req.query["hub.mode"];
-//   const token = req.query["hub.verify_token"];
-//   const challenge = req.query["hub.challenge"];
-
-//   if (
-//     mode === "subscribe" &&
-//     token === process.env.VERIFY_TOKEN
-//   ) {
-//     console.log("Webhook Verified");
-//     return res.status(200).send(challenge);
-//   }
-
-//   return res.sendStatus(403);
-// });
-
-// router.post("/", async (req, res) => {
-//   try {
-//     const value = req.body.entry?.[0]?.changes?.[0]?.value;
-//     const message = value?.messages?.[0];
-//     const statuses = value?.statuses;
-
-//     if (message) {
-//       const phone = message.from;
-
-//       // Fall back for non-text messages (image/sticker/voice/location/
-//       // button or interactive replies) so the incoming message still
-//       // gets saved instead of throwing on a required "content" field.
-//       const text =
-//         message.text?.body ||
-//         message.button?.text ||
-//         message.interactive?.button_reply?.title ||
-//         message.interactive?.list_reply?.title ||
-//         `[${message.type || "unsupported"} message]`;
-
-//       console.log("Phone :", phone);
-//       console.log("Message :", text);
-
-//       const conversation = await getOrCreateConversation(phone);
-
-//       console.log("Conversation ID :",conversation.id);
-//       if (conversation.customer) {
-//         console.log("Customer :", conversation.customer.name);
-//         } else {
-//         console.log("Customer : Not linked yet");
-//         }
-    
-//       await saveIncomingMessage(conversation.id, text);
-//         console.log("Message saved successfully");
-
-//       // AI AUTO-REPLY (Grok)
-//       // Only fires when this specific conversation has the bot toggle
-//       // ON (conversation.botEnabled). If an agent already sent a manual
-//       // reply, botEnabled would have been flipped off elsewhere.
-//       if (conversation.botEnabled) {
-//         triggerAutoReply(conversation.id).catch((err) => {
-//           console.error("Auto-reply pipeline failed:", err);
-//         });
-//       }
-//     }
-
-//     // Delivery status updates (sent/delivered/read/failed) for messages
-//     // we sent out. Matched back to our Message row via metaMessageId so
-//     // failures are visible instead of silently disappearing.
-//     if (statuses && statuses.length > 0) {
-//       for (const statusEvent of statuses) {
-//         const metaMessageId = statusEvent.id;
-//         const newStatus = statusEvent.status; // sent | delivered | read | failed
-//         const failureReason =
-//           statusEvent.errors?.[0]?.title ||
-//           statusEvent.errors?.[0]?.message ||
-//           null;
-
-//         console.log("Status update:", metaMessageId, newStatus, failureReason || "");
-
-//         if (!metaMessageId) continue;
-
-//         try {
-//           await prisma.message.updateMany({
-//             where: { metaMessageId },
-//             data: {
-//               status: newStatus ? newStatus.toUpperCase() : undefined,
-//               failureReason,
-//             },
-//           });
-//         } catch (err) {
-//           console.error("Failed to update message status:", err);
-//         }
-//       }
-//     }
-
-//     return res.sendStatus(200);
-//   } catch (error) {
-//     console.error(error);
-//     return res.sendStatus(500);
-//   }
-// });
-
-
-
-// module.exports = router;
 
 const express = require("express");
 const router = express.Router();
@@ -288,48 +12,105 @@ const {
 } = require("../helpers/messageHelper");
 
 const { sendTextMessage } = require("../services/whatsappService");
-const { getAutoReply } = require("../services/grokService");
+const { getAutoReply } = require("../services/aiService");
 
 // ============================================
-// AI AUTO-REPLY (GROK) — unchanged
+// AI AUTO-REPLY (any provider: Gemini, OpenAI, Claude, Grok, ...)
 // ============================================
-// Fetches Grok's reply, sends it to the customer on WhatsApp, and
+// Fetches the AI reply, sends it to the customer on WhatsApp, and
 // saves it as a BOT message. Runs after the webhook has already
-// responded 200 to Meta, so a slow/failed Grok call never delays or
-// breaks message delivery for the customer's inbound message.
-const triggerAutoReply = async (conversationId) => {
+// responded to Meta's request, so a slow/failed AI call never
+// delays or breaks message delivery for the customer's inbound message.
+//
+// Safeguards:
+//  - one reply pipeline per conversation at a time (no duplicate or
+//    out-of-order replies when a customer sends several messages fast)
+//  - if the customer sends another message while the AI is thinking, the
+//    stale reply is discarded and regenerated with the full context
+//  - bot is re-checked right before sending, so an agent who takes
+//    over mid-generation is never talked over
+//  - BOT message stores Meta's message id so delivery status updates
+//    work and the Coexistence echo handler doesn't mistake it for a
+//    manual agent message (which would switch the bot off)
+const activeReplies = new Set();
+const MAX_REGENERATIONS = 3;
+
+const attemptAutoReply = async (conversationId) => {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: { customer: true, whatsappAccount: true },
   });
 
-  if (!conversation || !conversation.botEnabled) return;
+  if (!conversation || !conversation.botEnabled) return "done";
 
   const recipientPhone = conversation.phone || conversation.customer?.phone;
-  if (!recipientPhone) return;
-
-  if (!conversation.whatsappAccount) {
-    console.error("Cannot send Grok auto-reply: no WhatsApp account on this conversation");
-    return;
+  if (!recipientPhone) {
+    console.error("Cannot send AI auto-reply: conversation has no phone number");
+    return "done";
   }
+
+  // Fall back to the company's connected number if this conversation
+  // was never linked to a WhatsApp account.
+  let whatsappAccount = conversation.whatsappAccount;
+  if (!whatsappAccount) {
+    whatsappAccount = await prisma.whatsAppAccount.findFirst({
+      where: { companyId: conversation.companyId, status: "CONNECTED" },
+    });
+  }
+
+  if (!whatsappAccount) {
+    console.error("Cannot send AI auto-reply: no WhatsApp account on this conversation");
+    return "done";
+  }
+
+  // Latest customer message at the moment we start generating
+  const latestCustomerMessage = await prisma.message.findFirst({
+    where: { conversationId, sender: "CUSTOMER" },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!latestCustomerMessage) return "done";
 
   const result = await getAutoReply(conversationId);
 
   if (!result.success) {
-    console.error("Grok did not return a reply:", result.error);
-    return;
+    console.error("AI did not return a reply:", result.error);
+    return "done";
   }
+
+  // Customer wrote again while the AI was thinking -> throw this reply
+  // away and answer the whole burst of messages in one go.
+  const newerCustomerMessages = await prisma.message.count({
+    where: {
+      conversationId,
+      sender: "CUSTOMER",
+      createdAt: { gt: latestCustomerMessage.createdAt },
+    },
+  });
+
+  if (newerCustomerMessages > 0) return "stale";
+
+  // Re-check: an agent may have taken over (bot switched off) or the
+  // master switch may have been turned off while we were waiting.
+  const fresh = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { botEnabled: true },
+  });
+
+  if (!fresh || !fresh.botEnabled) return "done";
 
   const sendResult = await sendTextMessage(
     recipientPhone,
     result.reply,
-    conversation.whatsappAccount
+    whatsappAccount
   );
 
   if (!sendResult.success) {
-    console.error("Failed to send Grok auto-reply on WhatsApp:", sendResult.error);
-    return;
+    console.error("Failed to send AI auto-reply on WhatsApp:", sendResult.error);
+    return "done";
   }
+
+  const metaMessageId = sendResult.data?.messages?.[0]?.id || undefined;
 
   const botMessage = await prisma.message.create({
     data: {
@@ -338,6 +119,7 @@ const triggerAutoReply = async (conversationId) => {
       sender: "BOT",
       messageType: "TEXT",
       status: "SENT",
+      metaMessageId,
     },
   });
 
@@ -347,6 +129,26 @@ const triggerAutoReply = async (conversationId) => {
   });
 
   console.log("Auto-reply sent:", botMessage.id);
+  return "done";
+};
+
+const triggerAutoReply = async (conversationId) => {
+  if (activeReplies.has(conversationId)) {
+    // A pipeline is already running for this chat. It will notice the
+    // newer customer message and regenerate, so nothing to do here.
+    return;
+  }
+
+  activeReplies.add(conversationId);
+
+  try {
+    for (let i = 0; i < MAX_REGENERATIONS; i++) {
+      const outcome = await attemptAutoReply(conversationId);
+      if (outcome !== "stale") break;
+    }
+  } finally {
+    activeReplies.delete(conversationId);
+  }
 };
 
 // ============================================

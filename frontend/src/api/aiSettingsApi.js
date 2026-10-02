@@ -1,7 +1,8 @@
 import apiClient from "./apiClient";
 
 // ==========================================
-// GET AI SETTINGS (Grok config)
+// GET AI SETTINGS + list of supported providers
+// Response: { settings, providers }
 // ==========================================
 export const getAiSettings = async () => {
   const response = await apiClient.get("/api/ai-settings");
@@ -9,9 +10,21 @@ export const getAiSettings = async () => {
 };
 
 // ==========================================
-// UPDATE AI SETTINGS (Grok config)
+// UPDATE AI SETTINGS
+// payload: { isEnabled, provider, model, baseUrl, systemPrompt,
+//            historyLimit, apiKey?, removeKeyFor? }
 // ==========================================
-export const updateAiSettings = async (settingsData) => {
-  const response = await apiClient.patch("/api/ai-settings", settingsData);
+export const updateAiSettings = async (payload) => {
+  const response = await apiClient.patch("/api/ai-settings", payload);
+  return response.data;
+};
+
+// ==========================================
+// TEST CONNECTION (works with unsaved form values)
+// payload: { message, provider, model, baseUrl, apiKey?, systemPrompt }
+// Response: { reply, latencyMs, provider, model }
+// ==========================================
+export const testAiSettings = async (payload) => {
+  const response = await apiClient.post("/api/ai-settings/test", payload);
   return response.data;
 };

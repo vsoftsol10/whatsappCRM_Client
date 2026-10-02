@@ -5,6 +5,7 @@
 // const sendPasswordResetEmail = require("../services/passwordResetEmail");
 // const { logAction, logDirect } = require("../services/auditLogService");
 // const uploadToCloudinary = require("../utils/cloudinaryUplode");
+// const { buildFrontendUrl } = require("../utils/frontendUrl");
 
 // // ========================
 // // REGISTER USER
@@ -147,6 +148,8 @@
 //           email: user.email,
 //           role: user.role,
 //           companyId: user.companyId,
+//           companyName: user.company?.companyName,
+//           companyLogo: user.company?.logo,
 //           companyStatus: user.company?.status,
 //           expiryDate: user.company?.expiryDate,
 //         },
@@ -177,6 +180,8 @@
 //         email: user.email,
 //         role: user.role,
 //         companyId: user.companyId,
+//         companyName: user.company?.companyName,
+//         companyLogo: user.company?.logo,
 //         companyStatus: user.company?.status,
 //         expiryDate: user.company?.expiryDate,
 //       },
@@ -198,25 +203,14 @@
 // // ========================
 // const getMe = async (req, res) => {
 //   try {
-//     const users = await prisma.user.findMany();
-
-//     console.log("========== ALL USERS ==========");
-//     console.table(
-//       users.map((u) => ({
-//         email: u.email,
-//         role: u.role,
-//       }))
-//     );
-
 //     const user = await prisma.user.findUnique({
 //       where: {
 //         id: req.user.userId,
 //       },
+//       include: {
+//         company: true,
+//       },
 //     });
-
-//     console.log("FOUND USER:", user);
-//     console.log("FOUND USER:", user);
-
 
 //     if (!user) {
 //       return res.status(404).json({
@@ -224,7 +218,22 @@
 //       });
 //     }
 
-//     return res.status(200).json(user);
+//     return res.status(200).json({
+//       id: user.id,
+//       name: user.name,
+//       email: user.email,
+//       role: user.role,
+//       phone: user.phone,
+//       address: user.address,
+//       department: user.department,
+//       designation: user.designation,
+//       profileImage: user.profileImage,
+//       companyId: user.companyId,
+//       companyName: user.company?.companyName,
+//       companyLogo: user.company?.logo,
+//       companyStatus: user.company?.status,
+//       expiryDate: user.company?.expiryDate,
+//     });
 //   } catch (error) {
 //     return res.status(500).json({
 //       message: error.message,
@@ -500,8 +509,7 @@
 //       },
 //     });
 
-//     const resetLink =
-//       `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+//         const resetLink = buildFrontendUrl(`/reset-password/${resetToken}`);
 
 //     console.log("========== RESET PASSWORD ==========");
 //     console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
@@ -846,6 +854,7 @@ const updateProfile = async (req, res) => {
       address,
       department,
       designation,
+      removeProfileImage,
     } = req.body;
 
     if (!name || !name.trim()) {
@@ -876,14 +885,21 @@ const updateProfile = async (req, res) => {
         designation !== undefined ? designation : existingUser.designation,
     };
 
-    // Optional profile picture upload
+    // Multipart form data always arrives as strings, so "true" (not true)
+    const shouldRemoveImage =
+      removeProfileImage === true || removeProfileImage === "true";
+
     if (req.file) {
+      // New profile picture uploaded — replaces any existing one
       const result = await uploadToCloudinary(
         req.file.buffer,
         "profile-images"
       );
 
       data.profileImage = result.secure_url;
+    } else if (shouldRemoveImage) {
+      // User clicked "Remove photo" — clear the stored image
+      data.profileImage = null;
     }
 
     const updatedUser = await prisma.user.update({
@@ -1100,7 +1116,7 @@ const forgotPassword = async (req, res) => {
       },
     });
 
-        const resetLink = buildFrontendUrl(`/reset-password/${resetToken}`);
+    const resetLink = buildFrontendUrl(`/reset-password/${resetToken}`);
 
     console.log("========== RESET PASSWORD ==========");
     console.log("FRONTEND_URL:", process.env.FRONTEND_URL);

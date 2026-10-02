@@ -75,6 +75,9 @@ model Company {
   purchases Purchase[]
 
   backups Backup[]
+
+  // AI auto-reply configuration (one row per company)
+  aiSettings AiSettings?
 }
 
 enum CompanyStatus {
@@ -1411,26 +1414,47 @@ enum CrmAuditModule {
 }
 
 //////////////////////////////////////////////////////
-// AI SETTINGS (Grok Auto-Reply)
+// AI SETTINGS (Multi-provider AI Auto-Reply)
 //////////////////////////////////////////////////////
 
-// Single global row (not per-company) — one Grok key/config shared
-// across all companies. Master isEnabled switch plus each
-// Conversation's own botEnabled controls whether a given chat
-// actually gets auto-replied.
+// One row PER COMPANY. Each company brings its own AI provider and
+// API key (Gemini, Grok, OpenAI, Claude, DeepSeek, Groq, Mistral or
+// any OpenAI-compatible endpoint).
+//
+//  - isEnabled     : company-wide master switch. Each Conversation's
+//                    own botEnabled still decides per chat.
+//  - provider      : the ACTIVE provider id (GEMINI, GROK, OPENAI,
+//                    ANTHROPIC, DEEPSEEK, GROQ, MISTRAL, CUSTOM)
+//  - providerKeys  : { "GEMINI": "enc:v1:...", "OPENAI": "enc:v1:..." }
+//                    API keys are stored ENCRYPTED (AES-256-GCM), one
+//                    per provider, so switching providers never needs
+//                    the key to be pasted again.
+//  - baseUrl       : only used by the CUSTOM provider
+//  - apiKey        : DEPRECATED legacy column from the old global
+//                    Grok-only setup. No longer read or written.
 model AiSettings {
   id Int @id @default(autoincrement())
 
+  companyId Int?     @unique
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   isEnabled Boolean @default(false)
 
-  provider String @default("GROK")
-  apiKey   String?
-  model    String @default("grok-4")
+  provider     String @default("GEMINI")
+  model        String @default("gemini-2.5-flash")
+  providerKeys Json?
+  baseUrl      String?
+
+  apiKey String?
 
   systemPrompt String @default("You are a helpful, friendly customer support assistant for this business. Keep replies short, clear, and polite. If you don't know the answer or the customer wants a human, say you'll connect them to the team.")
 
   // How many previous messages (both sides) to send as context
   historyLimit Int @default(10)
+
+  // Last failure of the auto-reply pipeline, shown on the settings page
+  lastError   String?
+  lastErrorAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
