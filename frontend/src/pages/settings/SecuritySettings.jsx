@@ -1,4 +1,6 @@
+// import { useEffect, useState } from "react";
 // import { Link } from "react-router-dom";
+// import axios from "axios";
 // import {
 //   Lock,
 //   ChevronRight,
@@ -8,6 +10,37 @@
 // import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 
 // function SecuritySettings() {
+//   const [loadingStatus, setLoadingStatus] = useState(true);
+//   const [connectedAccount, setConnectedAccount] = useState(null);
+
+//   const fetchWhatsAppStatus = async () => {
+//     try {
+//       setLoadingStatus(true);
+//       const token = localStorage.getItem("token");
+
+//       const response = await axios.get(
+//         `${import.meta.env.VITE_API_URL}/api/whatsapp/accounts`,
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+
+//       const accounts = response.data?.accounts || [];
+//       const connected = accounts.find((acc) => acc.status === "CONNECTED");
+
+//       setConnectedAccount(connected || null);
+//     } catch (error) {
+//       console.error("Failed to fetch WhatsApp account status:", error);
+//       setConnectedAccount(null);
+//     } finally {
+//       setLoadingStatus(false);
+//     }
+//   };
+
+//   useEffect(() => {
+//     fetchWhatsAppStatus();
+//   }, []);
+
+//   const isConnected = !!connectedAccount;
+
 //   return (
 //     <div className="crm-page bg-slate-50">
 
@@ -98,10 +131,26 @@
 
 //               <div className="mt-3 flex items-center gap-2">
 
-//                 <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+//                 <span
+//                   className={`h-2.5 w-2.5 rounded-full ${
+//                     loadingStatus
+//                       ? "bg-slate-300"
+//                       : isConnected
+//                       ? "bg-[#25D366]"
+//                       : "bg-slate-400"
+//                   }`}
+//                 />
 
 //                 <span className="text-sm font-medium text-slate-500">
-//                   Not Connected
+//                   {loadingStatus
+//                     ? "Checking..."
+//                     : isConnected
+//                     ? `Connected${
+//                         connectedAccount?.displayPhoneNumber
+//                           ? ` (${connectedAccount.displayPhoneNumber})`
+//                           : ""
+//                       }`
+//                     : "Not Connected"}
 //                 </span>
 
 //               </div>
@@ -110,7 +159,7 @@
 
 //           </div>
 
-//           <ConnectWhatsApp />
+//           <ConnectWhatsApp onConnected={fetchWhatsAppStatus} />
 
 //         </div>
 
@@ -122,6 +171,7 @@
 
 // export default SecuritySettings;
 
+
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
@@ -132,8 +182,12 @@ import {
 } from "lucide-react";
 
 import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
+import { useAuthStore } from "../../store/authStore";
 
 function SecuritySettings() {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === "ADMIN";
+
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [connectedAccount, setConnectedAccount] = useState(null);
 
@@ -249,8 +303,9 @@ function SecuritySettings() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-500">
-                Connect your WhatsApp Business Account to send and receive
-                WhatsApp messages through the CRM.
+                {isAdmin
+                  ? "Connect your WhatsApp Business Account to send and receive WhatsApp messages through the CRM."
+                  : "The WhatsApp Business Account connected to this CRM. Only an admin can connect or change it."}
               </p>
 
               <div className="mt-3 flex items-center gap-2">
@@ -279,11 +334,28 @@ function SecuritySettings() {
 
               </div>
 
+              {/* Employee view-only extras */}
+              {!isAdmin && !loadingStatus && isConnected && connectedAccount?.whatsappBusinessName && (
+                <p className="mt-2 text-sm text-slate-500">
+                  Business name:{" "}
+                  <span className="font-medium text-slate-700">
+                    {connectedAccount.whatsappBusinessName}
+                  </span>
+                </p>
+              )}
+
+              {!isAdmin && !loadingStatus && !isConnected && (
+                <p className="mt-2 text-sm text-slate-500">
+                  No WhatsApp account is connected yet. Please ask your admin to connect one.
+                </p>
+              )}
+
             </div>
 
           </div>
 
-          <ConnectWhatsApp onConnected={fetchWhatsAppStatus} />
+          {/* Connect buttons are visible to ADMIN only */}
+          {isAdmin && <ConnectWhatsApp onConnected={fetchWhatsAppStatus} />}
 
         </div>
 
