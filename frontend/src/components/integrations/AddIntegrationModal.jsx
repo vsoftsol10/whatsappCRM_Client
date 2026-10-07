@@ -1,5 +1,18 @@
-// import React from "react";
+// import React, { useEffect, useState } from "react";
 // import { X, Loader2, Plug } from "lucide-react";
+// import { getSupportedProviders } from "../../api/integrationApi";
+
+// // Fallback list shown if the /providers call fails (e.g. while
+// // offline) - kept in sync manually with
+// // backend/src/integrations/adapters/index.js as a safety net.
+// // The live list from the API always wins when it loads.
+// const FALLBACK_PROVIDERS = ["GENERIC", "STRIPE", "RAZORPAY"];
+
+// const PROVIDER_LABELS = {
+//   GENERIC: "Generic / Custom (I'll send events in your CRM's format)",
+//   STRIPE: "Stripe",
+//   RAZORPAY: "Razorpay",
+// };
 
 // const integrationTypes = [
 //   {
@@ -42,6 +55,31 @@
 //   onClose,
 //   onSubmit,
 // }) => {
+//   const [providers, setProviders] = useState(FALLBACK_PROVIDERS);
+
+//   // Load the real list of supported providers from the backend
+//   // as soon as the modal is used, so this dropdown can never
+//   // drift out of sync with the adapters that actually exist.
+//   useEffect(() => {
+//     if (!show) return;
+
+//     let cancelled = false;
+
+//     getSupportedProviders()
+//       .then((res) => {
+//         if (!cancelled && res?.providers?.length) {
+//           setProviders(res.providers);
+//         }
+//       })
+//       .catch(() => {
+//         // Keep FALLBACK_PROVIDERS - no need to block the form.
+//       });
+
+//     return () => {
+//       cancelled = true;
+//     };
+//   }, [show]);
+
 //   if (!show) return null;
 
 //   const handleChange = (e) => {
@@ -114,21 +152,38 @@
 //             <div>
 //               <label className="block text-sm font-medium text-gray-700 mb-2">
 //                 Provider
-//                 <span className="text-gray-400 font-normal">
-//                   {" "}
-//                   (Optional)
-//                 </span>
 //               </label>
 
-//               <input
-//                 type="text"
+//               {/*
+//                 CHANGED from a free-text input to a dropdown.
+//                 The provider value picks which backend adapter
+//                 handles this integration's webhooks (signature
+//                 verification + payload normalization) - a typo
+//                 or an unsupported name here used to silently
+//                 fall back to the generic format and fail on the
+//                 first real webhook. A dropdown makes that
+//                 impossible.
+//               */}
+//               <select
 //                 name="provider"
-//                 value={form.provider}
+//                 value={form.provider || "GENERIC"}
 //                 onChange={handleChange}
-//                 placeholder="e.g. Zoho, Shopify, Razorpay"
 //                 disabled={submitting}
 //                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
-//               />
+//               >
+//                 {providers.map((providerKey) => (
+//                   <option key={providerKey} value={providerKey}>
+//                     {PROVIDER_LABELS[providerKey] || providerKey}
+//                   </option>
+//                 ))}
+//               </select>
+
+//               <p className="mt-1.5 text-xs text-gray-500">
+//                 Don't see your billing system? Choose "Generic /
+//                 Custom" and send events directly in your CRM's
+//                 expected format, or ask your developer to add a
+//                 dedicated adapter for it.
+//               </p>
 //             </div>
 
 //             {/* Integration Type */}
@@ -163,6 +218,18 @@
 //                 e-commerce, POS, or other system can use these to
 //                 send customer and purchase events to your CRM.
 //               </p>
+
+//               {form.provider &&
+//                 form.provider !== "GENERIC" && (
+//                   <p className="text-sm text-green-800 mt-2">
+//                     For {PROVIDER_LABELS[form.provider] || form.provider},
+//                     open that provider's dashboard after creating
+//                     this integration and copy their real webhook
+//                     signing secret over the generated one here -
+//                     otherwise their webhook calls will be
+//                     rejected as unverified.
+//                   </p>
+//                 )}
 //             </div>
 //           </div>
 
@@ -203,6 +270,8 @@
 
 // export default AddIntegrationModal;
 
+
+
 import React, { useEffect, useState } from "react";
 import { X, Loader2, Plug } from "lucide-react";
 import { getSupportedProviders } from "../../api/integrationApi";
@@ -211,12 +280,15 @@ import { getSupportedProviders } from "../../api/integrationApi";
 // offline) - kept in sync manually with
 // backend/src/integrations/adapters/index.js as a safety net.
 // The live list from the API always wins when it loads.
-const FALLBACK_PROVIDERS = ["GENERIC", "STRIPE", "RAZORPAY"];
+const FALLBACK_PROVIDERS = ["GENERIC", "STRIPE", "RAZORPAY", "SQUARE", "SHOPIFY", "WOOCOMMERCE"];
 
 const PROVIDER_LABELS = {
   GENERIC: "Generic / Custom (I'll send events in your CRM's format)",
   STRIPE: "Stripe",
   RAZORPAY: "Razorpay",
+  SQUARE: "Square",
+  SHOPIFY: "Shopify",
+  WOOCOMMERCE: "WooCommerce",
 };
 
 const integrationTypes = [
