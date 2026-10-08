@@ -622,11 +622,7 @@ router.post("/leads/:publicKey", rateLimit(10, 60 * 1000), async (req, res) => {
       return res.json({ success: true, duplicate: true, leadId: duplicate.id });
     }
 
-    const requirements =
-      [message, pageUrl ? `Page: ${pageUrl}` : ""]
-        .filter(Boolean)
-        .join("\n\n")
-        .slice(0, 2000) || null;
+     const requirements = message.slice(0, 2000) || null;
 
     const lead = await prisma.lead.create({
       data: {
