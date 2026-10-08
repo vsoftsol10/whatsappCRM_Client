@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = {
   autoCreateCustomer: true,
   autoCreatePurchase: true,
   allowedEventTypes: [],
+  // WEBSITE integrations: websites allowed to send leads ([] = any website)
+  allowedOrigins: [],
 };
 
 // ------------------------------------------------------
@@ -46,6 +48,10 @@ const getIntegrationSettings = (integration) => {
     allowedEventTypes: Array.isArray(stored.allowedEventTypes)
       ? stored.allowedEventTypes.filter((v) => typeof v === "string" && v.trim())
       : DEFAULT_SETTINGS.allowedEventTypes,
+
+    allowedOrigins: Array.isArray(stored.allowedOrigins)
+      ? stored.allowedOrigins.filter((v) => typeof v === "string" && v.trim())
+      : DEFAULT_SETTINGS.allowedOrigins,
   };
 };
 
@@ -91,6 +97,32 @@ const sanitizeIncomingSettings = (input) => {
     result.allowedEventTypes = input.allowedEventTypes
       .map((v) => v.trim())
       .filter(Boolean);
+  }
+
+  if (input.allowedOrigins !== undefined) {
+    if (
+      !Array.isArray(input.allowedOrigins) ||
+      !input.allowedOrigins.every((v) => typeof v === "string")
+    ) {
+      throw new Error("settings.allowedOrigins must be an array of strings");
+    }
+
+    // Keep only the domain: "https://www.Shop.com/page" -> "shop.com"
+    const hosts = input.allowedOrigins
+      .map((v) => {
+        try {
+          const t = v.trim();
+          if (!t) return "";
+          return new URL(t.includes("://") ? t : `https://${t}`).hostname
+            .toLowerCase()
+            .replace(/^www\./, "");
+        } catch (e) {
+          return "";
+        }
+      })
+      .filter(Boolean);
+
+    result.allowedOrigins = [...new Set(hosts)].slice(0, 20);
   }
 
   return result;

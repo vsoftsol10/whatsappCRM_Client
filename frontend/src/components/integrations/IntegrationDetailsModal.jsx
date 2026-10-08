@@ -1,4 +1,4 @@
-// import React from "react";
+// import React, { useEffect, useState } from "react";
 // import {
 //   X,
 //   Copy,
@@ -12,6 +12,11 @@
 //   CheckCircle2,
 //   XCircle,
 //   AlertCircle,
+//   SkipForward,
+//   UserPlus,
+//   ReceiptText,
+//   Settings2,
+//   Save,
 // } from "lucide-react";
 
 // const formatDate = (date) => {
@@ -53,6 +58,13 @@
 //         icon: AlertCircle,
 //       };
 
+//     case "SKIPPED":
+//       return {
+//         label: "Skipped",
+//         className: "bg-gray-200 text-gray-700",
+//         icon: SkipForward,
+//       };
+
 //     default:
 //       return {
 //         label: status || "Received",
@@ -60,6 +72,12 @@
 //         icon: Clock,
 //       };
 //   }
+// };
+
+// const DEFAULT_SETTINGS = {
+//   autoCreateCustomer: true,
+//   autoCreatePurchase: true,
+//   allowedEventTypes: [],
 // };
 
 // const IntegrationDetailsModal = ({
@@ -72,8 +90,65 @@
 //   copiedField,
 //   onCopy,
 //   onClose,
+//   onSaveSettings,
+//   savingSettings,
+//   onSaveSecret,
+//   savingSecret,
 // }) => {
+//   const [localSettings, setLocalSettings] = useState(DEFAULT_SETTINGS);
+//   const [allowedEventTypesInput, setAllowedEventTypesInput] = useState("");
+//   const [secretInput, setSecretInput] = useState("");
+//   const [editingSecret, setEditingSecret] = useState(false);
+
+//   // Sync local editable state whenever a different (or freshly
+//   // reloaded) integration is opened.
+//   useEffect(() => {
+//     if (!integration) return;
+
+//     const settings = {
+//       ...DEFAULT_SETTINGS,
+//       ...(integration.settings || {}),
+//     };
+
+//     setLocalSettings(settings);
+//     setAllowedEventTypesInput(
+//       (settings.allowedEventTypes || []).join(", ")
+//     );
+//     setSecretInput(integration.webhookSecret || "");
+//     setEditingSecret(false);
+//   }, [integration]);
+
 //   if (!integration) return null;
+
+//   const handleToggleLocalSetting = (key) => {
+//     setLocalSettings((current) => ({
+//       ...current,
+//       [key]: !current[key],
+//     }));
+//   };
+
+//   const parsedAllowedEventTypes = allowedEventTypesInput
+//     .split(",")
+//     .map((v) => v.trim())
+//     .filter(Boolean);
+
+//   const hasUnsavedChanges =
+//     localSettings.autoCreateCustomer !==
+//       (integration.settings?.autoCreateCustomer ?? true) ||
+//     localSettings.autoCreatePurchase !==
+//       (integration.settings?.autoCreatePurchase ?? true) ||
+//     JSON.stringify(parsedAllowedEventTypes) !==
+//       JSON.stringify(integration.settings?.allowedEventTypes || []);
+
+//   const handleSaveSettings = () => {
+//     if (!onSaveSettings) return;
+
+//     onSaveSettings(integration.id, {
+//       autoCreateCustomer: localSettings.autoCreateCustomer,
+//       autoCreatePurchase: localSettings.autoCreatePurchase,
+//       allowedEventTypes: parsedAllowedEventTypes,
+//     });
+//   };
 
 //   return (
 //     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -157,57 +232,123 @@
 
 //               {/* Webhook Secret */}
 //               <div>
-//                 <label className="block text-sm font-medium text-gray-700 mb-2">
-//                   Webhook Secret
-//                 </label>
+//                 <div className="flex items-center justify-between mb-2">
+//                   <label className="block text-sm font-medium text-gray-700">
+//                     Webhook Secret
+//                   </label>
 
-//                 <div className="flex gap-2">
-//                   <div className="relative flex-1 min-w-0">
+//                   {!editingSecret && (
+//                     <button
+//                       type="button"
+//                       onClick={() => setEditingSecret(true)}
+//                       className="text-xs font-medium text-green-700 hover:text-green-800"
+//                     >
+//                       {integration.provider &&
+//                       integration.provider !== "GENERIC"
+//                         ? `Paste ${integration.provider} signing secret`
+//                         : "TEST123"}
+//                     </button>
+//                   )}
+//                 </div>
+
+//                 {editingSecret ? (
+//                   <div className="flex gap-2">
 //                     <input
-//                       type={showSecret ? "text" : "password"}
-//                       readOnly
-//                       value={integration.webhookSecret || ""}
-//                       className="w-full px-3 py-2.5 pr-11 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 font-mono"
+//                       type="text"
+//                       autoFocus
+//                       value={secretInput}
+//                       onChange={(e) => setSecretInput(e.target.value)}
+//                       placeholder="Paste the signing secret from your provider's dashboard"
+//                       className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 font-mono"
 //                     />
 
 //                     <button
 //                       type="button"
+//                       disabled={savingSecret || !secretInput.trim()}
 //                       onClick={() =>
-//                         setShowSecret((current) => !current)
+//                         onSaveSecret &&
+//                         onSaveSecret(integration.id, secretInput.trim())
 //                       }
-//                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600"
+//                       className="inline-flex items-center gap-2 px-3 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
 //                     >
-//                       {showSecret ? (
-//                         <EyeOff className="w-4 h-4" />
+//                       {savingSecret ? (
+//                         <Loader2 className="w-4 h-4 animate-spin" />
 //                       ) : (
-//                         <Eye className="w-4 h-4" />
+//                         <Save className="w-4 h-4" />
+//                       )}
+//                       Save
+//                     </button>
+
+//                     <button
+//                       type="button"
+//                       onClick={() => {
+//                         setEditingSecret(false);
+//                         setSecretInput(integration.webhookSecret || "");
+//                       }}
+//                       className="px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700"
+//                     >
+//                       Cancel
+//                     </button>
+//                   </div>
+//                 ) : (
+//                   <div className="flex gap-2">
+//                     <div className="relative flex-1 min-w-0">
+//                       <input
+//                         type={showSecret ? "text" : "password"}
+//                         readOnly
+//                         value={integration.webhookSecret || ""}
+//                         className="w-full px-3 py-2.5 pr-11 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-700 font-mono"
+//                       />
+
+//                       <button
+//                         type="button"
+//                         onClick={() =>
+//                           setShowSecret((current) => !current)
+//                         }
+//                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600"
+//                       >
+//                         {showSecret ? (
+//                           <EyeOff className="w-4 h-4" />
+//                         ) : (
+//                           <Eye className="w-4 h-4" />
+//                         )}
+//                       </button>
+//                     </div>
+
+//                     <button
+//                       type="button"
+//                       onClick={() =>
+//                         onCopy(
+//                           integration.webhookSecret || "",
+//                           "webhookSecret"
+//                         )
+//                       }
+//                       className="inline-flex items-center gap-2 px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+//                     >
+//                       {copiedField === "webhookSecret" ? (
+//                         <>
+//                           <Check className="w-4 h-4 text-green-600" />
+//                           Copied
+//                         </>
+//                       ) : (
+//                         <>
+//                           <Copy className="w-4 h-4" />
+//                           Copy
+//                         </>
 //                       )}
 //                     </button>
 //                   </div>
+//                 )}
 
-//                   <button
-//                     type="button"
-//                     onClick={() =>
-//                       onCopy(
-//                         integration.webhookSecret || "",
-//                         "webhookSecret"
-//                       )
-//                     }
-//                     className="inline-flex items-center gap-2 px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-//                   >
-//                     {copiedField === "webhookSecret" ? (
-//                       <>
-//                         <Check className="w-4 h-4 text-green-600" />
-//                         Copied
-//                       </>
-//                     ) : (
-//                       <>
-//                         <Copy className="w-4 h-4" />
-//                         Copy
-//                       </>
-//                     )}
-//                   </button>
-//                 </div>
+//                 {integration.provider &&
+//                   integration.provider !== "GENERIC" && (
+//                     <p className="text-xs text-gray-500 mt-1.5">
+//                       For {integration.provider}, this must be the signing
+//                       secret from your {integration.provider} dashboard's
+//                       webhook settings - not the value shown above by
+//                       default, which only works for testing.
+//                     </p>
+//                   )}
 //               </div>
 //             </div>
 
@@ -216,13 +357,162 @@
 //               <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
 
 //               <p className="text-sm text-blue-800">
-//                 Keep your webhook secret secure. Your external
-//                 system should send it using the{" "}
+//                 Keep your webhook secret secure. For a Generic
+//                 integration, sign requests with HMAC-SHA256 of
+//                 the raw request body using this secret, and send
+//                 the hex digest in the{" "}
 //                 <code className="font-mono text-xs">
-//                   x-webhook-secret
+//                   x-webhook-signature
 //                 </code>{" "}
-//                 header when sending events to this URL.
+//                 header. Unsigned requests are still accepted for
+//                 testing, but are logged as unverified. Stripe and
+//                 Razorpay integrations sign requests automatically
+//                 using their own headers - just paste their signing
+//                 secret above.
 //               </p>
+//             </div>
+//           </div>
+
+//           {/* Automation Settings */}
+//           <div className="mt-8">
+//             <div className="flex items-center gap-2 mb-4">
+//               <Settings2 className="w-5 h-5 text-green-600" />
+
+//               <h3 className="text-base font-semibold text-gray-900">
+//                 Automation Settings
+//               </h3>
+//             </div>
+
+//             <div className="space-y-2">
+//               {/* Auto-create customer */}
+//               <button
+//                 type="button"
+//                 onClick={() =>
+//                   handleToggleLocalSetting("autoCreateCustomer")
+//                 }
+//                 className="w-full flex items-start justify-between gap-3 p-3.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+//               >
+//                 <div className="flex items-start gap-3">
+//                   <UserPlus className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+//                   <div>
+//                     <p className="text-sm font-medium text-gray-900">
+//                       Automatically create customer
+//                     </p>
+//                     <p className="text-xs text-gray-500 mt-0.5">
+//                       When a payment/order event arrives for a phone
+//                       number that isn't already in your CRM, create a
+//                       new customer. Turn this off if you'd rather
+//                       review and add customers yourself.
+//                     </p>
+//                   </div>
+//                 </div>
+
+//                 <span
+//                   className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+//                     localSettings.autoCreateCustomer
+//                       ? "bg-green-600"
+//                       : "bg-gray-300"
+//                   }`}
+//                 >
+//                   <span
+//                     className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+//                       localSettings.autoCreateCustomer
+//                         ? "translate-x-[18px]"
+//                         : "translate-x-1"
+//                     }`}
+//                   />
+//                 </span>
+//               </button>
+
+//               {/* Auto-create purchase */}
+//               <button
+//                 type="button"
+//                 onClick={() =>
+//                   handleToggleLocalSetting("autoCreatePurchase")
+//                 }
+//                 className="w-full flex items-start justify-between gap-3 p-3.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
+//               >
+//                 <div className="flex items-start gap-3">
+//                   <ReceiptText className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+//                   <div>
+//                     <p className="text-sm font-medium text-gray-900">
+//                       Record purchase
+//                     </p>
+//                     <p className="text-xs text-gray-500 mt-0.5">
+//                       Log the order amount against the customer's
+//                       purchase history.
+//                     </p>
+//                   </div>
+//                 </div>
+
+//                 <span
+//                   className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+//                     localSettings.autoCreatePurchase
+//                       ? "bg-green-600"
+//                       : "bg-gray-300"
+//                   }`}
+//                 >
+//                   <span
+//                     className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+//                       localSettings.autoCreatePurchase
+//                         ? "translate-x-[18px]"
+//                         : "translate-x-1"
+//                     }`}
+//                   />
+//                 </span>
+//               </button>
+
+//               {/* Allowed event types */}
+//               <div className="p-3.5 border border-gray-200 rounded-lg">
+//                 <label className="block text-sm font-medium text-gray-900 mb-1">
+//                   Only process these event types
+//                   <span className="text-gray-400 font-normal">
+//                     {" "}
+//                     (optional)
+//                   </span>
+//                 </label>
+
+//                 <p className="text-xs text-gray-500 mb-2">
+//                   Comma-separated, e.g.{" "}
+//                   <code className="font-mono">
+//                     payment.success, order.completed
+//                   </code>
+//                   . Leave empty to process every event type this
+//                   integration sends.
+//                 </p>
+
+//                 <input
+//                   type="text"
+//                   value={allowedEventTypesInput}
+//                   onChange={(e) =>
+//                     setAllowedEventTypesInput(e.target.value)
+//                   }
+//                   placeholder="e.g. payment.success"
+//                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+//                 />
+//               </div>
+//             </div>
+
+//             <div className="mt-3 flex items-center justify-between">
+//               <p className="text-xs text-gray-500">
+//                 This never sends a WhatsApp message automatically —
+//                 it only controls whether a customer/purchase record
+//                 is created.
+//               </p>
+
+//               <button
+//                 type="button"
+//                 disabled={!hasUnsavedChanges || savingSettings}
+//                 onClick={handleSaveSettings}
+//                 className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors flex-shrink-0"
+//               >
+//                 {savingSettings ? (
+//                   <Loader2 className="w-4 h-4 animate-spin" />
+//                 ) : (
+//                   <Save className="w-4 h-4" />
+//                 )}
+//                 Save settings
+//               </button>
 //             </div>
 //           </div>
 
@@ -388,10 +678,8 @@
 
 
 
-
-
-
 import React, { useEffect, useState } from "react";
+import WebsiteSnippetCard from "./WebsiteSnippetCard";
 import {
   X,
   Copy,
@@ -540,6 +828,7 @@ const IntegrationDetailsModal = ({
       autoCreateCustomer: localSettings.autoCreateCustomer,
       autoCreatePurchase: localSettings.autoCreatePurchase,
       allowedEventTypes: parsedAllowedEventTypes,
+      allowedOrigins: integration.settings?.allowedOrigins || [],
     });
   };
 
@@ -576,6 +865,20 @@ const IntegrationDetailsModal = ({
 
         {/* Content */}
         <div className="overflow-y-auto px-6 py-6">
+          {/* Website: one line of code to paste on the customer's site */}
+          {integration.provider === "WEBSITE" && (
+            <WebsiteSnippetCard
+              integration={integration}
+              onSaveSettings={onSaveSettings}
+              savingSettings={savingSettings}
+              onCopy={onCopy}
+              copiedField={copiedField}
+            />
+          )}
+
+          {/* Webhook, automation and events do not apply to WEBSITE */}
+          {integration.provider !== "WEBSITE" && (
+          <>
           {/* Webhook Configuration */}
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -639,7 +942,7 @@ const IntegrationDetailsModal = ({
                       {integration.provider &&
                       integration.provider !== "GENERIC"
                         ? `Paste ${integration.provider} signing secret`
-                        : "TEST123"}
+                        : "Set custom secret"}
                     </button>
                   )}
                 </div>
@@ -1016,6 +1319,9 @@ const IntegrationDetailsModal = ({
               </div>
             )}
           </div>
+
+          </>
+          )}
 
           {/* Integration details */}
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">

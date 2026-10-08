@@ -53,6 +53,7 @@ const razorpayAdapter = require("./razorpayAdapter");
 const squareAdapter = require("./squareAdapter");
 const shopifyAdapter = require("./shopifyAdapter");
 const woocommerceAdapter = require("./woocommerceAdapter");
+const websiteAdapter = require("./websiteAdapter");
 
 // ------------------------------------------------------
 // REGISTRY
@@ -67,6 +68,7 @@ const ADAPTERS = {
   SQUARE: squareAdapter,
   SHOPIFY: shopifyAdapter,
   WOOCOMMERCE: woocommerceAdapter,
+  WEBSITE: websiteAdapter,
   GENERIC: genericAdapter,
 };
 

@@ -229,7 +229,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
  
- 
+const publicLeadRoutes = require("./routes/publicLeadRoutes");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const customerRoutes = require("./routes/customerRoutes");
@@ -267,6 +267,8 @@ const app = express();
 // GLOBAL MIDDLEWARE
 // ======================================================
  
+app.use("/api/public", publicLeadRoutes);
+
 app.use(
   cors({
     origin: true,
