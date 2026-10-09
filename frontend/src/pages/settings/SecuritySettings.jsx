@@ -8,8 +8,12 @@
 // } from "lucide-react";
 
 // import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
+// import { useAuthStore } from "../../store/authStore";
 
 // function SecuritySettings() {
+//   const { user } = useAuthStore();
+//   const isAdmin = user?.role === "ADMIN";
+
 //   const [loadingStatus, setLoadingStatus] = useState(true);
 //   const [connectedAccount, setConnectedAccount] = useState(null);
 
@@ -125,8 +129,9 @@
 //               </h2>
 
 //               <p className="mt-2 text-sm text-slate-500">
-//                 Connect your WhatsApp Business Account to send and receive
-//                 WhatsApp messages through the CRM.
+//                 {isAdmin
+//                   ? "Connect your WhatsApp Business Account to send and receive WhatsApp messages through the CRM."
+//                   : "The WhatsApp Business Account connected to this CRM. Only an admin can connect or change it."}
 //               </p>
 
 //               <div className="mt-3 flex items-center gap-2">
@@ -155,11 +160,28 @@
 
 //               </div>
 
+//               {/* Employee view-only extras */}
+//               {!isAdmin && !loadingStatus && isConnected && connectedAccount?.whatsappBusinessName && (
+//                 <p className="mt-2 text-sm text-slate-500">
+//                   Business name:{" "}
+//                   <span className="font-medium text-slate-700">
+//                     {connectedAccount.whatsappBusinessName}
+//                   </span>
+//                 </p>
+//               )}
+
+//               {!isAdmin && !loadingStatus && !isConnected && (
+//                 <p className="mt-2 text-sm text-slate-500">
+//                   No WhatsApp account is connected yet. Please ask your admin to connect one.
+//                 </p>
+//               )}
+
 //             </div>
 
 //           </div>
 
-//           <ConnectWhatsApp onConnected={fetchWhatsAppStatus} />
+//           {/* Connect buttons are visible to ADMIN only */}
+//           {isAdmin && <ConnectWhatsApp onConnected={fetchWhatsAppStatus} />}
 
 //         </div>
 
@@ -172,8 +194,8 @@
 // export default SecuritySettings;
 
 
+
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   Lock,
@@ -183,11 +205,13 @@ import {
 
 import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 import { useAuthStore } from "../../store/authStore";
+import ChangePasswordModal from "../../components/common/ChangePasswordModal";
 
 function SecuritySettings() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === "ADMIN";
 
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [connectedAccount, setConnectedAccount] = useState(null);
 
@@ -265,14 +289,15 @@ function SecuritySettings() {
 
           </div>
 
-          <Link
-            to="/change-password"
+          <button
+            type="button"
+            onClick={() => setShowChangePassword(true)}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-6 py-3 font-semibold text-black transition hover:bg-[#128C7E]"
           >
             Change Password
 
             <ChevronRight size={18} />
-          </Link>
+          </button>
 
         </div>
 
@@ -360,6 +385,11 @@ function SecuritySettings() {
         </div>
 
       </div>
+
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
 
     </div>
   );
