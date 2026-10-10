@@ -370,6 +370,8 @@
 //   );
 // }
 
+
+
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Sparkles } from "lucide-react";
@@ -677,6 +679,11 @@ export default function Campaigns() {
           setAiCampaign(null);
         }}
         aiCampaign={aiCampaign}
+        onCreated={(campaign) => {
+          // Straight after creation, open the Send Campaign modal
+          setSelectedCampaign(campaign);
+          setShowSendModal(true);
+        }}
       />
 
       {/* ========================= */}

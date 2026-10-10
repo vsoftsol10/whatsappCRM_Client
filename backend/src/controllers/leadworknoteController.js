@@ -37,8 +37,8 @@ const getLeadWorkNotes = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const lead = await prisma.lead.findUnique({
-      where: { id: Number(id) },
+    const lead = await prisma.lead.findFirst({
+      where: { id: Number(id), companyId: req.user.companyId },
     });
 
     if (!lead) {
@@ -93,8 +93,8 @@ const createLeadWorkNote = async (req, res) => {
       });
     }
 
-    const lead = await prisma.lead.findUnique({
-      where: { id: Number(id) },
+    const lead = await prisma.lead.findFirst({
+      where: { id: Number(id), companyId: req.user.companyId },
     });
 
     if (!lead) {
@@ -140,6 +140,7 @@ const createLeadWorkNote = async (req, res) => {
         }
       } else {
         await notifyAdmins({
+          companyId: lead.companyId,
           title: "New Work Note",
           message,
           type: NotificationType.LEAD,
@@ -184,8 +185,8 @@ const updateLeadWorkNote = async (req, res) => {
       });
     }
 
-    const existingNote = await prisma.leadWorkNote.findUnique({
-      where: { id: noteId },
+    const existingNote = await prisma.leadWorkNote.findFirst({
+      where: { id: noteId, lead: { companyId: req.user.companyId } },
     });
 
     if (!existingNote) {
@@ -234,8 +235,8 @@ const deleteLeadWorkNote = async (req, res) => {
   try {
     const { noteId } = req.params;
 
-    const existingNote = await prisma.leadWorkNote.findUnique({
-      where: { id: noteId },
+    const existingNote = await prisma.leadWorkNote.findFirst({
+      where: { id: noteId, lead: { companyId: req.user.companyId } },
     });
 
     if (!existingNote) {

@@ -9,6 +9,7 @@ const {
 
 // Change this path to your actual authentication middleware
 const authMiddleware = require("../middleware/authMiddleware");
+const adminOnly = require("../middleware/adminOnly");
 
 const router = express.Router();
 
@@ -17,15 +18,15 @@ const router = express.Router();
 //////////////////////////////////////////////////////
 
 // Create manual backup
-router.post("/", authMiddleware, createBackup);
+router.post("/", authMiddleware, adminOnly, createBackup);
 
 // List company backups
-router.get("/", authMiddleware, getBackups);
+router.get("/", authMiddleware, adminOnly, getBackups);
 
 // Get one backup
-router.get("/:id", authMiddleware, getBackupById);
+router.get("/:id", authMiddleware, adminOnly, getBackupById);
 
 // Download backup
-router.get("/:id/download", authMiddleware, downloadBackup);
+router.get("/:id/download", authMiddleware, adminOnly, downloadBackup);
 
 module.exports = router;

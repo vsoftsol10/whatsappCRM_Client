@@ -262,6 +262,23 @@
 //      * messageContent is treated as campaign-specific
 //      * variable/custom content for now.
 //      */
+
+//     // 👈 NEW: if the newly selected template doesn't have an IMAGE
+//     // header, drop any image that was attached for the previous
+//     // template — otherwise it silently rides along and gets rejected
+//     // by Meta at send time because the new template has no header
+//     // component to put it in.
+//     const newTemplate = templates.find(
+//       (template) => String(template.id) === String(templateId)
+//     );
+
+//     if (newTemplate && newTemplate.headerType !== "IMAGE" && image) {
+//       removeImage();
+//       toast(
+//         "This template doesn't use an image header — the attached image was removed.",
+//         { icon: "ℹ️" }
+//       );
+//     }
 //   };
 
 //   // ============================================================
@@ -525,6 +542,29 @@
 //     ) {
 //       toast.error(
 //         "Only approved templates can be used for campaigns."
+//       );
+
+//       return;
+//     }
+
+//     // ==========================================================
+//     // TEMPLATE <-> IMAGE CONSISTENCY
+//     // ==========================================================
+//     // 👈 NEW: the template's approved header format and the campaign
+//     // image must match, or Meta rejects the send outright. Catch this
+//     // in the UI before it ever reaches the backend.
+
+//     if (image && selectedTemplate.headerType !== "IMAGE") {
+//       toast.error(
+//         "This template doesn't have an approved IMAGE header, so it can't be sent with an image. Remove the image or choose an IMAGE-header template."
+//       );
+
+//       return;
+//     }
+
+//     if (!image && selectedTemplate.headerType === "IMAGE") {
+//       toast.error(
+//         "This template requires an IMAGE header — please upload a campaign image."
 //       );
 
 //       return;
@@ -1047,12 +1087,33 @@
 
 //               </div>
 
+//               {/* 👈 NEW: the image only matters if the SELECTED
+//                   template was approved with an IMAGE header — this was
+//                   previously shown unconditionally, letting people
+//                   attach an image to templates that have no header at
+//                   all (which Meta then rejects at send time). */}
+//               {selectedTemplate?.headerType === "IMAGE" ? (
+//                 <p className="mb-2 text-xs text-[#128C7E]">
+//                   This template requires an image header — an image is required.
+//                 </p>
+//               ) : selectedTemplate ? (
+//                 <p className="mb-2 text-xs text-amber-600">
+//                   This template doesn't have an IMAGE header, so any image
+//                   you attach here won't be sent — Meta will reject the
+//                   message. Choose an IMAGE-header template to send media.
+//                 </p>
+//               ) : null}
+
 //               <input
 //                 ref={fileInputRef}
 //                 type="file"
 //                 accept="image/jpeg,image/png,image/webp"
 //                 onChange={handleImageChange}
-//                 disabled={submitting}
+//                 disabled={
+//                   submitting ||
+//                   (!!selectedTemplate &&
+//                     selectedTemplate.headerType !== "IMAGE")
+//                 }
 //                 className="hidden"
 //               />
 
@@ -1063,7 +1124,11 @@
 //                   onClick={() =>
 //                     fileInputRef.current?.click()
 //                   }
-//                   disabled={submitting}
+//                   disabled={
+//                     submitting ||
+//                     (!!selectedTemplate &&
+//                       selectedTemplate.headerType !== "IMAGE")
+//                   }
 //                   className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#25D366] bg-green-50 p-8 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50"
 //                 >
 
@@ -1439,11 +1504,13 @@
 // }
 
 
+
+
+
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Search, ImagePlus, CalendarClock, Users, FileText } from "lucide-react";
+import { X, ImagePlus, CalendarClock, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 
-import { getCustomers } from "../../api/customerApi";
 import useCampaignStore from "../../store/campaignStore";
 
 // Change this import path if your template API is located elsewhere
@@ -1453,6 +1520,7 @@ export default function CreateCampaignModal({
   isOpen,
   onClose,
   aiCampaign,
+  onCreated, // called with the new campaign after successful creation
 }) {
   const { addCampaign } = useCampaignStore();
 
@@ -1460,17 +1528,14 @@ export default function CreateCampaignModal({
   // DATA
   // ============================================================
 
-  const [customers, setCustomers] = useState([]);
   const [templates, setTemplates] = useState([]);
 
-  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
   // ============================================================
   // SELECTION
   // ============================================================
 
-  const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
   // ============================================================
@@ -1478,7 +1543,6 @@ export default function CreateCampaignModal({
   // ============================================================
 
   const [submitting, setSubmitting] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState("");
 
   // ============================================================
   // IMAGE
@@ -1512,10 +1576,7 @@ export default function CreateCampaignModal({
       scheduledAt: "",
     });
 
-    setSelectedCustomers([]);
     setSelectedTemplateId("");
-
-    setCustomerSearch("");
 
     setImage(null);
     setImagePreview("");
@@ -1534,7 +1595,6 @@ export default function CreateCampaignModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    fetchCustomers();
     fetchApprovedTemplates();
 
     if (!aiCampaign) {
@@ -1566,44 +1626,6 @@ export default function CreateCampaignModal({
         aiCampaign.messageContent || "",
     }));
   }, [aiCampaign]);
-
-  // ============================================================
-  // FETCH CUSTOMERS
-  // ============================================================
-
-  const fetchCustomers = async () => {
-    try {
-      setLoadingCustomers(true);
-
-      const response = await getCustomers();
-
-      console.log("Customers Response:", response);
-
-      let customerList = [];
-
-      if (Array.isArray(response)) {
-        customerList = response;
-      } else if (Array.isArray(response?.data)) {
-        customerList = response.data;
-      } else if (Array.isArray(response?.customers)) {
-        customerList = response.customers;
-      } else if (
-        Array.isArray(response?.data?.customers)
-      ) {
-        customerList = response.data.customers;
-      }
-
-      setCustomers(customerList);
-    } catch (error) {
-      console.error("Fetch customers error:", error);
-
-      toast.error("Failed to load customers.");
-
-      setCustomers([]);
-    } finally {
-      setLoadingCustomers(false);
-    }
-  };
 
   // ============================================================
   // FETCH APPROVED TEMPLATES
@@ -1819,82 +1841,6 @@ export default function CreateCampaignModal({
   };
 
   // ============================================================
-  // TOGGLE CUSTOMER
-  // ============================================================
-
-  const toggleCustomer = (id) => {
-    setSelectedCustomers((prev) =>
-      prev.includes(id)
-        ? prev.filter(
-            (customerId) =>
-              customerId !== id
-          )
-        : [...prev, id]
-    );
-  };
-
-  // ============================================================
-  // SELECT ALL
-  // ============================================================
-
-  const handleSelectAll = () => {
-    const allCustomerIds =
-      filteredCustomers.map(
-        (customer) => customer.id
-      );
-
-    setSelectedCustomers((prev) => [
-      ...new Set([
-        ...prev,
-        ...allCustomerIds,
-      ]),
-    ]);
-  };
-
-  // ============================================================
-  // CLEAR ALL
-  // ============================================================
-
-  const handleClearAll = () => {
-    setSelectedCustomers([]);
-  };
-
-  // ============================================================
-  // FILTER CUSTOMERS
-  // ============================================================
-
-  const filteredCustomers = useMemo(() => {
-    const search =
-      customerSearch
-        .trim()
-        .toLowerCase();
-
-    if (!search) {
-      return customers;
-    }
-
-    return customers.filter((customer) => {
-      const name =
-        customer.name
-          ?.toLowerCase() || "";
-
-      const phone =
-        customer.phone
-          ?.toLowerCase() || "";
-
-      const email =
-        customer.email
-          ?.toLowerCase() || "";
-
-      return (
-        name.includes(search) ||
-        phone.includes(search) ||
-        email.includes(search)
-      );
-    });
-  }, [customers, customerSearch]);
-
-  // ============================================================
   // VALIDATE SCHEDULE
   // ============================================================
 
@@ -2011,18 +1957,6 @@ export default function CreateCampaignModal({
     }
 
     // ==========================================================
-    // CUSTOMERS
-    // ==========================================================
-
-    if (selectedCustomers.length === 0) {
-      toast.error(
-        "Please select at least one customer."
-      );
-
-      return;
-    }
-
-    // ==========================================================
     // SCHEDULE
     // ==========================================================
 
@@ -2063,9 +1997,6 @@ export default function CreateCampaignModal({
         scheduledAt:
           formData.scheduledAt || "",
 
-        customerIds:
-          selectedCustomers,
-
         image,
       });
 
@@ -2083,6 +2014,11 @@ export default function CreateCampaignModal({
       resetForm();
 
       onClose();
+
+      // Open the Send Campaign flow for the campaign we just created
+      if (onCreated) {
+        onCreated(campaign);
+      }
     } catch (error) {
       console.error(
         "Create campaign failed:",
@@ -2155,7 +2091,7 @@ export default function CreateCampaignModal({
               </h2>
 
               <p className="mt-1 text-sm text-gray-700">
-                Send an approved WhatsApp template to your audience
+                Create a campaign using an approved WhatsApp template
               </p>
             </div>
 
@@ -2634,194 +2570,6 @@ export default function CreateCampaignModal({
             </div>
 
             {/* ==================================================
-                AUDIENCE
-            ================================================== */}
-
-            <div>
-
-              <div className="mb-3 flex items-center justify-between">
-
-                <div>
-
-                  <div className="flex items-center gap-2">
-
-                    <Users
-                      size={18}
-                      className="text-[#128C7E]"
-                    />
-
-                    <label className="font-medium text-gray-700">
-                      Campaign Audience
-                      <span className="text-red-500">
-                        {" "}*
-                      </span>
-                    </label>
-
-                  </div>
-
-                  <p className="mt-1 text-xs text-gray-500">
-                    Select customers who should receive this campaign.
-                  </p>
-
-                </div>
-
-                <span className="rounded-full bg-[#DCF8C6] px-3 py-1 text-sm font-semibold text-[#128C7E]">
-                  {selectedCustomers.length} selected
-                </span>
-
-              </div>
-
-              {/* Search */}
-
-              <div className="relative mb-3">
-
-                <Search
-                  size={18}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                />
-
-                <input
-                  type="text"
-                  value={customerSearch}
-                  onChange={(e) =>
-                    setCustomerSearch(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Search customers by name, phone or email..."
-                  disabled={submitting}
-                  className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-4 outline-none focus:border-[#25D366] disabled:bg-gray-100"
-                />
-
-              </div>
-
-              {/* Audience actions */}
-
-              <div className="mb-3 flex gap-2">
-
-                <button
-                  type="button"
-                  onClick={handleSelectAll}
-                  disabled={
-                    submitting ||
-                    filteredCustomers.length === 0
-                  }
-                  className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Select All
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClearAll}
-                  disabled={
-                    submitting ||
-                    selectedCustomers.length === 0
-                  }
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Clear All
-                </button>
-
-              </div>
-
-              {/* Customer list */}
-
-              <div className="rounded-xl border border-gray-300 bg-gray-50 p-4">
-
-                {loadingCustomers ? (
-
-                  <div className="py-10 text-center text-gray-500">
-                    Loading customers...
-                  </div>
-
-                ) : filteredCustomers.length === 0 ? (
-
-                  <div className="py-10 text-center text-gray-500">
-
-                    <Users
-                      size={30}
-                      className="mx-auto mb-2 text-gray-400"
-                    />
-
-                    <p>
-                      No customers found.
-                    </p>
-
-                  </div>
-
-                ) : (
-
-                  <div className="max-h-64 space-y-1 overflow-y-auto">
-
-                    {filteredCustomers.map(
-                      (customer) => {
-
-                        const isSelected =
-                          selectedCustomers.includes(
-                            customer.id
-                          );
-
-                        return (
-                          <label
-                            key={customer.id}
-                            className={`flex items-center gap-3 rounded-lg p-3 transition ${
-                              submitting
-                                ? "cursor-not-allowed opacity-60"
-                                : "cursor-pointer hover:bg-white"
-                            } ${
-                              isSelected
-                                ? "bg-green-50"
-                                : ""
-                            }`}
-                          >
-
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() =>
-                                toggleCustomer(
-                                  customer.id
-                                )
-                              }
-                              disabled={submitting}
-                              className="h-4 w-4 accent-[#25D366]"
-                            />
-
-                            <div className="min-w-0 flex-1">
-
-                              <p className="truncate font-medium text-gray-800">
-                                {customer.name ||
-                                  "Unnamed Customer"}
-                              </p>
-
-                              <p className="text-sm text-gray-500">
-                                {customer.phone ||
-                                  "No phone number"}
-                              </p>
-
-                            </div>
-
-                            {isSelected && (
-                              <span className="text-xs font-semibold text-[#128C7E]">
-                                Selected
-                              </span>
-                            )}
-
-                          </label>
-                        );
-                      }
-                    )}
-
-                  </div>
-
-                )}
-
-              </div>
-
-            </div>
-
-            {/* ==================================================
                 CAMPAIGN SUMMARY
             ================================================== */}
 
@@ -2831,7 +2579,7 @@ export default function CreateCampaignModal({
                 Campaign Summary
               </h4>
 
-              <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+              <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
 
                 <div>
                   <p className="text-gray-500">
@@ -2841,16 +2589,6 @@ export default function CreateCampaignModal({
                   <p className="font-medium text-gray-800">
                     {selectedTemplate?.name ||
                       "Not selected"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500">
-                    Audience
-                  </p>
-
-                  <p className="font-medium text-gray-800">
-                    {selectedCustomers.length} customers
                   </p>
                 </div>
 
@@ -2942,4 +2680,5 @@ export default function CreateCampaignModal({
     </div>
   );
 }
+
 

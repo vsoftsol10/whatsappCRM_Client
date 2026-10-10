@@ -1,7 +1,5 @@
-
-
 // import { useEffect, useMemo, useState } from "react";
-// import { LayoutGrid, List } from "lucide-react";
+// import { LayoutGrid, PanelsTopLeft } from "lucide-react";
 
 // import useLeadStore from "../store/leadStore";
 // import useEmployeeStore from "../store/employeeStore";
@@ -18,6 +16,39 @@
 // import useCustomerStore from "../store/customerStore";
 // import Pagination from "../components/common/Pagination";
 // import ConfirmModal from "../components/common/ConfirmModal";
+
+// // Table / Grid switch with icon + label (active option is green)
+// function ViewToggle({ viewMode, setViewMode }) {
+//   const options = [
+//     { value: "list", label: "Table", icon: PanelsTopLeft },
+//     { value: "grid", label: "Grid", icon: LayoutGrid },
+//   ];
+
+//   return (
+//     <div className="flex items-center gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
+//       {options.map(({ value, label, icon: Icon }) => {
+//         const isActive = viewMode === value;
+
+//         return (
+//           <button
+//             key={value}
+//             type="button"
+//             onClick={() => setViewMode(value)}
+//             aria-pressed={isActive}
+//             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+//               isActive
+//                 ? "bg-[#25D366] text-black shadow-sm"
+//                 : "text-slate-500 hover:bg-gray-100 hover:text-slate-800"
+//             }`}
+//           >
+//             <Icon size={18} />
+//             {label}
+//           </button>
+//         );
+//       })}
+//     </div>
+//   );
+// }
 
 // export default function Lead() {
 //   const {
@@ -39,6 +70,7 @@
 //   const [selectedStatus, setSelectedStatus] =
 //     useState("ALL");
 
+//   // "grid" = card view, "list" = table view
 //   const [viewMode, setViewMode] =
 //     useState("grid");
 
@@ -268,31 +300,12 @@
 
 //         <div className="flex flex-wrap items-center gap-3">
 
-//           {/* Grid / List Toggle */}
+//           {/* Table / Grid Toggle */}
 
-//           <div className="flex items-center rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-
-//             <button
-//               onClick={() => setViewMode("grid")}
-//               className={`p-2 transition ${viewMode === "grid"
-//                 ? "bg-[#25D366]"
-//                 : "hover:bg-gray-100"
-//                 }`}
-//             >
-//               <LayoutGrid size={18} />
-//             </button>
-
-//             <button
-//               onClick={() => setViewMode("list")}
-//               className={`p-2 transition ${viewMode === "list"
-//                 ? "bg-[#25D366]"
-//                 : "hover:bg-gray-100"
-//                 }`}
-//             >
-//               <List size={18} />
-//             </button>
-
-//           </div>
+//           <ViewToggle
+//             viewMode={viewMode}
+//             setViewMode={setViewMode}
+//           />
 
 //           <button
 //             onClick={() => setShowAddModal(true)}
@@ -427,6 +440,8 @@
 
 
 
+
+
 import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, PanelsTopLeft } from "lucide-react";
 
@@ -521,7 +536,10 @@ export default function Lead() {
   const [currentPage, setCurrentPage] =
     useState(1);
 
-  const itemsPerPage = 10;
+  // Grid view: 12 per page, because 12 divides evenly into the 3-column
+  // (xl), 2-column (md) and 1-column layouts, so the last row is never
+  // left with a single stray card. List/table view keeps 10 per page.
+  const itemsPerPage = viewMode === "grid" ? 12 : 10;
 
   useEffect(() => {
     fetchLeads();

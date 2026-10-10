@@ -1,3 +1,4 @@
+
 // import apiClient from "./apiClient";
 
 // // ===============================
@@ -26,8 +27,6 @@
 //   formData.append("type", campaignData.type);
 //   formData.append("messageContent", campaignData.messageContent);
 
-//   // 👈 NEW: this was missing, so templateId never reached the backend
-//   // and every campaign was silently created with no template attached.
 //   if (campaignData.templateId) {
 //     formData.append("templateId", campaignData.templateId);
 //   }
@@ -36,25 +35,17 @@
 //     formData.append("scheduledAt", campaignData.scheduledAt);
 //   }
 
-//   // Customer IDs
 //   campaignData.customerIds.forEach((id) => {
 //     formData.append("customerIds", id);
 //   });
 
-//   // Image
 //   if (campaignData.image) {
 //     formData.append("image", campaignData.image);
 //   }
 
-//   const response = await apiClient.post(
-//     "/api/campaigns",
-//     formData,
-//     {
-//       headers: {
-//         "Content-Type": "multipart/form-data",
-//       },
-//     }
-//   );
+//   const response = await apiClient.post("/api/campaigns", formData, {
+//     headers: { "Content-Type": "multipart/form-data" },
+//   });
 
 //   return response.data;
 // };
@@ -62,10 +53,7 @@
 // // ===============================
 // // UPDATE CAMPAIGN
 // // ===============================
-// export const updateCampaign = async (
-//   id,
-//   campaignData
-// ) => {
+// export const updateCampaign = async (id, campaignData) => {
 //   const formData = new FormData();
 
 //   if (campaignData.name !== undefined) {
@@ -76,17 +64,12 @@
 //     formData.append("type", campaignData.type);
 //   }
 
-//   // 👈 NEW: same bug existed here — templateId was never appended,
-//   // so editing a campaign's template silently did nothing.
 //   if (campaignData.templateId !== undefined) {
 //     formData.append("templateId", campaignData.templateId || "");
 //   }
 
 //   if (campaignData.messageContent !== undefined) {
-//     formData.append(
-//       "messageContent",
-//       campaignData.messageContent
-//     );
+//     formData.append("messageContent", campaignData.messageContent);
 //   }
 
 //   if (campaignData.status !== undefined) {
@@ -94,29 +77,16 @@
 //   }
 
 //   if (campaignData.scheduledAt) {
-//     formData.append(
-//       "scheduledAt",
-//       campaignData.scheduledAt
-//     );
+//     formData.append("scheduledAt", campaignData.scheduledAt);
 //   }
 
 //   if (campaignData.image) {
-//     formData.append(
-//       "image",
-//       campaignData.image
-//     );
+//     formData.append("image", campaignData.image);
 //   }
 
-//   const response = await apiClient.put(
-//     `/api/campaigns/${id}`,
-//     formData,
-//     {
-//       headers: {
-//         "Content-Type":
-//           "multipart/form-data",
-//       },
-//     }
-//   );
+//   const response = await apiClient.put(`/api/campaigns/${id}`, formData, {
+//     headers: { "Content-Type": "multipart/form-data" },
+//   });
 
 //   return response.data;
 // };
@@ -125,10 +95,7 @@
 // // DELETE CAMPAIGN
 // // ===============================
 // export const deleteCampaign = async (id) => {
-//   const response = await apiClient.delete(
-//     `/api/campaigns/${id}`
-//   );
-
+//   const response = await apiClient.delete(`/api/campaigns/${id}`);
 //   return response.data;
 // };
 
@@ -136,35 +103,49 @@
 // // GENERATE AI CAMPAIGN
 // // ===============================
 // export const generateAICampaign = async (prompt) => {
-//   const response = await apiClient.post(
-//     "/api/campaigns/generate-ai",
-//     {
-//       prompt,
-//     }
-//   );
+//   const response = await apiClient.post("/api/campaigns/generate-ai", {
+//     prompt,
+//   });
 
 //   return response.data;
 // };
 
 // // ===============================
-// // SEND CAMPAIGN TO CUSTOMERS
+// // SEND CAMPAIGN
 // // ===============================
-// export const sendCampaign = async (
-//   campaignId,
-//   customerIds
-// ) => {
-
+// // customerIds is now OPTIONAL:
+// //   - omit it (or pass []) to send to every recipient on the campaign
+// //   - pass specific customer IDs to send only to those recipients,
+// //     e.g. one new customer you added after the first send
+// // Works no matter the campaign's current status — nothing is blocked
+// // on the backend anymore, so this can be called any number of times.
+// export const sendCampaign = async (campaignId, customerIds = []) => {
 //   console.log("Sending Campaign...");
 //   console.log("Campaign:", campaignId);
-//   console.log("Customers:", customerIds);
+//   console.log("Recipients:", customerIds.length ? customerIds : "ALL");
 
-//   const response = await apiClient.post(
-//     "/api/campaigns/send",
-//     {
-//       campaignId,
-//       customerIds,
-//     }
-//   );
+//   const response = await apiClient.post("/api/campaigns/send", {
+//     campaignId,
+//     recipientIds: customerIds && customerIds.length ? customerIds : undefined,
+//   });
+
+//   console.log(response.data);
+
+//   return response.data;
+// };
+
+// // ===============================
+// // RESEND CAMPAIGN TO ALL RECIPIENTS
+// // ===============================
+// // Same as calling sendCampaign(campaignId) with no recipientIds —
+// // kept as its own function since your UI already calls it by name.
+// export const resendCampaign = async (campaignId) => {
+//   console.log("Resending Campaign...");
+//   console.log("Campaign:", campaignId);
+
+//   const response = await apiClient.post("/api/campaigns/resend", {
+//     campaignId,
+//   });
 
 //   console.log(response.data);
 
@@ -220,7 +201,7 @@ export const createCampaign = async (campaignData) => {
     formData.append("scheduledAt", campaignData.scheduledAt);
   }
 
-  campaignData.customerIds.forEach((id) => {
+  (campaignData.customerIds || []).forEach((id) => {
     formData.append("customerIds", id);
   });
 

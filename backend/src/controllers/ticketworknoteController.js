@@ -37,8 +37,8 @@ const getTicketWorkNotes = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const ticket = await prisma.ticket.findUnique({
-      where: { id },
+    const ticket = await prisma.ticket.findFirst({
+      where: { id, companyId: req.user.companyId },
     });
 
     if (!ticket) {
@@ -93,8 +93,8 @@ const createTicketWorkNote = async (req, res) => {
       });
     }
 
-    const ticket = await prisma.ticket.findUnique({
-      where: { id },
+    const ticket = await prisma.ticket.findFirst({
+      where: { id, companyId: req.user.companyId },
     });
 
     if (!ticket) {
@@ -140,6 +140,7 @@ const createTicketWorkNote = async (req, res) => {
         }
       } else {
         await notifyAdmins({
+          companyId: ticket.companyId,
           title: "New Work Note",
           message,
           type: NotificationType.TICKET,
@@ -184,8 +185,8 @@ const updateTicketWorkNote = async (req, res) => {
       });
     }
 
-    const existingNote = await prisma.ticketWorkNote.findUnique({
-      where: { id: noteId },
+    const existingNote = await prisma.ticketWorkNote.findFirst({
+      where: { id: noteId, ticket: { companyId: req.user.companyId } },
     });
 
     if (!existingNote) {
@@ -234,8 +235,8 @@ const deleteTicketWorkNote = async (req, res) => {
   try {
     const { noteId } = req.params;
 
-    const existingNote = await prisma.ticketWorkNote.findUnique({
-      where: { id: noteId },
+    const existingNote = await prisma.ticketWorkNote.findFirst({
+      where: { id: noteId, ticket: { companyId: req.user.companyId } },
     });
 
     if (!existingNote) {
