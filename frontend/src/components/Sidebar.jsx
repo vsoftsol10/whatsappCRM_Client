@@ -1,499 +1,9 @@
-// import { useState, useEffect } from "react";
-// import { NavLink, useLocation } from "react-router-dom";
-// import { useAuthStore } from "../store/authStore";
-
-
-// import {
-//   FaTachometerAlt,
-//   FaComments,
-//   FaUsers,
-//   FaTasks,
-//   FaUserTie,
-//   FaCog,
-//   FaUserPlus,
-//   FaTicketAlt,
-//   FaBullhorn,
-//   FaFileAlt,
-//   FaChevronRight,
-//   FaUser,
-//   FaLock,
-//   FaCreditCard,
-//   FaBox,
-//   FaHistory,
-//   FaRobot,
-//   FaDatabase,
-//   FaPlug,
-// } from "react-icons/fa";
-
-
-// const sections = [
-
-//   {
-//     id: "main",
-//     title: "Main",
-//     items: [
-//       {
-//         name: "Dashboard",
-//         icon: FaTachometerAlt,
-//         path: "/dashboard",
-//       },
-//       {
-//         name: "Conversations",
-//         icon: FaComments,
-//         path: "/conversations",
-//       },
-//     ],
-//   },
-
-
-//   {
-//     id: "crm",
-//     title: "CRM",
-//     items: [
-//       {
-//         name: "Customers",
-//         icon: FaUsers,
-//         path: "/customers",
-//       },
-//       {
-//         name: "Leads",
-//         icon: FaUserPlus,
-//         path: "/leads",
-//       },
-//       {
-//         name: "Campaigns",
-//         icon: FaBullhorn,
-//         path: "/campaigns",
-//       },
-//       {
-//         name: "Templates",
-//         icon: FaFileAlt,
-//         path: "/templates",
-//       },
-//     ],
-//   },
-
-
-//   {
-//     id: "management",
-//     title: "Management",
-//     items: [
-//       {
-//         name: "Employees",
-//         icon: FaUserTie,
-//         path: "/employees",
-//       },
-//       {
-//         name: "Tickets",
-//         icon: FaTicketAlt,
-//         path: "/tickets",
-//       },
-//     ],
-//   },
-
-
-//   {
-//     id: "productivity",
-//     title: "Productivity",
-//     items: [
-//       {
-//         name: "Tasks",
-//         icon: FaTasks,
-//         path: "/tasks",
-//       },
-//     ],
-//   },
-
-
-//   {
-//     id: "settings",
-//     title: "Settings",
-//     items: [
-//       // {
-//       //   name: "Profile",
-//       //   icon: FaUser,
-//       //   path: "/settings/profile",
-//       // },
-//       {
-//         name: "Security",
-//         icon: FaLock,
-//         path: "/settings/security",
-//       },
-//       // {
-//       //   name: "Billing & Subscription",
-//       //   icon: FaCreditCard,
-//       //   path: "/settings/billing",
-//       // },
-//       {
-//         name: "Integrations",
-//         icon: FaPlug,
-//         path: "/settings/integrations",
-//       },
-//       {
-//         name: "Backup & Restore",
-//         icon: FaDatabase,
-//         path: "/backup",
-//       },
-//       {
-//         name: "SaaS Support",
-//         icon: FaTicketAlt,
-//         path: "/settings/support",
-//       },
-//       {
-//         name: "Audit Logs",
-//         icon: FaHistory,
-//         path: "/settings/audit-logs",
-//       },
-//       {
-//         name: "AI Auto-Reply",
-//         icon: FaRobot,
-//         path: "/settings/ai-auto-reply",
-//       },
-
-//     ],
-//   },
-
-// ];
-
-
-
-// export default function Sidebar({
-//   isOpen = false,
-//   onClose = () => { },
-// }) {
-
-
-//   const user = useAuthStore(
-//     (state) => state.user
-//   );
-
-//   const companyName = user?.companyName || "Your Company";
-//   const companyInitial = companyName.charAt(0).toUpperCase();
-//   const companyLogo = user?.companyLogo;
-//   const [logoError, setLogoError] = useState(false);
-
-
-//   const location = useLocation();
-
-
-//   const [openSection, setOpenSection] = useState("main");
-
-//   useEffect(() => {
-
-//     const activeSection =
-//       sections.find(section =>
-//         section.items.some(
-//           item =>
-//             location.pathname.startsWith(item.path)
-//         )
-//       );
-
-
-//     if (activeSection) {
-//       setOpenSection(activeSection.id);
-//     }
-
-//   }, [location.pathname]);
-
-
-
-//   const toggleSection = (id) => {
-
-//     setOpenSection(prev =>
-//       prev === id ? "" : id
-//     );
-
-//   };
-
-//   const linkClass = ({ isActive }) =>
-
-//     `group flex h-11 items-center gap-3 rounded-lg px-3 text-[15px] transition-all duration-200 ease-out hover:scale-[1.02]
-    
-//     ${isActive
-//       ?
-//       "scale-[1.01] bg-[#00C86B] text-white font-semibold shadow-md shadow-[#00C86B]/20"
-//       :
-//       "bg-transparent text-slate-100 hover:bg-[#0A6E63] hover:text-white"
-//     }`;
-
-
-
-
-//   return (
-
-//     <>
-
-//       {isOpen && (
-
-//         <button
-
-//           type="button"
-
-//           onClick={onClose}
-
-//           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-
-//         />
-
-//       )}
-
-
-
-//       <aside
-
-//         className={`fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] flex-col border-r border-white/10 bg-gradient-to-b from-[#061113] via-[#071114] to-[#02090B] p-5 text-white shadow-xl shadow-black/20 transition-transform duration-300 lg:translate-x-0
-
-// ${isOpen ? "translate-x-0" : "-translate-x-full"}
-
-// `}
-
-//       >
-
-
-//         {/* BRAND */}
-
-//         <div className="border-b border-white/10 pb-4">
-
-//           {/* Their company — the tenant's brand, shown big */}
-
-//           <div className="flex items-center gap-3">
-
-//             <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#25D366] to-[#128C7E] text-lg font-bold text-black shadow-md shadow-black/20">
-//               {companyLogo && !logoError ? (
-//                 <img
-//                   src={companyLogo}
-//                   alt={companyName}
-//                   onError={() => setLogoError(true)}
-//                   className="h-full w-full object-cover"
-//                 />
-//               ) : (
-//                 companyInitial
-//               )}
-//             </span>
-
-//             <div className="min-w-0">
-//               <h1
-//                 className="truncate text-lg font-bold leading-tight text-white"
-//                 title={companyName}
-//               >
-//                 {companyName}
-//               </h1>
-
-//               <p className="truncate text-xs text-slate-400">
-//                 Business Messaging Platform
-//               </p>
-//             </div>
-
-//           </div>
-
-
-//           {/* Our platform — small, "powered by" branding */}
-
-//           <div className="mt-4 flex items-center gap-1.5 border-t border-white/5 pt-3 text-slate-500">
-
-//             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[9px] text-[#25D366]">
-//               <FaComments />
-//             </span>
-
-//             <span className="text-[11px] tracking-wide">
-//               Powered by
-//               <span className="ml-1 font-semibold text-slate-400">
-//                 WhatsApp
-//               </span>
-//               <span className="ml-1 font-semibold text-[#25D366]">
-//                 CRM
-//               </span>
-//             </span>
-
-//           </div>
-
-//         </div>
-
-
-
-
-//         {/* MENU */}
-
-
-//         <div className="mt-6 flex-1">
-
-
-//           <div className="space-y-5">
-
-
-//             {
-//               sections.map(section => (
-
-
-//                 <div
-//                   key={section.id}
-//                   className="border-b border-white/10 pb-4"
-//                 >
-
-
-//                   <button
-
-//                     onClick={() => toggleSection(section.id)}
-
-//                     className="mb-2 flex w-full items-center justify-between px-1 py-1"
-
-//                   >
-
-
-//                     <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#25D366]">
-
-//                       {section.title}
-
-//                     </span>
-
-
-
-//                     <FaChevronRight
-
-//                       className={`text-xs text-slate-600 transition-transform
-
-// ${openSection === section.id
-//                           ?
-//                           "rotate-90"
-//                           :
-//                           ""
-//                         }
-
-// `}
-
-//                     />
-
-
-//                   </button>
-
-
-
-
-//                   <div
-
-//                     className={`grid transition-all duration-300
-
-// ${openSection === section.id
-
-//                         ?
-//                         "grid-rows-[1fr] opacity-100"
-
-//                         :
-
-//                         "grid-rows-[0fr] opacity-0"
-
-//                       }
-
-// `}
-
-//                   >
-
-
-//                     <div className="overflow-hidden">
-
-
-//                       <div className="flex flex-col gap-2">
-
-
-//                         {
-
-//                           section.items
-
-//                             .filter(item => {
-
-//                               if (
-//                                 (item.path === "/employees" ||
-//                                   item.path === "/settings/support" ||
-//                                   item.path === "/settings/audit-logs" ||
-//                                   item.path === "/settings/ai-auto-reply") &&
-//                                 user?.role !== "ADMIN"
-//                               ) {
-//                                 return false;
-//                               }
-
-//                               return true;
-//                             })
-
-
-//                             .map(item => {
-
-
-//                               const Icon = item.icon;
-
-
-//                               return (
-
-//                                 <NavLink
-
-//                                   key={item.path}
-
-//                                   to={item.path}
-
-//                                   className={linkClass}
-
-//                                   onClick={onClose}
-
-//                                 >
-
-
-//                                   <Icon className="text-sm" />
-
-
-//                                   {item.name}
-
-
-//                                 </NavLink>
-
-//                               );
-
-
-//                             })
-
-
-//                         }
-
-
-
-//                       </div>
-
-
-//                     </div>
-
-
-//                   </div>
-
-
-
-
-//                 </div>
-
-
-//               ))
-
-
-//             }
-
-
-//           </div>
-
-
-//         </div>
-
-
-//       </aside>
-
-//     </>
-
-//   );
-
-// }
-
 // // src/components/Sidebar.jsx
 // import { useEffect, useMemo, useState } from "react";
 // import { NavLink, useLocation } from "react-router-dom";
 // import { ChevronDown, X } from "lucide-react";
 // import { useAuthStore } from "../store/authStore";
-// import { navGroups, filterByRole } from "../config/navigation";
+// import { navGroups, filterByRole, PLATFORM } from "../config/navigation";
 
 // // Main menu items: 15px text, 40px tall
 // const itemBase =
@@ -503,6 +13,29 @@
 //   isActive
 //     ? "bg-[#25D366]/10 text-white"
 //     : "text-slate-300 hover:bg-white/5 hover:text-white";
+
+// // Built-in round logo mark, used until PLATFORM.logo is set in navigation.js
+// function PlatformMark({ className = "" }) {
+//   return (
+//     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+//       <defs>
+//         <linearGradient id="platformMarkGrad" x1="0" y1="0" x2="1" y2="1">
+//           <stop offset="0" stopColor="#25D366" />
+//           <stop offset="1" stopColor="#128C7E" />
+//         </linearGradient>
+//       </defs>
+//       <circle cx="16" cy="16" r="16" fill="url(#platformMarkGrad)" />
+//       <path
+//         d="M9.5 10.5l5.3 11.3a1.4 1.4 0 0 0 2.4 0l5.3-11.3"
+//         fill="none"
+//         stroke="#fff"
+//         strokeWidth="3"
+//         strokeLinecap="round"
+//         strokeLinejoin="round"
+//       />
+//     </svg>
+//   );
+// }
 
 // function LinkItem({ item, onClose, nested = false }) {
 //   const Icon = item.icon;
@@ -579,14 +112,13 @@
 //   const { pathname } = useLocation();
 
 //   const [logoError, setLogoError] = useState(false);
+//   const [platformLogoError, setPlatformLogoError] = useState(false);
 //   const [openParents, setOpenParents] = useState({});
 
 //   const companyName = user?.companyName || "Your Company";
 //   const companyInitial = companyName.charAt(0).toUpperCase();
 //   const companyLogo = user?.companyLogo;
-
-//   // true only when a logo exists AND it loaded without error
-//   const showLogo = Boolean(companyLogo) && !logoError;
+//   const hasCompanyLogo = !!companyLogo && !logoError;
 
 //   // Reset logo error if a different logo URL arrives (e.g. after upload)
 //   useEffect(() => setLogoError(false), [companyLogo]);
@@ -632,20 +164,19 @@
 //         {/* TENANT BRAND (customer's company) — never scrolls */}
 //         <div className="shrink-0 px-3 pb-3 pt-4">
 //           <div className="flex items-center gap-3 px-3">
-//             {/* Logo box — WHITE when a logo is shown, green gradient only for the letter fallback */}
 //             <span
-//               className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg text-base font-bold shadow-md shadow-black/30 ${
-//                 showLogo
+//               className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-base font-bold shadow-md shadow-black/30 ${
+//                 hasCompanyLogo
 //                   ? "bg-white"
 //                   : "bg-gradient-to-br from-[#25D366] to-[#128C7E] text-[#04130C]"
 //               }`}
 //             >
-//               {showLogo ? (
+//               {hasCompanyLogo ? (
 //                 <img
 //                   src={companyLogo}
 //                   alt={companyName}
 //                   onError={() => setLogoError(true)}
-//                   className="h-full w-full object-cover"
+//                   className="h-full w-full object-contain p-1"
 //                 />
 //               ) : (
 //                 companyInitial
@@ -673,7 +204,7 @@
 //         {/* NAV — one evenly spaced list; scrolls if the screen is short */}
 //         <nav
 //           aria-label="Main navigation"
-//           className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-white/10 px-3 py-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15"
+//           className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-white/10 px-3 py-3 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-track]:bg-transparent"
 //         >
 //           <div className="flex flex-col gap-1">
 //             {items.map((item) =>
@@ -692,10 +223,35 @@
 //             )}
 //           </div>
 //         </nav>
+
+//         {/* PLATFORM BRAND (our logo) — pinned to the bottom, never scrolls */}
+//         <div className="shrink-0 border-t border-white/10 px-3 py-3">
+//           <div className="flex items-center gap-3 px-3">
+//             {PLATFORM.logo && !platformLogoError ? (
+//               <img
+//                 src={PLATFORM.logo}
+//                 alt={PLATFORM.name}
+//                 onError={() => setPlatformLogoError(true)}
+//                 className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-1.5"
+//               />
+//             ) : (
+//               <PlatformMark className="h-9 w-9 shrink-0" />
+//             )}
+
+//             <div className="leading-tight">
+//               <p className="text-[11px] text-slate-500">Powered by</p>
+//               <p className="text-sm font-semibold tracking-tight text-slate-200">
+//                 {PLATFORM.name}
+//               </p>
+//             </div>
+//           </div>
+//         </div>
 //       </aside>
 //     </>
 //   );
 // }
+
+
 
 // src/components/Sidebar.jsx
 import { useEffect, useMemo, useState } from "react";
@@ -712,29 +268,6 @@ const itemState = (isActive) =>
   isActive
     ? "bg-[#25D366]/10 text-white"
     : "text-slate-300 hover:bg-white/5 hover:text-white";
-
-// Built-in round logo mark, used until PLATFORM.logo is set in navigation.js
-function PlatformMark({ className = "" }) {
-  return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="platformMarkGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#25D366" />
-          <stop offset="1" stopColor="#128C7E" />
-        </linearGradient>
-      </defs>
-      <circle cx="16" cy="16" r="16" fill="url(#platformMarkGrad)" />
-      <path
-        d="M9.5 10.5l5.3 11.3a1.4 1.4 0 0 0 2.4 0l5.3-11.3"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function LinkItem({ item, onClose, nested = false }) {
   const Icon = item.icon;
@@ -843,6 +376,8 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
   const toggleParent = (key) =>
     setOpenParents((prev) => ({ ...prev, [key]: !prev[key] }));
 
+  const showPlatformLogo = !!PLATFORM.logo && !platformLogoError;
+
   return (
     <>
       {isOpen && (
@@ -923,27 +458,25 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
           </div>
         </nav>
 
-        {/* PLATFORM BRAND (our logo) — pinned to the bottom, never scrolls */}
-        <div className="shrink-0 border-t border-white/10 px-3 py-3">
-          <div className="flex items-center gap-3 px-3">
-            {PLATFORM.logo && !platformLogoError ? (
-              <img
-                src={PLATFORM.logo}
-                alt={PLATFORM.name}
-                onError={() => setPlatformLogoError(true)}
-                className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-1.5"
-              />
-            ) : (
-              <PlatformMark className="h-9 w-9 shrink-0" />
-            )}
+        {/* PLATFORM BRAND — "Powered by" + our logo, pinned to the bottom */}
+        <div className="shrink-0 border-t border-white/10 px-6 pb-5 pt-4">
+          <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-slate-500">
+            Powered by
+          </p>
 
-            <div className="leading-tight">
-              <p className="text-[11px] text-slate-500">Powered by</p>
-              <p className="text-sm font-semibold tracking-tight text-slate-200">
-                {PLATFORM.name}
-              </p>
-            </div>
-          </div>
+          {showPlatformLogo ? (
+            <img
+              src={PLATFORM.logo}
+              alt={PLATFORM.name}
+              onError={() => setPlatformLogoError(true)}
+              className="mt-2.5 h-11 w-auto max-w-full object-contain object-left"
+            />
+          ) : (
+            // Only shown if the logo file is missing or fails to load
+            <p className="mt-2.5 text-lg font-semibold tracking-tight text-slate-200">
+              {PLATFORM.name}
+            </p>
+          )}
         </div>
       </aside>
     </>

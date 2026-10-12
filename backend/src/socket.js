@@ -25,10 +25,21 @@ let io = null;
 const companyRoom = (companyId) => `company:${Number(companyId)}`;
 
 const initSocket = (httpServer) => {
+  const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
   io = new Server(httpServer, {
-    // Same policy as the REST API's cors({ origin: true }).
-    // Tighten later by listing your real frontend URL(s) here.
-    cors: { origin: true, credentials: true },
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin || allowedFrontendOrigins.includes(origin.replace(/\/$/, ""))) {
+          return callback(null, true);
+        }
+        return callback(new Error("Origin not allowed by CORS"));
+      },
+      credentials: true,
+    },
   });
 
   io.use(async (socket, next) => {
