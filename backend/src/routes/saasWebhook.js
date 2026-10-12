@@ -593,6 +593,7 @@
 
 
 
+
 // ============================================
 // SAAS WHATSAPP WEBHOOK (multi-tenant)
 // ============================================
@@ -813,20 +814,41 @@ router.get("/", (req, res) => {
 // ============================================
 // RECEIVE WEBHOOK EVENTS
 // ============================================
-router.post("/", async (req, res) => {
+// ============================================
+// RETRY OR DROP?
+//
+// If we answer 500, Meta re-sends the webhook (for up to 7 days). That is
+// what we WANT for temporary problems (database down / timed out): the
+// message is not lost, and the duplicate check keeps it from being saved
+// twice. For a payload that can never succeed (bad data, unknown account)
+// retrying would loop forever and Meta may disable the webhook, so those
+// are logged and answered with 200.
+// ============================================
+const TRANSIENT_PRISMA_CODES = new Set([
+  "P1001", // cannot reach database server
+  "P1002", // database server timed out
+  "P1008", // operations timed out
+  "P1017", // server closed the connection
+  "P2024", // timed out getting a connection from the pool
+  "P2028", // transaction API error
+]);
+
+const isTransientError = (error) => {
+  if (!error) return false;
+  if (TRANSIENT_PRISMA_CODES.has(error.code)) return true;
+  if (error.name === "PrismaClientInitializationError") return true;
+  if (error.name === "PrismaClientRustPanicError") return true;
+  return ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN"].includes(
+    error.code
+  );
+};
+
+// ============================================
+// PROCESS ONE "change" OF A WEBHOOK
+// (the body of the old POST handler, unchanged except where marked NEW)
+// ============================================
+const processWebhookChange = async (field, value) => {
   try {
-    console.log(
-      "========== SAAS WHATSAPP WEBHOOK =========="
-    );
-
-    const entry = req.body.entry?.[0];
-    const change = entry?.changes?.[0];
-    const field = change?.field;
-    const value = change?.value;
-
-    if (!value) {
-      return res.sendStatus(200);
-    }
 
     // ============================================
     // TEMPLATE STATUS UPDATE (Approved / Rejected / Paused / Disabled)
@@ -862,7 +884,7 @@ router.post("/", async (req, res) => {
         }
       }
 
-      return res.sendStatus(200);
+      return;
     }
 
     // ============================================
@@ -882,7 +904,7 @@ router.post("/", async (req, res) => {
       console.log("SaaS account_update event:", event, displayPhoneNumber);
 
       if (!displayPhoneNumber) {
-        return res.sendStatus(200);
+        return;
       }
 
       // Digit-based match, so "919876543210" finds "+91 98765 43210".
@@ -895,7 +917,7 @@ router.post("/", async (req, res) => {
           "Payload:",
           JSON.stringify(value)
         );
-        return res.sendStatus(200);
+        return;
       }
 
       try {
@@ -938,7 +960,7 @@ router.post("/", async (req, res) => {
         console.error("Failed to process account_update webhook:", error);
       }
 
-      return res.sendStatus(200);
+      return;
     }
 
     // ============================================
@@ -958,7 +980,7 @@ router.post("/", async (req, res) => {
         "No phone_number_id found in webhook"
       );
 
-      return res.sendStatus(200);
+      return;
     }
 
     // ============================================
@@ -979,7 +1001,7 @@ router.post("/", async (req, res) => {
         phoneNumberId
       );
 
-      return res.sendStatus(200);
+      return;
     }
 
     const companyId =
@@ -1000,76 +1022,133 @@ router.post("/", async (req, res) => {
     // INCOMING MESSAGE
     // ============================================
 
-    const message = value.messages?.[0];
+    // NEW: Meta can put several messages in one webhook, so loop over ALL of
+    // them (before, only messages[0] was handled and the rest were lost).
+    const incomingMessages = Array.isArray(value.messages)
+      ? value.messages
+      : [];
 
-    if (message) {
-      const customerPhone = message.from;
+    let transientFailure = null;
 
-      const text =
-        message.text?.body ||
-        message.button?.text ||
-        message.interactive?.button_reply?.title ||
-        message.interactive?.list_reply?.title ||
-        `[${message.type || "unsupported"} message]`;
+    for (const message of incomingMessages) {
+      try {
+        const customerPhone = message.from;
 
-      console.log(
-        "Customer Phone:",
-        customerPhone
-      );
+        if (!customerPhone) {
+          continue;
+        }
 
-      console.log(
-        "Message:",
-        text
-      );
+        // NEW: duplicate check. Meta re-sends a webhook when we answer slowly
+        // or with an error. The message id is unique, so skip if we have it.
+        if (message.id) {
+          const alreadySaved = await prisma.message.findUnique({
+            where: { metaMessageId: message.id },
+            select: { id: true },
+          });
 
-      // ============================================
-      // GET / CREATE CONVERSATION
-      // ============================================
+          if (alreadySaved) {
+            console.log("Duplicate webhook message skipped:", message.id);
+            continue;
+          }
+        }
 
-      const conversation =
-        await getOrCreateSaaSConversation(
-          companyId,
-          whatsappAccountId,
+        // NEW: images, audio, video, documents and stickers are downloaded
+        // and stored (same helper already used for echoes and history sync).
+        // Before, they were saved as the text "[image message]".
+        // Text / button / list replies behave exactly as before.
+        const { content: text, messageType, imageUrl } =
+          await resolveMessageContent(
+            message,
+            whatsappAccount.whatsappAccessToken ||
+              process.env.META_SYSTEM_USER_TOKEN
+          );
+
+        console.log(
+          "Customer Phone:",
           customerPhone
         );
 
-      console.log(
-        "Conversation ID:",
-        conversation.id
-      );
-
-      if (conversation.customer) {
         console.log(
-          "Customer:",
-          conversation.customer.name
+          "Message:",
+          text
         );
-      } else {
+
+        // ============================================
+        // GET / CREATE CONVERSATION
+        // ============================================
+
+        const conversation =
+          await getOrCreateSaaSConversation(
+            companyId,
+            whatsappAccountId,
+            customerPhone
+          );
+
         console.log(
-          "Customer: Not linked yet"
+          "Conversation ID:",
+          conversation.id
         );
+
+        if (conversation.customer) {
+          console.log(
+            "Customer:",
+            conversation.customer.name
+          );
+        } else {
+          console.log(
+            "Customer: Not linked yet"
+          );
+        }
+
+        // ============================================
+        // SAVE MESSAGE (with Meta's id, for duplicate protection)
+        // ============================================
+
+        const savedMessage = await saveIncomingMessage(
+          conversation.id,
+          text,
+          {
+            metaMessageId: message.id,
+            messageType,
+            imageUrl,
+          }
+        );
+
+        // null = a parallel delivery already saved it
+        if (!savedMessage) {
+          continue;
+        }
+
+        console.log(
+          "SaaS incoming message saved successfully"
+        );
+
+        // Only fires when this specific chat has the bot ON. The company's
+        // AI settings (enabled / provider / key) are checked inside
+        // getAutoReply. Not awaited, so Meta gets its 200 right away.
+        if (conversation.botEnabled) {
+          triggerAutoReply(conversation.id).catch((err) => {
+            console.error("SaaS auto-reply pipeline failed:", err);
+          });
+        }
+      } catch (error) {
+        // One bad message must not stop the rest of the batch.
+        console.error(
+          "Failed to process incoming message:",
+          message?.id,
+          error
+        );
+
+        if (isTransientError(error)) {
+          transientFailure = error;
+        }
       }
+    }
 
-      // ============================================
-      // SAVE MESSAGE
-      // ============================================
-
-      await saveIncomingMessage(
-        conversation.id,
-        text
-      );
-
-      console.log(
-        "SaaS incoming message saved successfully"
-      );
-
-      // Only fires when this specific chat has the bot ON. The company's
-      // AI settings (enabled / provider / key) are checked inside
-      // getAutoReply. Not awaited, so Meta gets its 200 right away.
-      if (conversation.botEnabled) {
-        triggerAutoReply(conversation.id).catch((err) => {
-          console.error("SaaS auto-reply pipeline failed:", err);
-        });
-      }
+    // Temporary failure (e.g. database down): let Meta retry the whole
+    // webhook. Messages already saved are skipped by the duplicate check.
+    if (transientFailure) {
+      throw transientFailure;
     }
 
     // ============================================
@@ -1348,27 +1427,54 @@ router.post("/", async (req, res) => {
       }
     }
 
-    // ============================================
-    // ALWAYS RETURN 200 TO META
-    // ============================================
-
-    return res.sendStatus(200);
-
   } catch (error) {
     console.error(
-      "SAAS WEBHOOK ERROR:",
+      "SAAS WEBHOOK ERROR (field: " + field + "):",
       error
     );
 
-    /*
-     * For production we generally want to acknowledge
-     * webhook events quickly. Logging the error allows
-     * us to investigate without causing Meta to retry
-     * endlessly.
-     */
-
-    return res.sendStatus(200);
+    throw error;
   }
+};
+
+router.post("/", async (req, res) => {
+  console.log(
+    "========== SAAS WHATSAPP WEBHOOK =========="
+  );
+
+  // NEW: handle EVERY entry and EVERY change in the payload.
+  // Before, only entry[0].changes[0] was processed.
+  const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
+
+  let retryNeeded = false;
+
+  for (const entry of entries) {
+    const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+
+    for (const change of changes) {
+      if (!change?.value) {
+        continue;
+      }
+
+      try {
+        await processWebhookChange(change.field, change.value);
+      } catch (error) {
+        if (isTransientError(error)) {
+          // answer 500 below so Meta sends this webhook again
+          retryNeeded = true;
+        } else {
+          // Cannot succeed on retry. Keep the payload in the logs so it
+          // can be replayed by hand, and acknowledge it.
+          console.error(
+            "SAAS WEBHOOK: dropping change that cannot be processed. Payload:",
+            JSON.stringify(change)
+          );
+        }
+      }
+    }
+  }
+
+  return res.sendStatus(retryNeeded ? 500 : 200);
 });
 
 module.exports = router;

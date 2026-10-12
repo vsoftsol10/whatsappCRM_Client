@@ -1,5 +1,11 @@
 const prisma = require("../config/prisma");
-const { sendTextMessage } = require("../services/whatsappService");
+const {
+  sendTextMessage,
+  uploadMediaToMeta,
+  sendMediaMessage: sendWhatsAppMedia,
+} = require("../services/whatsappService");
+const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
+const { classifyMedia } = require("../middleware/mediaUploadMiddleware");
 
 // SEND MESSAGE
 const sendMessage = async (req, res) => {
@@ -53,6 +59,10 @@ const sendMessage = async (req, res) => {
     }
 
     // Send only AGENT messages to WhatsApp
+    // Meta's id for the message we send. Saved below so delivered/read
+    // status webhooks can find this message later.
+    let metaMessageId;
+
     if (sender === "AGENT") {
       const recipientPhone =
         conversation.phone || conversation.customer?.phone;
@@ -93,6 +103,8 @@ const sendMessage = async (req, res) => {
           error: result.error,
         });
       }
+
+      metaMessageId = result.data?.messages?.[0]?.id || undefined;
     }
 
     // Save message after successful WhatsApp send
@@ -103,6 +115,7 @@ const sendMessage = async (req, res) => {
         sender,
         messageType,
         status,
+        ...(metaMessageId && { metaMessageId }),
       },
     });
 
@@ -243,8 +256,216 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+// SEND MEDIA MESSAGE (image / audio / video / document)
+// Multipart request: field "file" + conversationId (+ optional caption).
+// Existing text flow (sendMessage above) is untouched.
+const sendMediaMessage = async (req, res) => {
+  try {
+    const { conversationId } = req.body;
+    const caption = (req.body.caption || "").trim();
+    const file = req.file;
+
+    if (!conversationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Conversation ID is required",
+      });
+    }
+
+    if (!file || !file.buffer) {
+      return res.status(400).json({
+        success: false,
+        message: "File is required",
+      });
+    }
+
+    const media = classifyMedia(file.mimetype);
+
+    if (!media) {
+      return res.status(400).json({
+        success: false,
+        message: "Unsupported file type",
+      });
+    }
+
+    if (file.size > media.maxBytes) {
+      return res.status(400).json({
+        success: false,
+        message: `${media.type} files can be at most ${Math.round(
+          media.maxBytes / (1024 * 1024)
+        )} MB on WhatsApp.`,
+      });
+    }
+
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        companyId: req.user.companyId,
+      },
+      include: {
+        customer: true,
+        whatsappAccount: true,
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    const recipientPhone =
+      conversation.phone || conversation.customer?.phone;
+
+    if (!recipientPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Recipient phone number not found",
+      });
+    }
+
+    if (
+      !conversation.whatsappAccount ||
+      conversation.whatsappAccount.status !== "CONNECTED"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "WhatsApp account is not connected",
+      });
+    }
+
+    const safeName =
+      (file.originalname || "file")
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
+        .slice(-80) || "file";
+
+    // 1. Keep a stable copy so the CRM can show the file later.
+    let stored;
+
+    try {
+      stored = await uploadBufferToCloudinary(file.buffer, {
+        folder: "crm-sent-media",
+        resourceType: media.cloudinaryResourceType,
+        // Documents are "raw" files: put the name (with extension) in
+        // the public id so the URL keeps its extension.
+        ...(media.type === "document" && {
+          publicId: `${Date.now()}-${safeName}`,
+        }),
+      });
+    } catch (uploadError) {
+      console.error("Send media - storage upload failed:", uploadError);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to store the file",
+      });
+    }
+
+    if (!stored?.imageUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to store the file",
+      });
+    }
+
+    // 2. Upload the bytes to WhatsApp and get a media id.
+    const uploaded = await uploadMediaToMeta(
+      file.buffer,
+      media.mime,
+      safeName,
+      conversation.whatsappAccount
+    );
+
+    if (!uploaded.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to upload file to WhatsApp",
+        error: uploaded.error,
+      });
+    }
+
+    // 3. Send it to the customer.
+    const result = await sendWhatsAppMedia(
+      recipientPhone,
+      {
+        type: media.type,
+        mediaId: uploaded.mediaId,
+        caption: media.type === "image" || media.type === "video" ? caption : "",
+        fileName: media.type === "document" ? file.originalname || safeName : "",
+      },
+      conversation.whatsappAccount
+    );
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send WhatsApp message",
+        error: result.error,
+      });
+    }
+
+    const metaMessageId = result.data?.messages?.[0]?.id || undefined;
+
+    // 4. Save in the same shape incoming media already uses:
+    //    messageType = IMAGE | AUDIO | VIDEO | DOCUMENT, imageUrl = file URL.
+    const messageType = media.type.toUpperCase();
+
+    const content =
+      media.type === "document"
+        ? file.originalname || safeName
+        : media.type === "audio"
+        ? ""
+        : caption;
+
+    const lastMessage =
+      media.type === "image"
+        ? caption || "📷 Photo"
+        : media.type === "video"
+        ? caption || "🎥 Video"
+        : media.type === "audio"
+        ? "🎤 Voice message"
+        : `📄 ${content}`;
+
+    const message = await prisma.message.create({
+      data: {
+        conversationId,
+        content,
+        sender: "AGENT",
+        messageType,
+        status: "SENT",
+        imageUrl: stored.imageUrl,
+        ...(metaMessageId && { metaMessageId }),
+      },
+    });
+
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        lastMessage,
+        // Agent manually replied, so disable bot auto-reply (same as text).
+        botEnabled: false,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Message sent successfully",
+      data: message,
+    });
+  } catch (error) {
+    console.error("Send media message error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to send media message",
+    });
+  }
+};
+
 module.exports = {
   sendMessage,
+  sendMediaMessage,
   getMessagesByConversation,
   editMessage,
   deleteMessage,

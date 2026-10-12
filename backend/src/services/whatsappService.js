@@ -1,3 +1,4 @@
+
 // const axios = require("axios");
 
 // const GRAPH_API_VERSION = "v23.0";
@@ -170,7 +171,16 @@
 // // SEND TEMPLATE MESSAGE
 // // ============================================
 // // 👈 CHANGED: now takes whatsappAccount instead of process.env.WHATSAPP_PHONE_NUMBER_ID
-// const sendTemplateMessage = async (to, templateName, params = [], whatsappAccount) => {
+// // FIX: added optional `languageCode` as the LAST argument (default "en_US") so existing
+// // callers keep working. Before this, every non-image campaign was sent as en_US,
+// // so Tamil (ta) / Hindi (hi) templates failed with "template does not exist".
+// const sendTemplateMessage = async (
+//   to,
+//   templateName,
+//   params = [],
+//   whatsappAccount,
+//   languageCode = "en_US"
+// ) => {
 
 //   if (!to || typeof to !== "string" || !to.trim()) {
 //     return {
@@ -197,7 +207,7 @@
 //         type: "template",
 //         template: {
 //           name: templateName,
-//           language: { code: "en_US" },
+//           language: { code: languageCode || "en_US" },
 //           components: params.length > 0 ? [
 //             {
 //               type: "body",
@@ -304,6 +314,7 @@
 //   sendTemplateMessage,
 //   sendCampaignImageTemplate,
 // };
+
 
 
 const axios = require("axios");
@@ -615,9 +626,172 @@ const sendCampaignImageTemplate = async (to, templateName, imageUrl, params = []
   }
 };
 
+// ============================================
+// UPLOAD MEDIA TO META  (returns a WhatsApp media id)
+// ============================================
+// Used for files an agent attaches in the chat (image / audio / video /
+// document). Uploading the bytes to Meta and sending by media id is more
+// reliable than sending a public link, because Meta does not have to
+// fetch the file from our storage or guess its content type.
+const uploadMediaToMeta = async (buffer, mimeType, fileName, whatsappAccount) => {
+  if (!whatsappAccount?.phoneNumberId) {
+    return {
+      success: false,
+      error: { message: "WhatsApp account or Phone Number ID is missing" },
+    };
+  }
+
+  if (!process.env.META_SYSTEM_USER_TOKEN) {
+    return {
+      success: false,
+      error: {
+        message: "META_SYSTEM_USER_TOKEN is not configured on the server",
+      },
+    };
+  }
+
+  try {
+    const form = new FormData();
+    form.append("messaging_product", "whatsapp");
+    form.append("type", mimeType);
+    form.append(
+      "file",
+      new Blob([buffer], { type: mimeType }),
+      fileName || "file"
+    );
+
+    const response = await axios.post(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsappAccount.phoneNumberId}/media`,
+      form,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
+        },
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+      }
+    );
+
+    if (!response.data?.id) {
+      return {
+        success: false,
+        error: { message: "Meta did not return a media id" },
+      };
+    }
+
+    return { success: true, mediaId: response.data.id };
+  } catch (error) {
+    console.error("WhatsApp Media Upload Error:");
+
+    if (error.response) {
+      console.error(error.response.data);
+    } else {
+      console.error(error.message);
+    }
+
+    return {
+      success: false,
+      error: error.response?.data || error.message,
+    };
+  }
+};
+
+// ============================================
+// SEND MEDIA MESSAGE (image | audio | video | document)
+// ============================================
+// mediaId comes from uploadMediaToMeta(). Caption is ignored for audio
+// (WhatsApp does not support captions on audio). fileName is only used
+// for documents.
+const sendMediaMessage = async (
+  to,
+  { type, mediaId, caption = "", fileName = "" } = {},
+  whatsappAccount
+) => {
+  if (!to || typeof to !== "string" || !to.trim()) {
+    return {
+      success: false,
+      error: { message: "Recipient phone number is required" },
+    };
+  }
+
+  if (!["image", "audio", "video", "document"].includes(type)) {
+    return {
+      success: false,
+      error: { message: `Unsupported media type: ${type}` },
+    };
+  }
+
+  if (!mediaId) {
+    return { success: false, error: { message: "Media id is required" } };
+  }
+
+  if (!whatsappAccount?.phoneNumberId) {
+    return {
+      success: false,
+      error: { message: "WhatsApp account or Phone Number ID is missing" },
+    };
+  }
+
+  if (!process.env.META_SYSTEM_USER_TOKEN) {
+    return {
+      success: false,
+      error: {
+        message: "META_SYSTEM_USER_TOKEN is not configured on the server",
+      },
+    };
+  }
+
+  const mediaObject = { id: mediaId };
+
+  if (caption && type !== "audio") {
+    mediaObject.caption = caption;
+  }
+
+  if (type === "document" && fileName) {
+    mediaObject.filename = fileName;
+  }
+
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${whatsappAccount.phoneNumberId}/messages`,
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to.trim(),
+        type,
+        [type]: mediaObject,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error(`WhatsApp ${type} Send Error:`);
+
+    if (error.response) {
+      console.error(error.response.data);
+    } else {
+      console.error(error.message);
+    }
+
+    return {
+      success: false,
+      error: error.response?.data || error.message,
+    };
+  }
+};
+
+
 module.exports = {
   sendTextMessage,
   sendImageMessage,
   sendTemplateMessage,
   sendCampaignImageTemplate,
+  uploadMediaToMeta,
+  sendMediaMessage,
 };

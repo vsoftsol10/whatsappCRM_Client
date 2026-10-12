@@ -47,3 +47,31 @@ export const deleteMessage = async (id) => {
 
   return response.data;
 };
+
+// ===============================
+// SEND MEDIA MESSAGE (image / voice / video / document)
+// ===============================
+export const sendMediaMessage = async ({
+  conversationId,
+  file,
+  caption = "",
+}) => {
+  const formData = new FormData();
+
+  formData.append("conversationId", conversationId);
+  formData.append("file", file);
+
+  if (caption) {
+    formData.append("caption", caption);
+  }
+
+  const response = await apiClient.post(
+    "/api/messages/media",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    }
+  );
+
+  return response.data;
+};

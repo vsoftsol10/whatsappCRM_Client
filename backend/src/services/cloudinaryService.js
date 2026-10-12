@@ -1,3 +1,4 @@
+
 // const cloudinary = require("../config/cloudinary");
 // const streamifier = require("streamifier");
 
@@ -37,9 +38,49 @@
 //   });
 // };
 
+// // ============================================
+// // GENERIC BUFFER UPLOAD
+// // ============================================
+// // Used for incoming WhatsApp media (Coexistence history sync, message
+// // echoes, and — if wired up the same way — live inbound messages) where
+// // we already have the file bytes in memory rather than a multer `file`
+// // object from a form upload. Unlike uploadCampaignImage, resourceType
+// // is caller-supplied since incoming media can be image, video, audio,
+// // or a raw document — not just images.
+// const uploadBufferToCloudinary = (
+//   buffer,
+//   { folder = "whatsapp-media", resourceType = "auto" } = {}
+// ) => {
+//   return new Promise((resolve, reject) => {
+//     if (!buffer) {
+//       return resolve(null);
+//     }
+
+//     const stream = cloudinary.uploader.upload_stream(
+//       {
+//         folder,
+//         resource_type: resourceType, // "image" | "video" | "raw" | "auto"
+//       },
+//       (error, result) => {
+//         if (error) return reject(error);
+
+//         resolve({
+//           imageUrl: result.secure_url,
+//           publicId: result.public_id,
+//           resourceType: result.resource_type,
+//         });
+//       }
+//     );
+
+//     streamifier.createReadStream(buffer).pipe(stream);
+//   });
+// };
+
 // module.exports = {
 //   uploadCampaignImage,
+//   uploadBufferToCloudinary,
 // };
+
 
 
 const cloudinary = require("../config/cloudinary");
@@ -92,7 +133,7 @@ const uploadCampaignImage = (file, folder = "campaign-images") => {
 // or a raw document — not just images.
 const uploadBufferToCloudinary = (
   buffer,
-  { folder = "whatsapp-media", resourceType = "auto" } = {}
+  { folder = "whatsapp-media", resourceType = "auto", publicId } = {}
 ) => {
   return new Promise((resolve, reject) => {
     if (!buffer) {
@@ -103,6 +144,9 @@ const uploadBufferToCloudinary = (
       {
         folder,
         resource_type: resourceType, // "image" | "video" | "raw" | "auto"
+        // Optional (default: Cloudinary generates one). Used for sent
+        // documents so the file keeps its name + extension in the URL.
+        ...(publicId && { public_id: publicId }),
       },
       (error, result) => {
         if (error) return reject(error);

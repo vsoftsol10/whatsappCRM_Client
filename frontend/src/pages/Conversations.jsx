@@ -9,6 +9,7 @@ import CustomerDetails from "../components/conversation/CustomerDetails";
 
 
 import useMessageStore from "../store/messageStore";
+import { toast } from "react-hot-toast";
 
 function Conversations() {
   const location = useLocation();
@@ -34,6 +35,7 @@ function Conversations() {
     messages,
     fetchMessages,
     addMessage,
+    addMediaMessage,
   } = useMessageStore();
 
   // Load conversations when page opens
@@ -115,6 +117,26 @@ function Conversations() {
     await fetchConversations();
   };
 
+  // Send image / voice / video / document
+  const handleSendMedia = async (file, caption = "") => {
+    if (!selectedConversation) return false;
+
+    const result = await addMediaMessage({
+      conversationId: selectedConversation.id,
+      file,
+      caption,
+    });
+
+    if (!result.success) {
+      toast.error(result.message);
+      return false;
+    }
+
+    await fetchMessages(selectedConversation.id);
+    await fetchConversations();
+    return true;
+  };
+
   return (
     <div className="flex h-full min-h-[calc(100vh-4rem)] flex-col bg-white xl:min-h-full xl:flex-row">
 
@@ -160,6 +182,7 @@ function Conversations() {
         {/* Message Input */}
         <MessageInput
           onSendMessage={handleSendMessage}
+          onSendMedia={handleSendMedia}
           disabled={!selectedConversation}
         />
       </div>

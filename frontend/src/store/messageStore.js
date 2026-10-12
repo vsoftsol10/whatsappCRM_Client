@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   sendMessage,
+  sendMediaMessage,
   getMessagesByConversation,
   editMessage,
   deleteMessage,
@@ -33,6 +34,25 @@ const useMessageStore = create((set) => ({
       await sendMessage(messageData);
     } catch (error) {
       console.error(error);
+    }
+  },
+
+  // SEND MEDIA (image / voice / video / document)
+  // Returns { success, message } so the UI can show the real error.
+  addMediaMessage: async (mediaData) => {
+    try {
+      await sendMediaMessage(mediaData);
+      return { success: true };
+    } catch (error) {
+      console.error(error);
+
+      return {
+        success: false,
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to send file",
+      };
     }
   },
 
