@@ -1,7 +1,8 @@
-
 const express = require("express");
 const router = express.Router();
 const prisma = require("../config/prisma");
+const { findAccountByDisplayPhone } = require("../utils/whatsappAccountMatcher");
+const { canCompanySendMessages } = require("../utils/companyAccess");
 
 const {
   getOrCreateConversation,
@@ -42,6 +43,16 @@ const attemptAutoReply = async (conversationId) => {
   });
 
   if (!conversation || !conversation.botEnabled) return "done";
+
+  // Expired / inactive companies cannot send messages — this includes
+  // AI auto-replies. Incoming messages are still saved (view-only).
+  if (!(await canCompanySendMessages(conversation.companyId))) {
+    console.log(
+      "AI auto-reply skipped: company subscription is inactive or expired. companyId:",
+      conversation.companyId
+    );
+    return "done";
+  }
 
   const recipientPhone = conversation.phone || conversation.customer?.phone;
   if (!recipientPhone) {
@@ -463,11 +474,16 @@ const handleAccountUpdateField = async (value) => {
 
   if (!phone) return;
 
-  const account = await prisma.whatsAppAccount.findFirst({
-    where: { displayPhoneNumber: phone },
-  });
+  // Digit-based match, so "919876543210" finds "+91 98765 43210".
+  const account = await findAccountByDisplayPhone(phone);
 
-  if (!account) return;
+  if (!account) {
+    console.log(
+      "No WhatsApp account found for account_update. Payload:",
+      JSON.stringify(value)
+    );
+    return;
+  }
 
   if (event === "PARTNER_REMOVED") {
     const reason = value?.disconnection_info?.reason;
@@ -487,10 +503,19 @@ const handleAccountUpdateField = async (value) => {
   }
 
   if (event === "ACCOUNT_RECONNECTED") {
-    await prisma.whatsAppAccount.update({
-      where: { id: account.id },
-      data: { status: "CONNECTED", disconnectedAt: null },
-    });
+    // A disconnect from the CRM deletes the stored token, so without a
+    // token we must NOT show "Connected" — the admin has to reconnect.
+    if (!account.whatsappAccessToken) {
+      console.log(
+        "ACCOUNT_RECONNECTED ignored — no stored access token for account",
+        account.id
+      );
+    } else {
+      await prisma.whatsAppAccount.update({
+        where: { id: account.id },
+        data: { status: "CONNECTED", disconnectedAt: null },
+      });
+    }
   }
 };
 

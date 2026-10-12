@@ -1,5 +1,4 @@
 // import { useEffect, useState } from "react";
-// import { Link } from "react-router-dom";
 // import axios from "axios";
 // import {
 //   Lock,
@@ -9,11 +8,13 @@
 
 // import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 // import { useAuthStore } from "../../store/authStore";
+// import ChangePasswordModal from "../../components/common/ChangePasswordModal";
 
 // function SecuritySettings() {
 //   const { user } = useAuthStore();
 //   const isAdmin = user?.role === "ADMIN";
 
+//   const [showChangePassword, setShowChangePassword] = useState(false);
 //   const [loadingStatus, setLoadingStatus] = useState(true);
 //   const [connectedAccount, setConnectedAccount] = useState(null);
 
@@ -91,14 +92,15 @@
 
 //           </div>
 
-//           <Link
-//             to="/change-password"
+//           <button
+//             type="button"
+//             onClick={() => setShowChangePassword(true)}
 //             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-6 py-3 font-semibold text-black transition hover:bg-[#128C7E]"
 //           >
 //             Change Password
 
 //             <ChevronRight size={18} />
-//           </Link>
+//           </button>
 
 //         </div>
 
@@ -187,11 +189,17 @@
 
 //       </div>
 
+//       <ChangePasswordModal
+//         isOpen={showChangePassword}
+//         onClose={() => setShowChangePassword(false)}
+//       />
+
 //     </div>
 //   );
 // }
 
 // export default SecuritySettings;
+
 
 
 
@@ -206,6 +214,7 @@ import {
 import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 import { useAuthStore } from "../../store/authStore";
 import ChangePasswordModal from "../../components/common/ChangePasswordModal";
+import ConfirmModal from "../../components/common/ConfirmModal";
 
 function SecuritySettings() {
   const { user } = useAuthStore();
@@ -214,6 +223,8 @@ function SecuritySettings() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [connectedAccount, setConnectedAccount] = useState(null);
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const fetchWhatsAppStatus = async () => {
     try {
@@ -242,6 +253,35 @@ function SecuritySettings() {
   }, []);
 
   const isConnected = !!connectedAccount;
+
+  const handleDisconnect = async () => {
+    if (!connectedAccount?.id) return;
+
+    try {
+      setDisconnecting(true);
+      const token = localStorage.getItem("token");
+
+      await axios.put(
+        `${import.meta.env.VITE_API_URL}/api/whatsapp/accounts/${connectedAccount.id}/disconnect`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setShowDisconnectConfirm(false);
+      await fetchWhatsAppStatus();
+    } catch (error) {
+      console.error(
+        "Failed to disconnect WhatsApp:",
+        error.response?.data || error.message
+      );
+      alert(
+        error.response?.data?.message ||
+          "Failed to disconnect WhatsApp. Please try again."
+      );
+    } finally {
+      setDisconnecting(false);
+    }
+  };
 
   return (
     <div className="crm-page bg-slate-50">
@@ -380,7 +420,25 @@ function SecuritySettings() {
           </div>
 
           {/* Connect buttons are visible to ADMIN only */}
-          {isAdmin && <ConnectWhatsApp onConnected={fetchWhatsAppStatus} />}
+          {isAdmin && (
+            <div className="flex flex-col gap-3">
+              <ConnectWhatsApp
+                onConnected={fetchWhatsAppStatus}
+                hideButtons={isConnected}
+              />
+
+              {isConnected && (
+                <button
+                  type="button"
+                  onClick={() => setShowDisconnectConfirm(true)}
+                  disabled={disconnecting}
+                  className="rounded-xl border border-red-300 px-6 py-3 font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {disconnecting ? "Disconnecting..." : "Disconnect WhatsApp"}
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
 
@@ -391,8 +449,24 @@ function SecuritySettings() {
         onClose={() => setShowChangePassword(false)}
       />
 
+      <ConfirmModal
+        isOpen={showDisconnectConfirm}
+        title="Disconnect WhatsApp?"
+        message={
+          connectedAccount?.isCoexistence
+            ? "You won't be able to send or receive WhatsApp messages in the CRM until you reconnect. Existing chats are kept. Note: for a WhatsApp Business App (Coexistence) number, chat history may not sync again after reconnecting."
+            : "You won't be able to send or receive WhatsApp messages in the CRM until you reconnect. Existing chats are kept."
+        }
+        confirmText={disconnecting ? "Disconnecting..." : "Disconnect"}
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleDisconnect}
+        onCancel={() => setShowDisconnectConfirm(false)}
+      />
+
     </div>
   );
 }
 
 export default SecuritySettings;
+

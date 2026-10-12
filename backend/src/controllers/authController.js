@@ -1,4 +1,632 @@
 
+// const prisma = require("../config/prisma");
+// const bcrypt = require("bcrypt");
+// const jwt = require("jsonwebtoken");
+// const crypto = require("crypto");
+// const sendPasswordResetEmail = require("../services/passwordResetEmail");
+// const { logAction, logDirect } = require("../services/auditLogService");
+// const uploadToCloudinary = require("../utils/cloudinaryUplode");
+// const { buildFrontendUrl } = require("../utils/frontendUrl");
+
+// // ========================
+// // REGISTER USER
+// // ========================
+// const registerUser = async (req, res) => {
+//   try {
+//     const { name, email, password } = req.body;
+//     const existingUser = await prisma.user.findFirst({
+//       where: {
+//         email,
+//       },
+//     });
+
+//     if (existingUser) {
+//       return res.status(400).json({
+//         message: "User already exists",
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     const user = await prisma.user.create({
+//       data: {
+//         name,
+//         email,
+//         password: hashedPassword,
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         role: true,
+//         createdAt: true,
+//         updatedAt: true,
+//       },
+//     });
+
+//     return res.status(201).json({
+//       message: "User registered successfully",
+//       user,
+//     });
+//   } catch (error) {
+//     return res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // ========================
+// // LOGIN USER
+// // ========================
+// const loginUser = async (req, res) => {
+//   try {
+
+//     const { email, password, companyId } = req.body;
+
+//     const users = await prisma.user.findMany({
+//       where: {
+//         email: email.trim().toLowerCase(),
+//       },
+//       include: {
+//         company: true,
+//       },
+//     });
+
+//     if (users.length === 0) {
+//       return res.status(400).json({
+//         message: "User not found",
+//       });
+//     }
+
+//     // Collect EVERY account (one per company) whose password matches.
+//     const matchedUsers = [];
+
+//     for (const candidate of users) {
+//       const isPasswordValid = await bcrypt.compare(
+//         password,
+//         candidate.password
+//       );
+
+//       if (isPasswordValid) {
+//         matchedUsers.push(candidate);
+//       }
+//     }
+
+//     let user = null;
+
+//     if (matchedUsers.length === 1) {
+//       // Normal case - exactly one account matches.
+//       user = matchedUsers[0];
+//     } else if (matchedUsers.length > 1) {
+//       // Same email + same password exists in more than one company.
+//       // Use the company code from the login link (?company=COM-xxx).
+//       const wantedCompany =
+//         companyId !== undefined && companyId !== null
+//           ? String(companyId).trim().toLowerCase()
+//           : "";
+
+//       const sameCompany = wantedCompany
+//         ? matchedUsers.filter(
+//             (candidate) =>
+//               String(candidate.company?.companyId || "").toLowerCase() ===
+//               wantedCompany
+//           )
+//         : [];
+
+//       if (sameCompany.length === 1) {
+//         user = sameCompany[0];
+//       } else {
+//         return res.status(400).json({
+//           message:
+//             "This email is registered in more than one company. Please log in using the login link sent by your company.",
+//         });
+//       }
+//     }
+
+//     if (!user) {
+//       return res.status(400).json({
+//         message: "Invalid password",
+//       });
+//     }
+
+//     if (user.status === "INACTIVE") {
+//       return res.status(400).json({
+//         message:
+//           "Your account is inactive. Please contact your administrator.",
+//       });
+//     }
+
+//     const token = jwt.sign(
+//       {
+//         userId: user.id,
+//         companyId: user.companyId,
+//         role: user.role,
+//       },
+//       process.env.JWT_SECRET,
+//       {
+//         expiresIn: "1d",
+//       }
+//     );
+
+//     // First login check
+//     if (user.isFirstLogin) {
+//       logDirect({
+//         req,
+//         companyId: user.companyId,
+//         userId: user.id,
+//         userName: user.name,
+//         userRole: user.role,
+//         action: "STATUS_CHANGE",
+//         module: "USER",
+//         entityId: user.id,
+//         entityName: user.name,
+//         changes: { after: { event: "LOGIN", firstLogin: true } },
+//       });
+
+//       return res.status(200).json({
+//         message: "First login detected",
+//         forcePasswordChange: true,
+//         token,
+//         companyStatus: user.company.status,
+//         user: {
+//           id: user.id,
+//           name: user.name,
+//           email: user.email,
+//           role: user.role,
+//           companyId: user.companyId,
+//           companyName: user.company?.companyName,
+//           companyLogo: user.company?.logo,
+//           companyStatus: user.company?.status,
+//           expiryDate: user.company?.expiryDate,
+//         },
+//       });
+//     }
+
+//     logDirect({
+//       req,
+//       companyId: user.companyId,
+//       userId: user.id,
+//       userName: user.name,
+//       userRole: user.role,
+//       action: "STATUS_CHANGE",
+//       module: "USER",
+//       entityId: user.id,
+//       entityName: user.name,
+//       changes: { after: { event: "LOGIN" } },
+//     });
+
+//     return res.status(200).json({
+//       message: "Login successful",
+//       forcePasswordChange: false,
+//       token,
+//       companyStatus: user.company.status,
+//       user: {
+//         id: user.id,
+//         name: user.name,
+//         email: user.email,
+//         role: user.role,
+//         companyId: user.companyId,
+//         companyName: user.company?.companyName,
+//         companyLogo: user.company?.logo,
+//         companyStatus: user.company?.status,
+//         expiryDate: user.company?.expiryDate,
+//       },
+//     });
+//   } catch (error) {
+
+//     console.error("LOGIN ERROR:");
+//     console.error(error);
+//     console.error(error.stack);
+
+//     return res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // ========================
+// // GET CURRENT USER
+// // ========================
+// const getMe = async (req, res) => {
+//   try {
+//     const user = await prisma.user.findUnique({
+//       where: {
+//         id: req.user.userId,
+//       },
+//       include: {
+//         company: true,
+//       },
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({
+//         message: "User not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       id: user.id,
+//       name: user.name,
+//       email: user.email,
+//       role: user.role,
+//       phone: user.phone,
+//       address: user.address,
+//       department: user.department,
+//       designation: user.designation,
+//       profileImage: user.profileImage,
+//       companyId: user.companyId,
+//       companyName: user.company?.companyName,
+//       companyLogo: user.company?.logo,
+//       companyStatus: user.company?.status,
+//       expiryDate: user.company?.expiryDate,
+//     });
+//   } catch (error) {
+//     return res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // ========================
+// // UPDATE MY PROFILE
+// // (Self-service — the logged-in user, admin or employee,
+// //  editing their own profile only. Email, role, company
+// //  and password are intentionally NOT editable here.)
+// // ========================
+// const updateProfile = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       phone,
+//       address,
+//       department,
+//       designation,
+//       removeProfileImage,
+//     } = req.body;
+
+//     if (!name || !name.trim()) {
+//       return res.status(400).json({
+//         message: "Name is required",
+//       });
+//     }
+
+//     const existingUser = await prisma.user.findUnique({
+//       where: {
+//         id: req.user.userId,
+//       },
+//     });
+
+//     if (!existingUser) {
+//       return res.status(404).json({
+//         message: "User not found",
+//       });
+//     }
+
+//     const data = {
+//       name: name.trim(),
+//       phone: phone !== undefined ? phone : existingUser.phone,
+//       address: address !== undefined ? address : existingUser.address,
+//       department:
+//         department !== undefined ? department : existingUser.department,
+//       designation:
+//         designation !== undefined ? designation : existingUser.designation,
+//     };
+
+//     // Multipart form data always arrives as strings, so "true" (not true)
+//     const shouldRemoveImage =
+//       removeProfileImage === true || removeProfileImage === "true";
+
+//     if (req.file) {
+//       // New profile picture uploaded — replaces any existing one
+//       const result = await uploadToCloudinary(
+//         req.file.buffer,
+//         "profile-images"
+//       );
+
+//       data.profileImage = result.secure_url;
+//     } else if (shouldRemoveImage) {
+//       // User clicked "Remove photo" — clear the stored image
+//       data.profileImage = null;
+//     }
+
+//     const updatedUser = await prisma.user.update({
+//       where: {
+//         id: existingUser.id,
+//       },
+//       data,
+//     });
+
+//     logAction({
+//       req,
+//       action: "UPDATE",
+//       module: "USER",
+//       entityId: updatedUser.id,
+//       entityName: updatedUser.name,
+//       changes: {
+//         before: {
+//           name: existingUser.name,
+//           phone: existingUser.phone,
+//           address: existingUser.address,
+//           department: existingUser.department,
+//           designation: existingUser.designation,
+//           profileImage: existingUser.profileImage,
+//         },
+//         after: {
+//           name: updatedUser.name,
+//           phone: updatedUser.phone,
+//           address: updatedUser.address,
+//           department: updatedUser.department,
+//           designation: updatedUser.designation,
+//           profileImage: updatedUser.profileImage,
+//         },
+//       },
+//     });
+
+//     const { password: _password, ...safeUser } = updatedUser;
+
+//     return res.status(200).json({
+//       message: "Profile updated successfully",
+//       user: safeUser,
+//     });
+//   } catch (error) {
+//     console.error("UPDATE PROFILE ERROR:");
+//     console.error(error);
+
+//     return res.status(500).json({
+//       message: "Failed to update profile",
+//     });
+//   }
+// };
+
+// // ========================
+// // CHANGE PASSWORD
+// // ========================
+// const changePassword = async (req, res) => {
+//   try {
+//     const { currentPassword, newPassword } = req.body;
+
+//     console.log("========== CHANGE PASSWORD ==========");
+//     console.log("User ID:", req.user.userId);
+//     console.log("Current password received:", !!currentPassword);
+//     console.log("New password received:", !!newPassword);
+
+//     // Validate input
+//     if (!currentPassword || !newPassword) {
+//       return res.status(400).json({
+//         message: "Current password and new password are required",
+//       });
+//     }
+
+//     // Optional but recommended
+//     if (newPassword.length < 6) {
+//       return res.status(400).json({
+//         message: "New password must be at least 6 characters",
+//       });
+//     }
+
+//     // Get logged-in user
+//     const user = await prisma.user.findUnique({
+//       where: {
+//         id: req.user.userId,
+//       },
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({
+//         message: "User not found",
+//       });
+//     }
+
+//     // Check current password
+//     const isPasswordValid = await bcrypt.compare(
+//       currentPassword,
+//       user.password
+//     );
+
+//     console.log("Password Match:", isPasswordValid);
+
+//     if (!isPasswordValid) {
+//       return res.status(400).json({
+//         message: "Current password is incorrect",
+//       });
+//     }
+
+//     // Hash new password
+//     const hashedPassword = await bcrypt.hash(
+//       newPassword,
+//       10
+//     );
+
+//     // Update password
+//     await prisma.user.update({
+//       where: {
+//         id: user.id,
+//       },
+//       data: {
+//         password: hashedPassword,
+//         isFirstLogin: false,
+//       },
+//     });
+
+//     console.log("Password updated successfully");
+
+//     logAction({
+//       req,
+//       action: "UPDATE",
+//       module: "USER",
+//       entityId: user.id,
+//       entityName: user.name,
+//       changes: { after: { event: "PASSWORD_CHANGED" } },
+//     });
+
+//     return res.status(200).json({
+//       message: "Password changed successfully",
+//     });
+
+//   } catch (error) {
+//     console.error("CHANGE PASSWORD ERROR:");
+//     console.error(error);
+//     console.error(error.stack);
+
+//     return res.status(500).json({
+//       message: "Failed to change password",
+//     });
+//   }
+// };
+
+// const forgotPassword = async (req, res) => {
+//   try {
+//     const { email } = req.body;
+
+//     // Validate email
+//     if (!email || !email.trim()) {
+//       return res.status(400).json({
+//         message: "Email is required",
+//       });
+//     }
+
+//     const normalizedEmail = email.trim().toLowerCase();
+
+//     // Find all users with this email
+//     const users = await prisma.user.findMany({
+//       where: {
+//         email: normalizedEmail,
+//       },
+//       include: {
+//         company: true,
+//       },
+//     });
+
+//     console.log("FORGOT PASSWORD EMAIL:", normalizedEmail);
+//     console.log(
+//       "USERS FOUND:",
+//       users.map((u) => ({
+//         id: u.id,
+//         email: u.email,
+//         companyId: u.companyId,
+//         companyCode: u.company?.companyId,
+//         companyName: u.company?.companyName,
+//       }))
+//     );
+
+//     // No account found
+//     if (users.length === 0) {
+//       return res.status(404).json({
+//         message: "User not found",
+//       });
+//     }
+
+//     // Same email exists in multiple companies
+//     if (users.length > 1) {
+//       return res.status(400).json({
+//         message:
+//           "Multiple accounts are registered with this email. Please contact your company administrator.",
+//       });
+//     }
+
+//     // Exactly one user
+//     const user = users[0];
+
+//     const resetToken = crypto.randomBytes(32).toString("hex");
+
+//     const resetTokenExpiry = new Date(
+//       Date.now() + 60 * 60 * 1000
+//     );
+
+//     await prisma.user.update({
+//       where: {
+//         id: user.id,
+//       },
+//       data: {
+//         resetToken,
+//         resetTokenExpiry,
+//       },
+//     });
+
+//     const resetLink = buildFrontendUrl(`/reset-password/${resetToken}`);
+
+//     await sendPasswordResetEmail(
+//       normalizedEmail,
+//       resetLink
+//     );
+
+//     return res.status(200).json({
+//       message: "Password reset email sent successfully",
+//     });
+
+//   } catch (error) {
+//     console.error("FORGOT PASSWORD ERROR:");
+//     console.error(error);
+//     console.error(error.stack);
+
+//     return res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
+// const resetPassword = async (req, res) => {
+//   try {
+//     const { token } = req.params;
+//     const { password } = req.body;
+
+//     const user = await prisma.user.findFirst({
+//       where: {
+//         resetToken: token,
+//         resetTokenExpiry: {
+//           gt: new Date(),
+//         },
+//       },
+//     });
+
+//     if (!user) {
+//       return res.status(400).json({
+//         message: "Invalid or expired token",
+//       });
+//     }
+
+//     const hashedPassword = await bcrypt.hash(
+//       password,
+//       10
+//     );
+
+//     await prisma.user.update({
+//       where: {
+//         id: user.id,
+//       },
+//       data: {
+//         password: hashedPassword,
+//         resetToken: null,
+//         resetTokenExpiry: null,
+//         isFirstLogin: false,
+//       },
+//     });
+
+//     return res.status(200).json({
+//       message: "Password reset successful",
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({
+//       message: error.message,
+//     });
+//   }
+// };
+
+// // ========================
+// // EXPORTS
+// // ========================
+// module.exports = {
+//   registerUser,
+//   loginUser,
+//   getMe,
+//   updateProfile,
+//   changePassword,
+//   forgotPassword,
+//   resetPassword,
+// };
+
+
 const prisma = require("../config/prisma");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -57,6 +685,9 @@ const registerUser = async (req, res) => {
 
 // ========================
 // LOGIN USER
+const FORGOT_PASSWORD_GENERIC_MESSAGE =
+  "If an account exists for this email, a password reset link has been sent.";
+
 // ========================
 const loginUser = async (req, res) => {
   try {
@@ -74,7 +705,7 @@ const loginUser = async (req, res) => {
 
     if (users.length === 0) {
       return res.status(400).json({
-        message: "User not found",
+        message: "Invalid email or password",
       });
     }
 
@@ -125,7 +756,7 @@ const loginUser = async (req, res) => {
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid password",
+        message: "Invalid email or password",
       });
     }
 
@@ -509,10 +1140,11 @@ const forgotPassword = async (req, res) => {
       }))
     );
 
-    // No account found
+    // No account found - answer exactly like a success so attackers
+    // cannot discover which emails are registered.
     if (users.length === 0) {
-      return res.status(404).json({
-        message: "User not found",
+      return res.status(200).json({
+        message: FORGOT_PASSWORD_GENERIC_MESSAGE,
       });
     }
 
@@ -551,7 +1183,7 @@ const forgotPassword = async (req, res) => {
     );
 
     return res.status(200).json({
-      message: "Password reset email sent successfully",
+      message: FORGOT_PASSWORD_GENERIC_MESSAGE,
     });
 
   } catch (error) {

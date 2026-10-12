@@ -10,41 +10,29 @@
 //   deleteMessage,
 // } = require("../controllers/messageController");
 
-// // SEND MESSAGE
-// router.post(
-//   "/",
-//   authMiddleware,
-//   sendMessage
-// );
+// router.post("/", authMiddleware, sendMessage);
 
-// // GET MESSAGES
 // router.get(
 //   "/:conversationId",
 //   authMiddleware,
 //   getMessagesByConversation
 // );
 
-// // EDIT MESSAGE
-// router.put(
-//   "/:id",
-//   authMiddleware,
-//   editMessage
-// );
+// router.put("/:id", authMiddleware, editMessage);
 
-// // DELETE MESSAGE
-// router.delete(
-//   "/:id",
-//   authMiddleware,
-//   deleteMessage
-// );
+// router.delete("/:id", authMiddleware, deleteMessage);
 
 // module.exports = router;
+
+
+
 
 
 const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   sendMessage,
@@ -53,7 +41,8 @@ const {
   deleteMessage,
 } = require("../controllers/messageController");
 
-router.post("/", authMiddleware, sendMessage);
+// Expired / inactive companies cannot send, edit or delete messages (view-only).
+router.post("/", authMiddleware, allowWriteAccess, sendMessage);
 
 router.get(
   "/:conversationId",
@@ -61,8 +50,8 @@ router.get(
   getMessagesByConversation
 );
 
-router.put("/:id", authMiddleware, editMessage);
+router.put("/:id", authMiddleware, allowWriteAccess, editMessage);
 
-router.delete("/:id", authMiddleware, deleteMessage);
+router.delete("/:id", authMiddleware, allowWriteAccess, deleteMessage);
 
 module.exports = router;

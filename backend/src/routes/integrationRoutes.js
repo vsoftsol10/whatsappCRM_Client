@@ -7,7 +7,10 @@
 //   getIntegrations,
 //   getIntegrationById,
 //   updateIntegrationStatus,
+//   updateIntegrationSecret,
+//   updateIntegrationSettings,
 //   deleteIntegration,
+//   getSupportedProviders,
 // } = require("../controllers/integrationController");
 
 // const {
@@ -28,6 +31,18 @@
 //   "/",
 //   authMiddleware,
 //   getIntegrations
+// );
+
+// // ==========================================
+// // GET SUPPORTED PROVIDERS
+// // IMPORTANT: Keep this BEFORE /:id, otherwise
+// // Express matches "providers" as an :id param.
+// // ==========================================
+
+// router.get(
+//   "/providers",
+//   authMiddleware,
+//   getSupportedProviders
 // );
 
 // // ==========================================
@@ -69,6 +84,28 @@
 //   "/:id/status",
 //   authMiddleware,
 //   updateIntegrationStatus
+// );
+
+// // ==========================================
+// // UPDATE WEBHOOK SECRET
+// // Paste the provider's real signing secret here
+// // (Stripe/Razorpay dashboard) after creating the integration.
+// // ==========================================
+
+// router.put(
+//   "/:id/secret",
+//   authMiddleware,
+//   updateIntegrationSecret
+// );
+
+// // ==========================================
+// // UPDATE AUTOMATION SETTINGS
+// // ==========================================
+
+// router.put(
+//   "/:id/settings",
+//   authMiddleware,
+//   updateIntegrationSettings
 // );
 
 // // ==========================================
@@ -121,6 +158,7 @@ const {
 } = require("../controllers/integrationWebhookController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 // ==========================================
 // GET ALL INTEGRATIONS
@@ -172,6 +210,7 @@ router.get(
 router.post(
   "/",
   authMiddleware,
+  allowWriteAccess,
   createIntegration
 );
 
@@ -182,6 +221,7 @@ router.post(
 router.put(
   "/:id/status",
   authMiddleware,
+  allowWriteAccess,
   updateIntegrationStatus
 );
 
@@ -194,6 +234,7 @@ router.put(
 router.put(
   "/:id/secret",
   authMiddleware,
+  allowWriteAccess,
   updateIntegrationSecret
 );
 
@@ -204,6 +245,7 @@ router.put(
 router.put(
   "/:id/settings",
   authMiddleware,
+  allowWriteAccess,
   updateIntegrationSettings
 );
 
@@ -214,6 +256,7 @@ router.put(
 router.delete(
   "/:id",
   authMiddleware,
+  allowWriteAccess,
   deleteIntegration
 );
 
