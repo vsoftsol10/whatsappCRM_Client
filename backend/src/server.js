@@ -212,12 +212,16 @@
 
 
 
+
+
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
  
 const express = require("express");
+const http = require("http");
 const cors = require("cors");
 require("dotenv").config();
+const { initSocket } = require("./socket");
  
 const publicLeadRoutes = require("./routes/publicLeadRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -418,7 +422,10 @@ app.use((err, req, res, next) => {
  
 const PORT = process.env.PORT || 5000;
  
-app.listen(PORT, () => {
+const httpServer = http.createServer(app);
+initSocket(httpServer);
+
+httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(
     "FRONTEND_URL:",

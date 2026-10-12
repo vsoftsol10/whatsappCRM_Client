@@ -1,11 +1,21 @@
-// import { useState } from "react";
+
+// import { useEffect, useState } from "react";
 // import { Outlet, useLocation } from "react-router-dom";
 // import Sidebar from "../components/Sidebar";
 // import TopHeader from "../components/header/TopHeader";
+// import { useAuthStore } from "../store/authStore";
 
 // function AppLayout() {
 //   const location = useLocation();
 //   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+//   const fetchMe = useAuthStore((state) => state.fetchMe);
+
+//   // Top up the logged-in user with the latest info (company name, etc.)
+//   // once per app session, without forcing a re-login.
+//   useEffect(() => {
+//     fetchMe();
+//   }, [fetchMe]);
 
 //   const fullWidthPages = [
 //     "/conversations",
@@ -42,17 +52,22 @@
 // export default AppLayout;
 
 
+
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import TopHeader from "../components/header/TopHeader";
 import { useAuthStore } from "../store/authStore";
+import useChatSocket from "../hooks/useChatSocket";
 
 function AppLayout() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const fetchMe = useAuthStore((state) => state.fetchMe);
+
+  // Live chat updates (new messages, delivery ticks) on every page
+  useChatSocket();
 
   // Top up the logged-in user with the latest info (company name, etc.)
   // once per app session, without forcing a re-login.

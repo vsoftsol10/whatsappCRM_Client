@@ -594,6 +594,7 @@
 
 
 
+
 // ============================================
 // SAAS WHATSAPP WEBHOOK (multi-tenant)
 // ============================================
@@ -623,6 +624,7 @@ const {
 const { sendTextMessage } = require("../services/whatsappService");
 const { getAutoReply } = require("../services/aiService");
 const { canCompanySendMessages } = require("../utils/companyAccess");
+const { emitToCompany } = require("../socket");
 
 // ============================================
 // AI AUTO-REPLY (multi-tenant)
@@ -757,6 +759,11 @@ const attemptAutoReply = async (conversationId) => {
   await prisma.conversation.update({
     where: { id: conversationId },
     data: { lastMessage: result.reply },
+  });
+
+  emitToCompany(conversation.companyId, "message:new", {
+    conversationId,
+    message: botMessage,
   });
 
   console.log("SaaS auto-reply sent:", botMessage.id);
@@ -1123,6 +1130,11 @@ const processWebhookChange = async (field, value) => {
           "SaaS incoming message saved successfully"
         );
 
+        emitToCompany(companyId, "message:new", {
+          conversationId: conversation.id,
+          message: savedMessage,
+        });
+
         // Only fires when this specific chat has the bot ON. The company's
         // AI settings (enabled / provider / key) are checked inside
         // getAutoReply. Not awaited, so Meta gets its 200 right away.
@@ -1193,6 +1205,12 @@ const processWebhookChange = async (field, value) => {
               failureReason,
             },
           });
+
+          emitToCompany(companyId, "message:status", {
+            metaMessageId,
+            status: newStatus ? newStatus.toUpperCase() : undefined,
+            failureReason,
+          });
         } catch (error) {
           console.error(
             "Failed to update SaaS message status:",
@@ -1241,7 +1259,7 @@ const processWebhookChange = async (field, value) => {
             customerPhone
           );
 
-          await prisma.message.create({
+          const echoMessage = await prisma.message.create({
             data: {
               conversationId: conversation.id,
               content,
@@ -1251,6 +1269,11 @@ const processWebhookChange = async (field, value) => {
               status: "SENT",
               metaMessageId: echo.id || undefined,
             },
+          });
+
+          emitToCompany(companyId, "message:new", {
+            conversationId: conversation.id,
+            message: echoMessage,
           });
 
           await prisma.conversation.update({
