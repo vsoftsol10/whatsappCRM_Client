@@ -41,16 +41,47 @@ const isOutsideWindowError = (error) =>
 // ---------------------------------------------------------------
 
 // Exchange the `code` returned by FB.login() for a user access token.
+//
+// A code from the JavaScript SDK popup can be tied to a redirect_uri that we
+// do not know. Meta then answers with error 100 / subcode 36008 ("redirect_uri
+// is identical to the one you used in the OAuth dialog request"). When that
+// happens we retry with the values that are known to match: an empty
+// redirect_uri first, then the CRM's own address.
 const exchangeCodeForToken = async (code) => {
-  const res = await axios.get(`${GRAPH}/oauth/access_token`, {
-    params: {
-      client_id: process.env.META_APP_ID,
-      client_secret: process.env.META_APP_SECRET,
-      code,
-    },
-    timeout: REQUEST_TIMEOUT_MS,
-  });
-  return res.data.access_token;
+  const base = {
+    client_id: process.env.META_APP_ID,
+    client_secret: process.env.META_APP_SECRET,
+    code,
+  };
+
+  // FRONTEND_URL can hold several comma-separated addresses (see server.js)
+  const origins = (process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  const candidates = ["", ...origins.flatMap((o) => [o, `${o}/`])];
+
+  let lastError;
+  for (const redirectUri of candidates) {
+    try {
+      const res = await axios.get(`${GRAPH}/oauth/access_token`, {
+        params: { ...base, redirect_uri: redirectUri },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      console.log(
+        "Facebook code exchange succeeded (redirect_uri:",
+        JSON.stringify(redirectUri),
+        ")"
+      );
+      return res.data.access_token;
+    } catch (err) {
+      lastError = err;
+      const detail = extractError(err);
+      const isRedirectMismatch = detail.code === 100 && detail.subcode === 36008;
+      if (!isRedirectMismatch) throw err; // a different problem - stop here
+    }
+  }
+  throw lastError;
 };
 
 // Turn a user token into a long-lived one (~60 days). Page tokens obtained
