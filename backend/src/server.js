@@ -1,11 +1,13 @@
-
-
 // const dns = require("dns");
 // dns.setDefaultResultOrder("ipv4first");
  
 // const express = require("express");
+// const http = require("http");
 // const cors = require("cors");
+// const helmet = require("helmet");
+// const rateLimit = require("express-rate-limit");
 // require("dotenv").config();
+// const { initSocket } = require("./socket");
  
 // const publicLeadRoutes = require("./routes/publicLeadRoutes");
 // const authRoutes = require("./routes/authRoutes");
@@ -23,7 +25,7 @@
 // const ticketRoutes = require("./routes/ticketRoutes");
 // const dealRoutes = require("./routes/dealRoutes");
 // const dealActivityRoutes = require("./routes/dealActivityRoutes");
-// const webhookRoutes = require("./routes/webhook");
+// // const webhookRoutes = require("./routes/webhook"); // legacy, replaced (see below)
 // const userNotificationRoutes = require("./routes/userNotificationRoutes");
 // const subscriptionRoutes = require("./routes/subscriptionRoutes");
 // const planRoutes = require("./routes/planRoutes");
@@ -45,11 +47,39 @@
 // // GLOBAL MIDDLEWARE
 // // ======================================================
  
+// // Use the configured CRM frontend origin(s), rather than reflecting any
+// // requesting origin. FRONTEND_URL may contain comma-separated origins.
+// const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com")
+//   .split(",")
+//   .map((origin) => origin.trim().replace(/\/$/, ""))
+//   .filter(Boolean);
+
+// app.use(helmet());
+
+// // General API protection. Configure trust proxy correctly in production if
+// // running behind a reverse proxy so client IP-based limits are accurate.
+// app.use("/api", rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   limit: 300,
+//   standardHeaders: "draft-7",
+//   legacyHeaders: false,
+//   message: { success: false, message: "Too many requests. Please try again later." },
+// }));
+
+// // This public widget intentionally handles its own CORS before the CRM-wide
+// // CORS middleware because customer websites submit leads from their domains.
 // app.use("/api/public", publicLeadRoutes);
 
 // app.use(
 //   cors({
-//     origin: true,
+//     origin: (origin, callback) => {
+//       // Requests without an Origin header (e.g. server-to-server webhooks)
+//       // are not browser CORS requests and remain allowed.
+//       if (!origin || allowedFrontendOrigins.includes(origin.replace(/\/$/, ""))) {
+//         return callback(null, true);
+//       }
+//       return callback(new Error("Origin not allowed by CORS"));
+//     },
 //     credentials: true,
 //   })
 // );
@@ -117,7 +147,11 @@
  
 // app.use("/api/deals", dealActivityRoutes);
  
-// app.use("/api/webhook", verifyMetaWebhookSignature, webhookRoutes);
+// // LEGACY /api/webhook: the old handler (routes/webhook.js) used findUnique on
+// // non-unique fields and always threw. The URL is kept alive (in case the Meta
+// // dashboard still points to it) but now runs the same handler as /api/saas/webhook.
+// // app.use("/api/webhook", verifyMetaWebhookSignature, webhookRoutes);
+// app.use("/api/webhook", verifyMetaWebhookSignature, saasWebhookRoutes);
  
 // app.use(
 //   "/api/user-notifications",
@@ -190,9 +224,13 @@
 //   console.error(err);
 //   console.error("========================================");
  
-//   res.status(err.status || 500).json({
+//   const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500
+//     ? err.status
+//     : 500;
+//   res.status(status).json({
 //     success: false,
-//     message: err.message || "Internal Server Error",
+//     // Never expose exception text, database details, or stack-derived data.
+//     message: status === 500 ? "Internal Server Error" : "Request failed",
 //   });
 // });
  
@@ -202,16 +240,16 @@
  
 // const PORT = process.env.PORT || 5000;
  
-// app.listen(PORT, () => {
+// const httpServer = http.createServer(app);
+// initSocket(httpServer);
+
+// httpServer.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 //   console.log(
 //     "FRONTEND_URL:",
 //     process.env.FRONTEND_URL
 //   );
 // });
-
-
-
 
 
 
@@ -257,6 +295,8 @@ const backupRoutes = require("./routes/backupRoutes");
  
 const saasWebhookRoutes = require("./routes/saasWebhook");
 const verifyMetaWebhookSignature = require("./middleware/verifyMetaWebhookSignature");
+const facebookRoutes = require("./routes/facebookRoutes");
+const facebookWebhookRoutes = require("./routes/facebookWebhook");
  
 const app = express();
  
@@ -413,6 +453,17 @@ app.use(
   verifyMetaWebhookSignature,
   saasWebhookRoutes
 );
+ 
+// FACEBOOK MESSENGER
+// The webhook must be mounted BEFORE /api/facebook, because /api/facebook
+// requires a logged-in user and Meta's webhook calls are not logged in.
+app.use(
+  "/api/facebook/webhook",
+  verifyMetaWebhookSignature,
+  facebookWebhookRoutes
+);
+ 
+app.use("/api/facebook", facebookRoutes);
  
 app.use(
   "/api/support-tickets",

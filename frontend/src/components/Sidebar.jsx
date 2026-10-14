@@ -1,3 +1,4 @@
+
 // // src/components/Sidebar.jsx
 // import { useEffect, useMemo, useState } from "react";
 // import { NavLink, useLocation } from "react-router-dom";
@@ -13,29 +14,6 @@
 //   isActive
 //     ? "bg-[#25D366]/10 text-white"
 //     : "text-slate-300 hover:bg-white/5 hover:text-white";
-
-// // Built-in round logo mark, used until PLATFORM.logo is set in navigation.js
-// function PlatformMark({ className = "" }) {
-//   return (
-//     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-//       <defs>
-//         <linearGradient id="platformMarkGrad" x1="0" y1="0" x2="1" y2="1">
-//           <stop offset="0" stopColor="#25D366" />
-//           <stop offset="1" stopColor="#128C7E" />
-//         </linearGradient>
-//       </defs>
-//       <circle cx="16" cy="16" r="16" fill="url(#platformMarkGrad)" />
-//       <path
-//         d="M9.5 10.5l5.3 11.3a1.4 1.4 0 0 0 2.4 0l5.3-11.3"
-//         fill="none"
-//         stroke="#fff"
-//         strokeWidth="3"
-//         strokeLinecap="round"
-//         strokeLinejoin="round"
-//       />
-//     </svg>
-//   );
-// }
 
 // function LinkItem({ item, onClose, nested = false }) {
 //   const Icon = item.icon;
@@ -144,6 +122,8 @@
 //   const toggleParent = (key) =>
 //     setOpenParents((prev) => ({ ...prev, [key]: !prev[key] }));
 
+//   const showPlatformLogo = !!PLATFORM.logo && !platformLogoError;
+
 //   return (
 //     <>
 //       {isOpen && (
@@ -224,27 +204,25 @@
 //           </div>
 //         </nav>
 
-//         {/* PLATFORM BRAND (our logo) — pinned to the bottom, never scrolls */}
-//         <div className="shrink-0 border-t border-white/10 px-3 py-3">
-//           <div className="flex items-center gap-3 px-3">
-//             {PLATFORM.logo && !platformLogoError ? (
-//               <img
-//                 src={PLATFORM.logo}
-//                 alt={PLATFORM.name}
-//                 onError={() => setPlatformLogoError(true)}
-//                 className="h-9 w-9 shrink-0 rounded-full bg-white object-contain p-1.5"
-//               />
-//             ) : (
-//               <PlatformMark className="h-9 w-9 shrink-0" />
-//             )}
+//         {/* PLATFORM BRAND — "Powered by" + our logo, pinned to the bottom */}
+//         <div className="shrink-0 border-t border-white/10 px-6 pb-5 pt-4">
+//           <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-slate-500">
+//             Powered by
+//           </p>
 
-//             <div className="leading-tight">
-//               <p className="text-[11px] text-slate-500">Powered by</p>
-//               <p className="text-sm font-semibold tracking-tight text-slate-200">
-//                 {PLATFORM.name}
-//               </p>
-//             </div>
-//           </div>
+//           {showPlatformLogo ? (
+//             <img
+//               src={PLATFORM.logo}
+//               alt={PLATFORM.name}
+//               onError={() => setPlatformLogoError(true)}
+//               className="mt-2.5 h-11 w-auto max-w-full object-contain object-left"
+//             />
+//           ) : (
+//             // Only shown if the logo file is missing or fails to load
+//             <p className="mt-2.5 text-lg font-semibold tracking-tight text-slate-200">
+//               {PLATFORM.name}
+//             </p>
+//           )}
 //         </div>
 //       </aside>
 //     </>

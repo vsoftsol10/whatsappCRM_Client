@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 // const {
 //   sendTextMessage,
@@ -161,9 +162,26 @@
 //   try {
 //     const { conversationId } = req.params;
 
+//     // Verify the conversation belongs to the authenticated company before
+//     // returning any messages. Keep the existing response shape and ordering.
+//     const conversation = await prisma.conversation.findFirst({
+//       where: {
+//         id: conversationId,
+//         companyId: req.user.companyId,
+//       },
+//       select: { id: true },
+//     });
+
+//     if (!conversation) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Conversation not found",
+//       });
+//     }
+
 //     const messages = await prisma.message.findMany({
 //       where: {
-//         conversationId,
+//         conversationId: conversation.id,
 //       },
 //       orderBy: {
 //         createdAt: "asc",
@@ -197,8 +215,12 @@
 //       });
 //     }
 
-//     const existingMessage = await prisma.message.findUnique({
-//       where: { id },
+//     // Scope the message lookup through its conversation's company.
+//     const existingMessage = await prisma.message.findFirst({
+//       where: {
+//         id,
+//         conversation: { companyId: req.user.companyId },
+//       },
 //     });
 
 //     if (!existingMessage) {
@@ -236,10 +258,24 @@
 //   try {
 //     const { id } = req.params;
 
-//     await prisma.message.delete({
+//     // Delete only if the message belongs to the authenticated company.
+//     const existingMessage = await prisma.message.findFirst({
 //       where: {
 //         id,
+//         conversation: { companyId: req.user.companyId },
 //       },
+//       select: { id: true },
+//     });
+
+//     if (!existingMessage) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Message not found",
+//       });
+//     }
+
+//     await prisma.message.delete({
+//       where: { id: existingMessage.id },
 //     });
 
 //     res.status(200).json({
@@ -472,6 +508,7 @@
 // };
 
 
+
 const prisma = require("../config/prisma");
 const {
   sendTextMessage,
@@ -480,6 +517,7 @@ const {
 } = require("../services/whatsappService");
 const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 const { classifyMedia } = require("../middleware/mediaUploadMiddleware");
+const { sendMessengerReply } = require("../helpers/messengerSend");
 
 // SEND MESSAGE
 const sendMessage = async (req, res) => {
@@ -522,6 +560,7 @@ const sendMessage = async (req, res) => {
       include: {
         customer: true,
         whatsappAccount: true,
+        facebookPage: true,
       },
     });
 
@@ -529,6 +568,17 @@ const sendMessage = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Conversation not found",
+      });
+    }
+
+    // FACEBOOK MESSENGER chats are handled by their own helper.
+    // WhatsApp chats skip this and continue exactly as before.
+    if (conversation.channel === "MESSENGER") {
+      return sendMessengerReply(res, conversation, {
+        content,
+        sender,
+        messageType,
+        status,
       });
     }
 
@@ -821,6 +871,15 @@ const sendMediaMessage = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Conversation not found",
+      });
+    }
+
+    // Sending files is WhatsApp-only for now (Messenger supports text replies).
+    if (conversation.channel === "MESSENGER") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Sending files is not supported on Messenger yet. Please send a text message.",
       });
     }
 

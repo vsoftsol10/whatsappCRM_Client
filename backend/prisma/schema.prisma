@@ -52,6 +52,9 @@ model Company {
   // WhatsApp Business connection
   whatsappAccounts WhatsAppAccount[]
 
+  // Facebook Pages connected for Messenger
+  facebookPages FacebookPage[]
+
   // SaaS
   subscriptions   Subscription[]
   supportTickets  SupportTicket[]
@@ -627,6 +630,12 @@ model Conversation {
 
   phone String?
 
+  // FACEBOOK MESSENGER (all null for WhatsApp conversations)
+  // channel = "MESSENGER" for these conversations.
+  facebookPageId Int?
+  externalUserId String? // the person's Page-Scoped ID (PSID)
+  contactName    String? // name shown when there is no linked customer
+
   status  String @default("OPEN")
   channel String @default("WHATSAPP")
 
@@ -648,6 +657,7 @@ model Conversation {
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer        Customer?        @relation(fields: [customerId], references: [id])
   whatsappAccount WhatsAppAccount? @relation(fields: [whatsappAccountId], references: [id], onDelete: SetNull)
+  facebookPage    FacebookPage?    @relation(fields: [facebookPageId], references: [id], onDelete: SetNull)
 
   messages Message[]
 
@@ -655,6 +665,8 @@ model Conversation {
 
   @@index([companyId])
   @@index([whatsappAccountId])
+  @@index([facebookPageId])
+  @@unique([facebookPageId, externalUserId])
 }
 
 //////////////////////////////////////////////////////
@@ -1706,4 +1718,40 @@ model Purchase {
   @@index([integrationId])
   @@index([externalOrderId])
   @@index([purchaseDate])
+}
+
+//////////////////////////////////////////////////////
+// FACEBOOK PAGE (Messenger)
+//////////////////////////////////////////////////////
+
+model FacebookPage {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+
+  // Facebook's own Page ID. Meta webhooks tell us which Page a message
+  // belongs to, so this is how we find the company.
+  pageId   String  @unique
+  pageName String?
+
+  // Page access token, stored ENCRYPTED (see utils/secretCrypto.js).
+  // null once the Page is disconnected.
+  pageAccessToken String?
+
+  // CONNECTED | RECONNECT_NEEDED | DISCONNECTED
+  status String @default("CONNECTED")
+
+  connectedByUserId String?
+
+  connectedAt    DateTime  @default(now())
+  disconnectedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@index([companyId])
+  @@index([status])
 }
