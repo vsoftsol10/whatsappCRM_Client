@@ -51,7 +51,7 @@ const getFacebookPages = async (req, res) => {
 const connectFacebookPages = async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    const { code } = req.body;
+    const { code, accessToken } = req.body;
 
     if (!companyId) {
       return res
@@ -59,15 +59,18 @@ const connectFacebookPages = async (req, res) => {
         .json({ success: false, message: "Company ID is required" });
     }
 
-    if (!code) {
+    if (!accessToken && !code) {
       return res.status(400).json({
         success: false,
-        message: "Missing authorization code from Facebook",
+        message: "Missing login result from Facebook",
       });
     }
 
-    // 1. code -> user token -> long-lived user token
-    const shortToken = await fb.exchangeCodeForToken(code);
+    // 1. Facebook token -> long-lived user token.
+    //    Normal case: the browser already received an access token from the
+    //    login popup. (A code is still supported as a fallback.)
+    //    Meta checks the token itself when we extend it / read the Pages.
+    const shortToken = accessToken || (await fb.exchangeCodeForToken(code));
     const userToken = await fb.extendUserToken(shortToken);
 
     // 2. Pages this person shared with us (each has its own Page token)

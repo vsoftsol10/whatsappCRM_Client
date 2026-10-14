@@ -50,10 +50,10 @@ function FacebookMessengerCard({ isAdmin = false }) {
   const hasPages = pages.length > 0;
   const needsReconnect = pages.some((p) => p.status === "RECONNECT_NEEDED");
 
-  // Send the code from Facebook to our backend
-  const finishConnect = async (code) => {
+  // Send the Facebook login result (access token, or code) to our backend
+  const finishConnect = async ({ accessToken, code }) => {
     try {
-      const data = await connectFacebookPages(code);
+      const data = await connectFacebookPages({ accessToken, code });
 
       setNotice({
         type: "success",
@@ -106,9 +106,12 @@ function FacebookMessengerCard({ isAdmin = false }) {
     // NOTE: FB.login needs a normal (non-async) callback.
     window.FB.login(
       (response) => {
+        // A "User access token" configuration returns an access token
+        // directly, so there is no code to exchange on the server.
+        const accessToken = response?.authResponse?.accessToken;
         const code = response?.authResponse?.code;
 
-        if (!code) {
+        if (!accessToken && !code) {
           setConnecting(false);
           setNotice({
             type: "info",
@@ -117,12 +120,10 @@ function FacebookMessengerCard({ isAdmin = false }) {
           return;
         }
 
-        finishConnect(code);
+        finishConnect({ accessToken, code });
       },
       {
         config_id: FACEBOOK_CONFIG_ID,
-        response_type: "code",
-        override_default_response_type: true,
       }
     );
   };

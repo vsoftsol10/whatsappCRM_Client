@@ -8,9 +8,11 @@ export const getFacebookPages = async () => {
   return response.data;
 };
 
-// Send the code returned by FB.login() to the backend (admin only)
-export const connectFacebookPages = async (code) => {
+// Send the result of FB.login() to the backend (admin only).
+// Pass { accessToken } (normal case) or { code }.
+export const connectFacebookPages = async ({ accessToken, code }) => {
   const response = await apiClient.post(`${FACEBOOK_BASE_URL}/connect`, {
+    accessToken,
     code,
   });
   return response.data;
