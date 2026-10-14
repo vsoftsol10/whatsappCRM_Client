@@ -163,7 +163,9 @@ const connectFacebookPages = async (req, res) => {
     console.error("FACEBOOK CONNECT ERROR:", detail);
     return res.status(500).json({
       success: false,
-      message: "Failed to connect Facebook. Please try again.",
+      // Meta's own reason (safe to show to the admin) makes problems easy to diagnose.
+      message: `Failed to connect Facebook: ${detail.message}`,
+      metaErrorCode: detail.code,
     });
   }
 };
