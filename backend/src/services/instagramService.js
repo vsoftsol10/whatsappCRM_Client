@@ -98,8 +98,6 @@ const buildAuthUrl = (state) => {
     response_type: "code",
     scope: INSTAGRAM_LOGIN_SCOPES.join(","),
     state,
-    // always show the login screen so an admin can pick the right account
-    force_reauth: "true",
   });
   return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
 };
