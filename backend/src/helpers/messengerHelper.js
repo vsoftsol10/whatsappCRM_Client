@@ -1,22 +1,47 @@
+
 // // ============================================================
-// // MESSENGER HELPERS
+// // MESSENGER / INSTAGRAM HELPERS
 // //  - getOrCreateMessengerConversation : one conversation per (Page, person)
-// //  - resolveMessengerContent          : Messenger payload -> CRM message fields
+// //  - resolveMessengerContent          : platform payload -> CRM message fields
+// //
+// // Works for both Messenger (channel "MESSENGER") and Instagram DMs
+// // (channel "INSTAGRAM"). Messenger behaviour is unchanged.
 // // ============================================================
 // const axios = require("axios");
 // const prisma = require("../config/prisma");
 // const { decryptSecret } = require("../utils/secretCrypto");
-// const { getUserProfile } = require("../services/facebookService");
+// const {
+//   getUserProfile,
+//   getInstagramUserProfile,
+// } = require("../services/facebookService");
 // const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
+// const {
+//   INSTAGRAM_CHANNEL,
+//   toInstagramExternalId,
+//   INSTAGRAM_ATTACHMENT_LABELS,
+// } = require("./instagramHelper");
 
 // // ------------------------------------------------------------
 // // CONVERSATION
 // // ------------------------------------------------------------
-// const getOrCreateMessengerConversation = async (page, psid) => {
+// // `personId` is the Page-scoped ID (Messenger) or Instagram-scoped ID
+// // (Instagram) exactly as Meta sends it.
+// const getOrCreateMessengerConversation = async (
+//   page,
+//   personId,
+//   channel = "MESSENGER"
+// ) => {
+//   const isInstagram = channel === INSTAGRAM_CHANNEL;
+
+//   // Instagram IDs are stored with a prefix so they never clash with Messenger IDs.
+//   const externalUserId = isInstagram
+//     ? toInstagramExternalId(personId)
+//     : personId;
+
 //   const where = {
 //     facebookPageId_externalUserId: {
 //       facebookPageId: page.id,
-//       externalUserId: psid,
+//       externalUserId,
 //     },
 //   };
 
@@ -27,25 +52,33 @@
 
 //   if (existing) return existing;
 
-//   // New person: try to get their name (needs "Business Asset User Profile
-//   // Access" on the Meta app - if missing we fall back to a generic name).
+//   // New person: try to get their name (Messenger needs "Business Asset User
+//   // Profile Access"; if missing we fall back to a generic name).
 //   let profile = null;
-//   const token = page.pageAccessToken ? decryptSecret(page.pageAccessToken) : null;
+//   const token = page.pageAccessToken
+//     ? decryptSecret(page.pageAccessToken)
+//     : null;
 //   if (token) {
-//     profile = await getUserProfile(token, psid);
+//     profile = isInstagram
+//       ? await getInstagramUserProfile(token, personId)
+//       : await getUserProfile(token, personId);
 //   }
+
+//   const fallbackName = `${isInstagram ? "Instagram" : "Facebook"} user ${String(
+//     personId
+//   ).slice(-4)}`;
 
 //   try {
 //     return await prisma.conversation.create({
 //       data: {
 //         companyId: page.companyId,
 //         facebookPageId: page.id,
-//         externalUserId: psid,
-//         contactName: profile?.name || `Facebook user ${psid.slice(-4)}`,
+//         externalUserId,
+//         contactName: profile?.name || fallbackName,
 //         status: "OPEN",
-//         channel: "MESSENGER",
+//         channel: isInstagram ? INSTAGRAM_CHANNEL : "MESSENGER",
 //         unreadCount: 0,
-//         // AI auto-reply for Messenger is not enabled yet.
+//         // AI auto-reply for Messenger / Instagram is not enabled yet.
 //         botEnabled: false,
 //       },
 //       include: { customer: true },
@@ -68,7 +101,7 @@
 // // ------------------------------------------------------------
 // const MAX_MEDIA_BYTES = 15 * 1024 * 1024; // 15 MB
 
-// // Messenger attachment type -> CRM messageType + placeholder text
+// // Attachment type -> CRM messageType + placeholder text
 // const ATTACHMENT_MAP = {
 //   image: { messageType: "IMAGE", label: "📷 Photo", resourceType: "image" },
 //   video: { messageType: "VIDEO", label: "🎥 Video", resourceType: "video" },
@@ -76,8 +109,9 @@
 //   file: { messageType: "DOCUMENT", label: "📎 File", resourceType: "raw" },
 // };
 
-// // Facebook's attachment links are temporary CDN links. Copy the file to
-// // Cloudinary so it keeps working. If anything fails we keep the original link.
+// // Facebook / Instagram attachment links are temporary CDN links. Copy the
+// // file to Cloudinary so it keeps working. If anything fails we keep the
+// // original link.
 // const rehostAttachment = async (url, resourceType) => {
 //   if (!url) return null;
 
@@ -123,6 +157,12 @@
 //       if (!content) {
 //         content = url ? `📍 Location: ${url}` : "📍 Location shared";
 //       }
+//     } else if (INSTAGRAM_ATTACHMENT_LABELS[first.type]) {
+//       // Instagram shares / story mentions / reels
+//       if (!content) {
+//         const label = INSTAGRAM_ATTACHMENT_LABELS[first.type];
+//         content = url ? `${label}: ${url}` : label;
+//       }
 //     } else if (!content) {
 //       content = `[${first.type || "unsupported"} attachment]`;
 //     }
@@ -146,7 +186,6 @@
 
 
 
-
 // ============================================================
 // MESSENGER / INSTAGRAM HELPERS
 //  - getOrCreateMessengerConversation : one conversation per (Page, person)
@@ -162,6 +201,9 @@ const {
   getUserProfile,
   getInstagramUserProfile,
 } = require("../services/facebookService");
+const {
+  getInstagramLoginUserProfile,
+} = require("../services/instagramService");
 const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 const {
   INSTAGRAM_CHANNEL,
@@ -207,8 +249,11 @@ const getOrCreateMessengerConversation = async (
     ? decryptSecret(page.pageAccessToken)
     : null;
   if (token) {
+    // Instagram connected directly (no Facebook) is read from graph.instagram.com
     profile = isInstagram
-      ? await getInstagramUserProfile(token, personId)
+      ? page.connectionType === "INSTAGRAM_LOGIN"
+        ? await getInstagramLoginUserProfile(token, personId)
+        : await getInstagramUserProfile(token, personId)
       : await getUserProfile(token, personId);
   }
 

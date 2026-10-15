@@ -1,10 +1,12 @@
+
 // // ============================================================
-// // FACEBOOK PAGE WEBHOOK  (Messenger)
+// // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 // //
 // // Mounted in server.js as:
 // //   app.use("/api/facebook/webhook", verifyMetaWebhookSignature, facebookWebhookRoutes);
 // //
 // // Meta callback URL:  https://<your-backend-domain>/api/facebook/webhook
+// // Use the same URL for the "Page" webhook AND the "Instagram" webhook.
 // //
 // // Same Meta app as WhatsApp, so the same META_APP_SECRET is used to
 // // verify the X-Hub-Signature-256 header (done by verifyMetaWebhookSignature).
@@ -18,6 +20,7 @@
 //   getOrCreateMessengerConversation,
 //   resolveMessengerContent,
 // } = require("../helpers/messengerHelper");
+// const { INSTAGRAM_CHANNEL } = require("../helpers/instagramHelper");
 // const { emitToCompany } = require("../socket");
 
 // // Same transient-error list the WhatsApp webhook uses: for these we answer
@@ -61,27 +64,31 @@
 // });
 
 // // ------------------------------------------------------------
-// // One Messenger event (a person messaged the Page, or the Page sent one)
+// // One event (a person messaged the Page / Instagram account, or the
+// // account itself sent a message)
 // // ------------------------------------------------------------
-// const processMessagingEvent = async (page, event) => {
+// const processMessagingEvent = async (page, event, channel) => {
 //   const message = event?.message;
 
 //   // delivery / read / postback events are ignored for now
 //   if (!message || !message.mid) return;
 
+//   // Message the person unsent on Instagram - nothing to show
+//   if (message.is_deleted) return;
+
 //   const isEcho = !!message.is_echo;
 
 //   // Echo of a message WE sent from the CRM: it is already saved by the
-//   // send API, so skip it. Echoes from the Page inbox / Business Suite
-//   // (a different app_id or none) are mirrored into the CRM below.
+//   // send API, so skip it. Echoes from the Page inbox / Business Suite /
+//   // Instagram app (a different app_id or none) are mirrored below.
 //   if (isEcho && String(message.app_id) === String(process.env.META_APP_ID)) {
 //     return;
 //   }
 
 //   // For a normal message the person is the sender; for an echo the person
-//   // is the recipient (the Page is the sender).
-//   const psid = isEcho ? event.recipient?.id : event.sender?.id;
-//   if (!psid) return;
+//   // is the recipient (the Page / Instagram account is the sender).
+//   const personId = isEcho ? event.recipient?.id : event.sender?.id;
+//   if (!personId) return;
 
 //   // Meta re-delivers events - skip anything we already stored.
 //   const alreadySaved = await prisma.message.findUnique({
@@ -89,20 +96,21 @@
 //     select: { id: true },
 //   });
 //   if (alreadySaved) {
-//     console.log("Duplicate Messenger message skipped:", message.mid);
+//     console.log("Duplicate message skipped:", message.mid);
 //     return;
 //   }
 
 //   const conversation = await getOrCreateMessengerConversation(
 //     page,
-//     String(psid)
+//     String(personId),
+//     channel
 //   );
 
 //   const { content, messageType, imageUrl } = await resolveMessengerContent(
 //     message
 //   );
 
-//   // ---------- Page owner replied from Meta Business Suite / Page inbox ----------
+//   // ---------- Account owner replied outside the CRM ----------
 //   if (isEcho) {
 //     try {
 //       const echoMessage = await prisma.message.create({
@@ -133,7 +141,7 @@
 //     return;
 //   }
 
-//   // ---------- Person messaged the Page ----------
+//   // ---------- Person messaged us ----------
 //   const savedMessage = await saveIncomingMessage(conversation.id, content, {
 //     metaMessageId: message.mid,
 //     messageType,
@@ -148,7 +156,7 @@
 //     message: savedMessage,
 //   });
 
-//   // FUTURE: AI auto-reply for Messenger plugs in here
+//   // FUTURE: AI auto-reply for Messenger / Instagram plugs in here
 //   // (same idea as triggerAutoReply() in saasWebhook.js).
 // };
 
@@ -158,10 +166,14 @@
 // router.post("/", async (req, res) => {
 //   const body = req.body;
 
-//   // Only Page events belong on this URL.
-//   if (body?.object !== "page") {
+//   // Only Facebook Page and Instagram events belong on this URL.
+//   const objectType = body?.object;
+//   if (objectType !== "page" && objectType !== "instagram") {
 //     return res.sendStatus(404);
 //   }
+
+//   const isInstagram = objectType === "instagram";
+//   const channel = isInstagram ? INSTAGRAM_CHANNEL : "MESSENGER";
 
 //   const entries = Array.isArray(body.entry) ? body.entry : [];
 //   let retryNeeded = false;
@@ -171,14 +183,20 @@
 //     if (!events.length) continue;
 
 //     try {
-//       // entry.id is the Facebook Page ID -> tells us which company it is
-//       const page = await prisma.facebookPage.findUnique({
-//         where: { pageId: String(entry.id) },
-//       });
+//       // Facebook: entry.id is the Page ID.
+//       // Instagram: entry.id is the Instagram professional account ID.
+//       // Either one tells us which company it is.
+//       const page = isInstagram
+//         ? await prisma.facebookPage.findUnique({
+//             where: { instagramAccountId: String(entry.id) },
+//           })
+//         : await prisma.facebookPage.findUnique({
+//             where: { pageId: String(entry.id) },
+//           });
 
 //       if (!page || page.status === "DISCONNECTED") {
 //         console.log(
-//           "Facebook webhook: no active connected Page for",
+//           `${isInstagram ? "Instagram" : "Facebook"} webhook: no active connected account for`,
 //           entry.id
 //         );
 //         continue;
@@ -186,10 +204,10 @@
 
 //       for (const event of events) {
 //         try {
-//           await processMessagingEvent(page, event);
+//           await processMessagingEvent(page, event, channel);
 //         } catch (error) {
 //           console.error(
-//             "Failed to process Messenger event:",
+//             "Failed to process message event:",
 //             event?.message?.mid,
 //             error
 //           );
@@ -197,7 +215,7 @@
 //         }
 //       }
 //     } catch (error) {
-//       console.error("Facebook webhook entry failed:", entry?.id, error);
+//       console.error("Webhook entry failed:", entry?.id, error);
 //       if (isTransientError(error)) retryNeeded = true;
 //     }
 //   }
@@ -206,6 +224,7 @@
 // });
 
 // module.exports = router;
+
 
 
 // ============================================================
@@ -290,7 +309,14 @@ const processMessagingEvent = async (page, event, channel) => {
   // Echo of a message WE sent from the CRM: it is already saved by the
   // send API, so skip it. Echoes from the Page inbox / Business Suite /
   // Instagram app (a different app_id or none) are mirrored below.
-  if (isEcho && String(message.app_id) === String(process.env.META_APP_ID)) {
+  // (Instagram-Login accounts: the echo carries the Instagram App ID instead.)
+  if (
+    isEcho &&
+    [process.env.META_APP_ID, process.env.INSTAGRAM_APP_ID]
+      .filter(Boolean)
+      .map(String)
+      .includes(String(message.app_id))
+  ) {
     return;
   }
 

@@ -1739,6 +1739,15 @@ model FacebookPage {
   instagramAccountId String? @unique
   instagramUsername  String?
 
+  // FACEBOOK_LOGIN  = connected through Facebook (Page, plus linked Instagram)
+  // INSTAGRAM_LOGIN = Instagram connected directly, no Facebook needed.
+  //                   (pageId is then "ig_<instagram id>" and
+  //                    pageAccessToken holds the Instagram token)
+  connectionType String @default("FACEBOOK_LOGIN")
+
+  // INSTAGRAM_LOGIN only: when the 60-day Instagram token expires
+  tokenExpiresAt DateTime?
+
   // Page access token, stored ENCRYPTED (see utils/secretCrypto.js).
   // null once the Page is disconnected.
   pageAccessToken String?

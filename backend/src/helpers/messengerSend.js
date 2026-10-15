@@ -1,21 +1,27 @@
+
 // // ============================================================
-// // MESSENGER REPLY (used by messageController.sendMessage)
+// // MESSENGER / INSTAGRAM REPLY (used by messageController.sendMessage)
 // //
-// // Called only when conversation.channel === "MESSENGER".
+// // Called only when conversation.channel is "MESSENGER" or "INSTAGRAM".
 // // WhatsApp conversations never reach this file.
 // // ============================================================
 // const prisma = require("../config/prisma");
 // const { decryptSecret } = require("../utils/secretCrypto");
 // const {
 //   sendMessengerText,
+//   sendInstagramText,
 //   isTokenError,
 //   isOutsideWindowError,
 // } = require("../services/facebookService");
+// const {
+//   INSTAGRAM_CHANNEL,
+//   fromExternalId,
+// } = require("./instagramHelper");
 
-// const WINDOW_MS = 24 * 60 * 60 * 1000; // Messenger: free replies for 24h
+// const WINDOW_MS = 24 * 60 * 60 * 1000; // free replies for 24h
 
 // const WINDOW_CLOSED_MESSAGE =
-//   "The 24-hour Messenger reply window has closed. You can reply again once this person messages your Page.";
+//   "The 24-hour reply window has closed. You can reply again once this person messages your Page or Instagram account.";
 
 // const RECONNECT_MESSAGE =
 //   "The Facebook connection has expired. Please reconnect Facebook in Settings → Security.";
@@ -36,9 +42,10 @@
 //   { content, sender, messageType = "TEXT", status = "SENT" }
 // ) => {
 //   const text = content.trim();
+//   const isInstagram = conversation.channel === INSTAGRAM_CHANNEL;
 //   let metaMessageId;
 
-//   // Only AGENT messages are actually delivered to Messenger
+//   // Only AGENT messages are actually delivered
 //   // (same rule the WhatsApp path uses).
 //   if (sender === "AGENT") {
 //     const page = conversation.facebookPage;
@@ -64,10 +71,18 @@
 //       });
 //     }
 
+//     if (isInstagram && !page.instagramAccountId) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "No Instagram account is linked to this Facebook Page. Link it, then click Add / Update Pages in Settings → Security.",
+//       });
+//     }
+
 //     if (!conversation.externalUserId) {
 //       return res.status(400).json({
 //         success: false,
-//         message: "Recipient not found for this Messenger chat",
+//         message: "Recipient not found for this chat",
 //       });
 //     }
 
@@ -100,11 +115,12 @@
 //       });
 //     }
 
-//     const result = await sendMessengerText(
-//       token,
-//       conversation.externalUserId,
-//       text
-//     );
+//     // Instagram chats store the person's ID with a prefix - strip it.
+//     const recipientId = fromExternalId(conversation.externalUserId);
+
+//     const result = isInstagram
+//       ? await sendInstagramText(token, page.pageId, recipientId, text)
+//       : await sendMessengerText(token, recipientId, text);
 
 //     if (!result.success) {
 //       if (isTokenError(result.error)) {
@@ -124,10 +140,13 @@
 //         });
 //       }
 
-//       console.error("Messenger send failed:", result.error);
+//       console.error(
+//         `${isInstagram ? "Instagram" : "Messenger"} send failed:`,
+//         result.error
+//       );
 //       return res.status(500).json({
 //         success: false,
-//         message: "Failed to send Messenger message",
+//         message: `Failed to send ${isInstagram ? "Instagram" : "Messenger"} message`,
 //         error: result.error?.message,
 //       });
 //     }
@@ -179,6 +198,7 @@
 // module.exports = { sendMessengerReply };
 
 
+
 // ============================================================
 // MESSENGER / INSTAGRAM REPLY (used by messageController.sendMessage)
 //
@@ -193,6 +213,7 @@ const {
   isTokenError,
   isOutsideWindowError,
 } = require("../services/facebookService");
+const { sendInstagramLoginText } = require("../services/instagramService");
 const {
   INSTAGRAM_CHANNEL,
   fromExternalId,
@@ -205,6 +226,14 @@ const WINDOW_CLOSED_MESSAGE =
 
 const RECONNECT_MESSAGE =
   "The Facebook connection has expired. Please reconnect Facebook in Settings → Security.";
+
+// Instagram connected directly (no Facebook) has its own wording / token type
+const isInstagramLogin = (page) => page?.connectionType === "INSTAGRAM_LOGIN";
+
+const reconnectMessageFor = (page) =>
+  isInstagramLogin(page)
+    ? "The Instagram connection has expired. Please reconnect Instagram in Settings → Security."
+    : RECONNECT_MESSAGE;
 
 const markReconnectNeeded = (pageId) =>
   prisma.facebookPage
@@ -239,7 +268,9 @@ const sendMessengerReply = async (
     ) {
       return res.status(400).json({
         success: false,
-        message: "Facebook Page is not connected",
+        message: isInstagramLogin(page)
+          ? "Instagram account is not connected"
+          : "Facebook Page is not connected",
       });
     }
 
@@ -247,7 +278,7 @@ const sendMessengerReply = async (
       return res.status(400).json({
         success: false,
         code: "FACEBOOK_RECONNECT_NEEDED",
-        message: RECONNECT_MESSAGE,
+        message: reconnectMessageFor(page),
       });
     }
 
@@ -291,15 +322,19 @@ const sendMessengerReply = async (
       return res.status(400).json({
         success: false,
         code: "FACEBOOK_RECONNECT_NEEDED",
-        message: RECONNECT_MESSAGE,
+        message: reconnectMessageFor(page),
       });
     }
 
     // Instagram chats store the person's ID with a prefix - strip it.
     const recipientId = fromExternalId(conversation.externalUserId);
 
+    // Instagram connected directly uses graph.instagram.com + its own token;
+    // Instagram connected via a Facebook Page uses the Page token.
     const result = isInstagram
-      ? await sendInstagramText(token, page.pageId, recipientId, text)
+      ? isInstagramLogin(page)
+        ? await sendInstagramLoginText(token, recipientId, text)
+        : await sendInstagramText(token, page.pageId, recipientId, text)
       : await sendMessengerText(token, recipientId, text);
 
     if (!result.success) {
@@ -308,7 +343,7 @@ const sendMessengerReply = async (
         return res.status(400).json({
           success: false,
           code: "FACEBOOK_RECONNECT_NEEDED",
-          message: RECONNECT_MESSAGE,
+          message: reconnectMessageFor(page),
         });
       }
 

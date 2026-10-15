@@ -1,3 +1,4 @@
+
 // const dns = require("dns");
 // dns.setDefaultResultOrder("ipv4first");
  
@@ -39,6 +40,8 @@
  
 // const saasWebhookRoutes = require("./routes/saasWebhook");
 // const verifyMetaWebhookSignature = require("./middleware/verifyMetaWebhookSignature");
+// const facebookRoutes = require("./routes/facebookRoutes");
+// const facebookWebhookRoutes = require("./routes/facebookWebhook");
  
 // const app = express();
  
@@ -196,6 +199,17 @@
 //   saasWebhookRoutes
 // );
  
+// // FACEBOOK MESSENGER
+// // The webhook must be mounted BEFORE /api/facebook, because /api/facebook
+// // requires a logged-in user and Meta's webhook calls are not logged in.
+// app.use(
+//   "/api/facebook/webhook",
+//   verifyMetaWebhookSignature,
+//   facebookWebhookRoutes
+// );
+ 
+// app.use("/api/facebook", facebookRoutes);
+ 
 // app.use(
 //   "/api/support-tickets",
 //   supportTicketRoutes
@@ -253,7 +267,6 @@
 
 
 
-
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
  
@@ -297,6 +310,10 @@ const saasWebhookRoutes = require("./routes/saasWebhook");
 const verifyMetaWebhookSignature = require("./middleware/verifyMetaWebhookSignature");
 const facebookRoutes = require("./routes/facebookRoutes");
 const facebookWebhookRoutes = require("./routes/facebookWebhook");
+const instagramRoutes = require("./routes/instagramRoutes");
+const {
+  startInstagramTokenRefreshJob,
+} = require("./jobs/instagramTokenRefresh");
  
 const app = express();
  
@@ -464,6 +481,10 @@ app.use(
 );
  
 app.use("/api/facebook", facebookRoutes);
+
+// INSTAGRAM LOGIN (customers without Facebook)
+// /callback is public (Instagram redirects the browser there); /auth-url is admin-only.
+app.use("/api/instagram", instagramRoutes);
  
 app.use(
   "/api/support-tickets",
@@ -514,6 +535,7 @@ initSocket(httpServer);
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  startInstagramTokenRefreshJob();
   console.log(
     "FRONTEND_URL:",
     process.env.FRONTEND_URL
