@@ -63,6 +63,7 @@ const extractError = (err) => {
     code: e?.code ?? null,
     subcode: e?.error_subcode ?? null,
     type: e?.type ?? e?.error_type ?? null,
+    fbtrace: e?.fbtrace_id ?? null,
   };
 };
 
@@ -141,41 +142,72 @@ const exchangeCodeForToken = async (code) => {
 // ------------------------------------------------------------
 const getLongLivedToken = async (shortToken) => {
   const { appSecret } = getConfig();
-  const fields = {
-    grant_type: "ig_exchange_token",
-    client_secret: appSecret,
-    access_token: shortToken,
-  };
 
-  let res;
-  try {
-    // Meta now answers GET here with "Unsupported request - method type: get"
-    // for many apps, so try POST (form body) first ...
-    res = await axios.post(
-      `${IG_GRAPH_ROOT}/access_token`,
-      new URLSearchParams(fields).toString(),
-      {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        timeout: REQUEST_TIMEOUT_MS,
+  // Meta's docs say GET https://graph.instagram.com/access_token. Some apps get
+  // "Unsupported request - method type: ..." for it, so we try every sensible
+  // variant and record what each one returned (never the secret/token itself).
+  const secrets = [["instagram-secret", appSecret]];
+  if (process.env.META_APP_SECRET && process.env.META_APP_SECRET !== appSecret) {
+    secrets.push(["meta-secret", process.env.META_APP_SECRET]);
+  }
+
+  const attempts = [];
+
+  for (const [secretName, secret] of secrets) {
+    const fields = {
+      grant_type: "ig_exchange_token",
+      client_secret: secret,
+      access_token: shortToken,
+    };
+
+    for (const method of ["GET", "POST"]) {
+      try {
+        const res =
+          method === "GET"
+            ? await axios.get(`${IG_GRAPH_ROOT}/access_token`, {
+                params: fields,
+                timeout: REQUEST_TIMEOUT_MS,
+              })
+            : await axios.post(
+                `${IG_GRAPH_ROOT}/access_token`,
+                new URLSearchParams(fields).toString(),
+                {
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                  },
+                  timeout: REQUEST_TIMEOUT_MS,
+                }
+              );
+
+        if (res.data?.access_token) {
+          const expiresInSec =
+            Number(res.data?.expires_in) || 60 * 24 * 60 * 60;
+          return {
+            accessToken: res.data.access_token,
+            expiresAt: new Date(Date.now() + expiresInSec * 1000),
+          };
+        }
+        attempts.push({ method, secret: secretName, note: "no token in response" });
+      } catch (err) {
+        const d = extractError(err);
+        attempts.push({
+          method,
+          secret: secretName,
+          status: err?.response?.status ?? null,
+          code: d.code,
+          message: d.message,
+          fbtrace: d.fbtrace,
+        });
       }
-    );
-  } catch (postErr) {
-    // ... and fall back to the documented GET if POST is refused.
-    try {
-      res = await axios.get(`${IG_GRAPH_ROOT}/access_token`, {
-        params: fields,
-        timeout: REQUEST_TIMEOUT_MS,
-      });
-    } catch (getErr) {
-      throw postErr?.response ? postErr : getErr;
     }
   }
 
-  const expiresInSec = Number(res.data?.expires_in) || 60 * 24 * 60 * 60;
-  return {
-    accessToken: res.data.access_token,
-    expiresAt: new Date(Date.now() + expiresInSec * 1000),
-  };
+  const first = attempts[0] || {};
+  const error = new Error(
+    `Instagram refused to issue a long-lived token (${first.message || "no response"})`
+  );
+  error.attempts = attempts;
+  throw error;
 };
 
 // ------------------------------------------------------------

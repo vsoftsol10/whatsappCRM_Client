@@ -87,7 +87,44 @@ const instagramCallback = async (req, res) => {
     step = "exchange code for token";
     const short = await ig.exchangeCodeForToken(String(code));
     step = "exchange for long-lived token";
-    const long = await ig.getLongLivedToken(short.accessToken);
+    let long;
+    try {
+      long = await ig.getLongLivedToken(short.accessToken);
+    } catch (exchangeErr) {
+      console.error(
+        "LONG-LIVED TOKEN ATTEMPTS:",
+        JSON.stringify(exchangeErr.attempts || [])
+      );
+
+      // Diagnostic: is the short-lived token itself valid?
+      try {
+        const probe = await ig.getMyAccount(short.accessToken);
+        console.log(
+          "PROBE: short-lived token works for /me ->",
+          probe.username,
+          "(so only the long-lived exchange is refused)"
+        );
+      } catch (probeErr) {
+        console.error(
+          "PROBE: short-lived token /me also failed:",
+          ig.extractError(probeErr)
+        );
+      }
+
+      // TEST-ONLY escape hatch (off by default): keep the 1-hour token so the
+      // rest of the flow (webhooks, sending) can be tested. Needs reconnecting hourly.
+      if (process.env.INSTAGRAM_ALLOW_SHORT_TOKEN === "true") {
+        console.warn(
+          "INSTAGRAM_ALLOW_SHORT_TOKEN=true -> using the 1-hour token (testing only)"
+        );
+        long = {
+          accessToken: short.accessToken,
+          expiresAt: new Date(Date.now() + 55 * 60 * 1000),
+        };
+      } else {
+        throw exchangeErr;
+      }
+    }
 
     // 2. Who logged in?
     step = "read Instagram account (/me)";

@@ -329,6 +329,11 @@ const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://watsupcl.th
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
+// Render (and most hosts) put a proxy in front of the app. Trust the first
+// proxy so req.ip is the real visitor IP - otherwise everyone shares one
+// rate-limit bucket and express-rate-limit logs ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+app.set("trust proxy", 1);
+
 app.use(helmet());
 
 // General API protection. Configure trust proxy correctly in production if
