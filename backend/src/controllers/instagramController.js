@@ -78,13 +78,19 @@ const instagramCallback = async (req, res) => {
   }
 
   const companyId = who.companyId;
+  let step = "start"; // so an error tells us exactly which Meta call failed
 
   try {
+    console.log("INSTAGRAM CALLBACK: code received, company", companyId);
+
     // 1. code -> short token -> long-lived (60 day) token
+    step = "exchange code for token";
     const short = await ig.exchangeCodeForToken(String(code));
+    step = "exchange for long-lived token";
     const long = await ig.getLongLivedToken(short.accessToken);
 
     // 2. Who logged in?
+    step = "read Instagram account (/me)";
     const account = await ig.getMyAccount(long.accessToken);
 
     if (
@@ -127,7 +133,9 @@ const instagramCallback = async (req, res) => {
     }
 
     // 4. Subscribe to webhooks so DMs reach us
+    step = "subscribe to webhooks";
     await ig.subscribeAccount(long.accessToken);
+    step = "save account";
 
     // 5. Save (create or reconnect)
     const syntheticPageId = `ig_${account.id}`;
@@ -170,10 +178,10 @@ const instagramCallback = async (req, res) => {
     });
   } catch (err) {
     const detail = ig.extractError(err);
-    console.error("INSTAGRAM CONNECT ERROR:", detail);
+    console.error("INSTAGRAM CONNECT ERROR at step [" + step + "]:", detail);
     return redirectToFrontend(res, {
       instagram: "error",
-      message: `Failed to connect Instagram: ${detail.message}`,
+      message: `Failed to connect Instagram (${step}): ${detail.message}`,
     });
   }
 };

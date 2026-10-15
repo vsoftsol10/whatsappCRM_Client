@@ -141,14 +141,35 @@ const exchangeCodeForToken = async (code) => {
 // ------------------------------------------------------------
 const getLongLivedToken = async (shortToken) => {
   const { appSecret } = getConfig();
-  const res = await axios.get(`${IG_GRAPH_ROOT}/access_token`, {
-    params: {
-      grant_type: "ig_exchange_token",
-      client_secret: appSecret,
-      access_token: shortToken,
-    },
-    timeout: REQUEST_TIMEOUT_MS,
-  });
+  const fields = {
+    grant_type: "ig_exchange_token",
+    client_secret: appSecret,
+    access_token: shortToken,
+  };
+
+  let res;
+  try {
+    // Meta now answers GET here with "Unsupported request - method type: get"
+    // for many apps, so try POST (form body) first ...
+    res = await axios.post(
+      `${IG_GRAPH_ROOT}/access_token`,
+      new URLSearchParams(fields).toString(),
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: REQUEST_TIMEOUT_MS,
+      }
+    );
+  } catch (postErr) {
+    // ... and fall back to the documented GET if POST is refused.
+    try {
+      res = await axios.get(`${IG_GRAPH_ROOT}/access_token`, {
+        params: fields,
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+    } catch (getErr) {
+      throw postErr?.response ? postErr : getErr;
+    }
+  }
 
   const expiresInSec = Number(res.data?.expires_in) || 60 * 24 * 60 * 60;
   return {
@@ -178,13 +199,29 @@ const refreshLongLivedToken = async (token) => {
 // Meta sends as `entry.id` in webhooks.
 // ------------------------------------------------------------
 const getMyAccount = async (token) => {
-  const res = await axios.get(`${IG_GRAPH}/me`, {
-    params: {
-      fields: "user_id,username,name,account_type",
-      access_token: token,
-    },
-    timeout: REQUEST_TIMEOUT_MS,
-  });
+  let res;
+  try {
+    res = await axios.get(`${IG_GRAPH}/me`, {
+      params: {
+        fields: "user_id,username,name,account_type",
+        access_token: token,
+      },
+      timeout: REQUEST_TIMEOUT_MS,
+    });
+  } catch (firstErr) {
+    // Retry without a version in the path and with only the basic fields
+    res = await axios
+      .get(`${IG_GRAPH_ROOT}/me`, {
+        params: {
+          fields: "user_id,username,account_type",
+          access_token: token,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      })
+      .catch(() => {
+        throw firstErr;
+      });
+  }
 
   const d = res.data || {};
   return {
