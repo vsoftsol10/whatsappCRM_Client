@@ -1,3 +1,4 @@
+
 // import {
 //   FaCheck,
 //   FaCheckDouble,
@@ -44,6 +45,7 @@
 //       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-lg font-semibold text-white">
 //         {(
 //           conversation.customer?.name ||
+//           conversation.contactName ||
 //           conversation.phone ||
 //           "?"
 //         ).charAt(0)}
@@ -53,7 +55,9 @@
 //       <div className="min-w-0 flex-1">
 //         <div className="flex items-center justify-between gap-2">
 //           <h3 className="truncate font-semibold text-gray-900">
-//             {conversation.customer?.name || conversation.phone}
+//             {conversation.customer?.name ||
+//               conversation.contactName ||
+//               conversation.phone}
 //           </h3>
 
 //           <span className="shrink-0 text-xs text-gray-500">
@@ -63,6 +67,12 @@
 //             })}
 //           </span>
 //         </div>
+
+//         {conversation.channel === "MESSENGER" && (
+//           <span className="mt-0.5 inline-block rounded bg-[#E7F0FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#1877F2]">
+//             Messenger
+//           </span>
+//         )}
 
 //         <div className="mt-1 flex items-center gap-1">
 //           {getStatusIcon()}
@@ -159,6 +169,12 @@ function ConversationCard({
         {conversation.channel === "MESSENGER" && (
           <span className="mt-0.5 inline-block rounded bg-[#E7F0FF] px-1.5 py-0.5 text-[10px] font-semibold text-[#1877F2]">
             Messenger
+          </span>
+        )}
+
+        {conversation.channel === "INSTAGRAM" && (
+          <span className="mt-0.5 inline-block rounded bg-pink-50 px-1.5 py-0.5 text-[10px] font-semibold text-pink-600">
+            Instagram
           </span>
         )}
 

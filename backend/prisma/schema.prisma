@@ -1734,6 +1734,11 @@ model FacebookPage {
   pageId   String  @unique
   pageName String?
 
+  // Instagram professional account linked to this Page (null if none).
+  // Instagram webhooks identify the account by this ID.
+  instagramAccountId String? @unique
+  instagramUsername  String?
+
   // Page access token, stored ENCRYPTED (see utils/secretCrypto.js).
   // null once the Page is disconnected.
   pageAccessToken String?
