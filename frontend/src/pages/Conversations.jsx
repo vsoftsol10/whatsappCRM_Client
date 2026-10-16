@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import useConversationStore from "../store/conversationStore";
 import Sidebar from "../components/conversation/Sidebar";
@@ -11,7 +11,23 @@ import CustomerDetails from "../components/conversation/CustomerDetails";
 import useMessageStore from "../store/messageStore";
 import { toast } from "react-hot-toast";
 
-function Conversations() {
+// Which inbox a conversation belongs to.
+// Anything that is not MESSENGER / INSTAGRAM is treated as WhatsApp,
+// so older conversations keep showing up on the WhatsApp page.
+const getConversationChannel = (conversation) => {
+  if (conversation?.channel === "MESSENGER") return "MESSENGER";
+  if (conversation?.channel === "INSTAGRAM") return "INSTAGRAM";
+  return "WHATSAPP";
+};
+
+const CHANNEL_TITLES = {
+  WHATSAPP: "WhatsApp Conversations",
+  MESSENGER: "Facebook Conversations",
+  INSTAGRAM: "Instagram Conversations",
+};
+
+// channel = "WHATSAPP" (default) | "MESSENGER" | "INSTAGRAM"
+function Conversations({ channel = "WHATSAPP" }) {
   const location = useLocation();
 
   const customerId = location.state?.customerId;
@@ -36,16 +52,37 @@ function Conversations() {
     fetchMessages,
     addMessage,
     addMediaMessage,
+    clearMessages,
   } = useMessageStore();
+
+  // Only show the conversations of this page's channel
+  const channelConversations = useMemo(
+    () =>
+      (conversations || []).filter(
+        (conversation) => getConversationChannel(conversation) === channel
+      ),
+    [conversations, channel]
+  );
 
   // Load conversations when page opens
   useEffect(() => {
     fetchConversations();
+
+    // The selected chat is shared between pages. If it belongs to another
+    // channel (e.g. we came from the WhatsApp page), clear it.
+    const { selectedConversation: current } =
+      useConversationStore.getState();
+
+    if (current && getConversationChannel(current) !== channel) {
+      setSelectedConversation(null);
+      clearMessages();
+    }
   }, []);
 
   useEffect(() => {
     const openCustomerConversation = async () => {
-      if (!customerId) return;
+      // Opening a customer's chat from the Customers page is WhatsApp only
+      if (!customerId || channel !== "WHATSAPP") return;
 
       try {
         // First load all conversations
@@ -150,7 +187,8 @@ function Conversations() {
           `}
       >
         <Sidebar
-          conversations={conversations}
+          title={CHANNEL_TITLES[channel] || "Conversations"}
+          conversations={channelConversations}
           selectedConversation={selectedConversation}
           setSelectedConversation={setSelectedConversation}
         />

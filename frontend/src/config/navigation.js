@@ -1,4 +1,5 @@
 
+// // src/config/navigation.js
 // import {
 //   LayoutDashboard,
 //   MessageCircle,
@@ -18,11 +19,14 @@
 //   Bot,
 // } from "lucide-react";
 
+// // Platform logo, imported so the bundler resolves the file path for you.
+// // Put your PNG at: src/assets/vatup-logo.png (no spaces in the name)
+// import platformLogo from "../assets/vatup-logo.png";
+
 // // YOUR SaaS platform's branding (shown at the bottom of the sidebar: "Powered by ...").
-// // Put your logo file in /public and set logo: "/platform-logo.png"
 // export const PLATFORM = {
-//   name: "Vatup CRM",
-//   logo: "/vatuo_logo_transparent.png", // e.g. ""/Updated.png""
+//   name: "Vatup CRM", // used only as the image alt text
+//   logo: platformLogo,
 // };
 
 // export const navGroups = [
@@ -90,7 +94,10 @@
 // }
 
 
+
+
 // src/config/navigation.js
+import { FaWhatsapp, FaFacebook, FaInstagram } from "react-icons/fa";
 import {
   LayoutDashboard,
   MessageCircle,
@@ -125,7 +132,16 @@ export const navGroups = [
     id: "main",
     items: [
       { key: "dashboard", name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-      { key: "conversations", name: "Conversations", path: "/conversations", icon: MessageCircle },
+      {
+        key: "conversations",
+        name: "Conversations",
+        icon: MessageCircle,
+        children: [
+          { key: "conversations-whatsapp", name: "WhatsApp", path: "/conversations", icon: FaWhatsapp },
+          { key: "conversations-facebook", name: "Facebook", path: "/facebook-conversations", icon: FaFacebook },
+          { key: "conversations-instagram", name: "Instagram", path: "/instagram-conversations", icon: FaInstagram },
+        ],
+      },
     ],
   },
   {
