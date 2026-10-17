@@ -1,4 +1,3 @@
-
 // // ============================================================
 // // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 // //
@@ -81,7 +80,14 @@
 //   // Echo of a message WE sent from the CRM: it is already saved by the
 //   // send API, so skip it. Echoes from the Page inbox / Business Suite /
 //   // Instagram app (a different app_id or none) are mirrored below.
-//   if (isEcho && String(message.app_id) === String(process.env.META_APP_ID)) {
+//   // (Instagram-Login accounts: the echo carries the Instagram App ID instead.)
+//   if (
+//     isEcho &&
+//     [process.env.META_APP_ID, process.env.INSTAGRAM_APP_ID]
+//       .filter(Boolean)
+//       .map(String)
+//       .includes(String(message.app_id))
+//   ) {
 //     return;
 //   }
 
@@ -227,6 +233,7 @@
 
 
 
+
 // ============================================================
 // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 //
@@ -341,9 +348,8 @@ const processMessagingEvent = async (page, event, channel) => {
     channel
   );
 
-  const { content, messageType, imageUrl } = await resolveMessengerContent(
-    message
-  );
+  const { content, messageType, imageUrl, extras } =
+    await resolveMessengerContent(message);
 
   // ---------- Account owner replied outside the CRM ----------
   if (isEcho) {
@@ -369,6 +375,36 @@ const processMessagingEvent = async (page, event, channel) => {
         conversationId: conversation.id,
         message: echoMessage,
       });
+
+      // Further attachments of the same platform message (e.g. several photos)
+      for (let i = 0; i < extras.length; i += 1) {
+        const extra = extras[i];
+        try {
+          const extraEcho = await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              content: extra.content,
+              sender: "AGENT",
+              messageType: extra.messageType,
+              imageUrl: extra.imageUrl,
+              status: "SENT",
+              metaMessageId: `${message.mid}#${i + 2}`,
+            },
+          });
+
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: { lastMessage: extra.content },
+          });
+
+          emitToCompany(page.companyId, "message:new", {
+            conversationId: conversation.id,
+            message: extraEcho,
+          });
+        } catch (extraError) {
+          if (extraError?.code !== "P2002") throw extraError;
+        }
+      }
     } catch (error) {
       if (error?.code === "P2002") return; // saved by a parallel request
       throw error;
@@ -390,6 +426,29 @@ const processMessagingEvent = async (page, event, channel) => {
     conversationId: conversation.id,
     message: savedMessage,
   });
+
+  // Further attachments of the same platform message (e.g. several photos):
+  // each one becomes its own chat message.
+  for (let i = 0; i < extras.length; i += 1) {
+    const extra = extras[i];
+
+    const extraSaved = await saveIncomingMessage(
+      conversation.id,
+      extra.content,
+      {
+        metaMessageId: `${message.mid}#${i + 2}`,
+        messageType: extra.messageType,
+        imageUrl: extra.imageUrl,
+      }
+    );
+
+    if (extraSaved) {
+      emitToCompany(page.companyId, "message:new", {
+        conversationId: conversation.id,
+        message: extraSaved,
+      });
+    }
+  }
 
   // FUTURE: AI auto-reply for Messenger / Instagram plugs in here
   // (same idea as triggerAutoReply() in saasWebhook.js).
@@ -459,3 +518,4 @@ router.post("/", async (req, res) => {
 });
 
 module.exports = router;
+ 

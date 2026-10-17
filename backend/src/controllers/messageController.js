@@ -60,9 +60,12 @@
 //       });
 //     }
 
-//     // FACEBOOK MESSENGER chats are handled by their own helper.
+//     // FACEBOOK MESSENGER and INSTAGRAM chats are handled by their own helper.
 //     // WhatsApp chats skip this and continue exactly as before.
-//     if (conversation.channel === "MESSENGER") {
+//     if (
+//       conversation.channel === "MESSENGER" ||
+//       conversation.channel === "INSTAGRAM"
+//     ) {
 //       return sendMessengerReply(res, conversation, {
 //         content,
 //         sender,
@@ -363,12 +366,15 @@
 //       });
 //     }
 
-//     // Sending files is WhatsApp-only for now (Messenger supports text replies).
-//     if (conversation.channel === "MESSENGER") {
+//     // Sending files is WhatsApp-only for now (Messenger and Instagram support text replies).
+//     if (
+//       conversation.channel === "MESSENGER" ||
+//       conversation.channel === "INSTAGRAM"
+//     ) {
 //       return res.status(400).json({
 //         success: false,
 //         message:
-//           "Sending files is not supported on Messenger yet. Please send a text message.",
+//           "Sending files is not supported on Messenger or Instagram yet. Please send a text message.",
 //       });
 //     }
 
@@ -538,7 +544,10 @@ const {
 } = require("../services/whatsappService");
 const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 const { classifyMedia } = require("../middleware/mediaUploadMiddleware");
-const { sendMessengerReply } = require("../helpers/messengerSend");
+const {
+  sendMessengerReply,
+  sendMessengerMediaReply,
+} = require("../helpers/messengerSend");
 
 // SEND MESSAGE
 const sendMessage = async (req, res) => {
@@ -888,6 +897,7 @@ const sendMediaMessage = async (req, res) => {
       include: {
         customer: true,
         whatsappAccount: true,
+        facebookPage: true,
       },
     });
 
@@ -898,15 +908,16 @@ const sendMediaMessage = async (req, res) => {
       });
     }
 
-    // Sending files is WhatsApp-only for now (Messenger and Instagram support text replies).
+    // MESSENGER and INSTAGRAM chats send files through their own helper.
+    // WhatsApp chats skip this and continue exactly as before.
     if (
       conversation.channel === "MESSENGER" ||
       conversation.channel === "INSTAGRAM"
     ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Sending files is not supported on Messenger or Instagram yet. Please send a text message.",
+      return sendMessengerMediaReply(res, conversation, {
+        file,
+        media,
+        caption,
       });
     }
 

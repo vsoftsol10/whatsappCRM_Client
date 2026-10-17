@@ -1,3 +1,4 @@
+
 // // ============================================================
 // // FACEBOOK / MESSENGER SERVICE
 // // Thin wrapper around the Meta Graph API for Facebook Pages.
@@ -19,6 +20,9 @@
 // // Messenger text limit is 2000 characters per message.
 // const MESSENGER_TEXT_LIMIT = 2000;
 
+// // Instagram text limit is 1000 bytes (UTF-8) per message.
+// const INSTAGRAM_TEXT_LIMIT_BYTES = 1000;
+
 // const extractError = (err) => {
 //   const e = err?.response?.data?.error;
 //   return {
@@ -32,9 +36,11 @@
 // // Error 190 = the access token is invalid / expired / revoked.
 // const isTokenError = (error) => !!error && error.code === 190;
 
-// // Error 10 + subcode 2018278 = outside the 24 hour messaging window.
+// // Error 10 + these subcodes = outside the 24 hour messaging window
+// // (2018278 = Messenger, 2534022 = Instagram).
+// const OUTSIDE_WINDOW_SUBCODES = [2018278, 2534022];
 // const isOutsideWindowError = (error) =>
-//   !!error && error.code === 10 && error.subcode === 2018278;
+//   !!error && error.code === 10 && OUTSIDE_WINDOW_SUBCODES.includes(error.subcode);
 
 // // ---------------------------------------------------------------
 // // OAUTH
@@ -214,7 +220,91 @@
 //   }
 // };
 
+// // ---------------------------------------------------------------
+// // INSTAGRAM (professional account linked to a Facebook Page)
+// // ---------------------------------------------------------------
+
+// // Which Instagram professional account (if any) is linked to this Page.
+// // Returns { account: { id, username } | null, error: {...} | null }
+// const getLinkedInstagramAccount = async (pageId, pageToken) => {
+//   try {
+//     const res = await axios.get(`${GRAPH}/${pageId}`, {
+//       params: {
+//         fields: "instagram_business_account{id,username}",
+//         access_token: pageToken,
+//       },
+//       timeout: REQUEST_TIMEOUT_MS,
+//     });
+
+//     const ig = res.data?.instagram_business_account;
+//     if (!ig?.id) return { account: null, error: null };
+
+//     return {
+//       account: { id: String(ig.id), username: ig.username || null },
+//       error: null,
+//     };
+//   } catch (err) {
+//     return { account: null, error: extractError(err) };
+//   }
+// };
+
+// // Instagram DM through the linked Page:  POST /{page-id}/messages
+// // Returns { success: true, data } or { success: false, error: {...} }
+// const sendInstagramText = async (pageToken, pageId, igsid, text) => {
+//   if (!text || !String(text).trim()) {
+//     return { success: false, error: { message: "Message is empty" } };
+//   }
+//   if (Buffer.byteLength(String(text), "utf8") > INSTAGRAM_TEXT_LIMIT_BYTES) {
+//     return {
+//       success: false,
+//       error: {
+//         message:
+//           "Instagram messages can be at most 1000 bytes (about 1000 English characters, fewer in other languages)",
+//       },
+//     };
+//   }
+
+//   try {
+//     const res = await axios.post(
+//       `${GRAPH}/${pageId}/messages`,
+//       {
+//         recipient: { id: igsid },
+//         message: { text: String(text) },
+//       },
+//       {
+//         params: { access_token: pageToken },
+//         timeout: REQUEST_TIMEOUT_MS,
+//       }
+//     );
+//     return { success: true, data: res.data }; // { recipient_id, message_id }
+//   } catch (err) {
+//     return { success: false, error: extractError(err) };
+//   }
+// };
+
+// // Name / username of the person on Instagram (best effort).
+// const getInstagramUserProfile = async (pageToken, igsid) => {
+//   try {
+//     const res = await axios.get(`${GRAPH}/${igsid}`, {
+//       params: {
+//         fields: "name,username,profile_pic",
+//         access_token: pageToken,
+//       },
+//       timeout: 4000,
+//     });
+//     const d = res.data || {};
+//     const name = d.name || (d.username ? `@${d.username}` : null);
+//     return { name, profilePic: d.profile_pic || null };
+//   } catch (err) {
+//     return null;
+//   }
+// };
+
 // module.exports = {
+//   INSTAGRAM_TEXT_LIMIT_BYTES,
+//   getLinkedInstagramAccount,
+//   sendInstagramText,
+//   getInstagramUserProfile,
 //   GRAPH_API_VERSION,
 //   PAGE_SUBSCRIBED_FIELDS,
 //   MESSENGER_TEXT_LIMIT,
@@ -232,6 +322,7 @@
 
 
 
+
 // ============================================================
 // FACEBOOK / MESSENGER SERVICE
 // Thin wrapper around the Meta Graph API for Facebook Pages.
@@ -243,6 +334,9 @@ const GRAPH_API_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 const GRAPH = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 const REQUEST_TIMEOUT_MS = 15000;
+
+// Meta has to download the file before it answers, so attachments get longer.
+const ATTACHMENT_TIMEOUT_MS = 45000;
 
 // Page webhook fields every connected Page is subscribed to.
 //   messages        -> people messaging the Page
@@ -515,6 +609,67 @@ const sendInstagramText = async (pageToken, pageId, igsid, text) => {
   }
 };
 
+// ---------------------------------------------------------------
+// ATTACHMENTS (image / video / audio / file)
+// Meta downloads the file from a PUBLIC https url, so the caller must pass
+// a stored url (we use the Cloudinary link). Captions cannot ride along with
+// an attachment on Messenger / Instagram - send them as a separate text.
+// Returns { success: true, data } or { success: false, error: {...} }
+// ---------------------------------------------------------------
+const ATTACHMENT_TYPES = ["image", "video", "audio", "file"];
+
+const buildAttachmentMessage = (type, url) => ({
+  attachment: { type, payload: { url, is_reusable: false } },
+});
+
+const sendMessengerAttachment = async (pageToken, psid, type, url) => {
+  if (!ATTACHMENT_TYPES.includes(type) || !url) {
+    return { success: false, error: { message: "Invalid attachment" } };
+  }
+
+  try {
+    const res = await axios.post(
+      `${GRAPH}/me/messages`,
+      {
+        recipient: { id: psid },
+        messaging_type: "RESPONSE",
+        message: buildAttachmentMessage(type, url),
+      },
+      {
+        params: { access_token: pageToken },
+        timeout: ATTACHMENT_TIMEOUT_MS,
+      }
+    );
+    return { success: true, data: res.data }; // { recipient_id, message_id }
+  } catch (err) {
+    return { success: false, error: extractError(err) };
+  }
+};
+
+// Instagram through the linked Page:  POST /{page-id}/messages
+const sendInstagramAttachment = async (pageToken, pageId, igsid, type, url) => {
+  if (!ATTACHMENT_TYPES.includes(type) || !url) {
+    return { success: false, error: { message: "Invalid attachment" } };
+  }
+
+  try {
+    const res = await axios.post(
+      `${GRAPH}/${pageId}/messages`,
+      {
+        recipient: { id: igsid },
+        message: buildAttachmentMessage(type, url),
+      },
+      {
+        params: { access_token: pageToken },
+        timeout: ATTACHMENT_TIMEOUT_MS,
+      }
+    );
+    return { success: true, data: res.data };
+  } catch (err) {
+    return { success: false, error: extractError(err) };
+  }
+};
+
 // Name / username of the person on Instagram (best effort).
 const getInstagramUserProfile = async (pageToken, igsid) => {
   try {
@@ -550,5 +705,8 @@ module.exports = {
   subscribePageToApp,
   unsubscribePageFromApp,
   sendMessengerText,
+  sendMessengerAttachment,
+  sendInstagramAttachment,
   getUserProfile,
 };
+ 

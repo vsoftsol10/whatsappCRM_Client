@@ -14,6 +14,9 @@
 //   getUserProfile,
 //   getInstagramUserProfile,
 // } = require("../services/facebookService");
+// const {
+//   getInstagramLoginUserProfile,
+// } = require("../services/instagramService");
 // const { uploadBufferToCloudinary } = require("../services/cloudinaryService");
 // const {
 //   INSTAGRAM_CHANNEL,
@@ -59,8 +62,11 @@
 //     ? decryptSecret(page.pageAccessToken)
 //     : null;
 //   if (token) {
+//     // Instagram connected directly (no Facebook) is read from graph.instagram.com
 //     profile = isInstagram
-//       ? await getInstagramUserProfile(token, personId)
+//       ? page.connectionType === "INSTAGRAM_LOGIN"
+//         ? await getInstagramLoginUserProfile(token, personId)
+//         : await getInstagramUserProfile(token, personId)
 //       : await getUserProfile(token, personId);
 //   }
 
@@ -186,6 +192,7 @@
 
 
 
+
 // ============================================================
 // MESSENGER / INSTAGRAM HELPERS
 //  - getOrCreateMessengerConversation : one conversation per (Page, person)
@@ -292,7 +299,7 @@ const getOrCreateMessengerConversation = async (
 // ------------------------------------------------------------
 // MESSAGE CONTENT
 // ------------------------------------------------------------
-const MAX_MEDIA_BYTES = 15 * 1024 * 1024; // 15 MB
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024; // 25 MB (Messenger / Instagram limit)
 
 // Attachment type -> CRM messageType + placeholder text
 const ATTACHMENT_MAP = {
@@ -302,16 +309,28 @@ const ATTACHMENT_MAP = {
   file: { messageType: "DOCUMENT", label: "📎 File", resourceType: "raw" },
 };
 
+// File name from a Facebook / Instagram CDN link
+// (".../report.pdf?_nc_cat=..." -> "report.pdf"). null if there is none.
+const fileNameFromUrl = (url) => {
+  try {
+    const last = new URL(url).pathname.split("/").filter(Boolean).pop() || "";
+    const name = decodeURIComponent(last).replace(/[^a-zA-Z0-9._ -]/g, "_");
+    return /\.[a-zA-Z0-9]{1,8}$/.test(name) ? name.slice(-80) : null;
+  } catch (error) {
+    return null;
+  }
+};
+
 // Facebook / Instagram attachment links are temporary CDN links. Copy the
 // file to Cloudinary so it keeps working. If anything fails we keep the
 // original link.
-const rehostAttachment = async (url, resourceType) => {
+const rehostAttachment = async (url, resourceType, fileName) => {
   if (!url) return null;
 
   try {
     const response = await axios.get(url, {
       responseType: "arraybuffer",
-      timeout: 8000,
+      timeout: 20000,
       maxContentLength: MAX_MEDIA_BYTES,
       maxBodyLength: MAX_MEDIA_BYTES,
     });
@@ -319,6 +338,10 @@ const rehostAttachment = async (url, resourceType) => {
     const uploaded = await uploadBufferToCloudinary(Buffer.from(response.data), {
       folder: "messenger-media",
       resourceType,
+      // Raw files (documents): keep the name + extension in the public id so
+      // the stored link opens with the right file type.
+      ...(resourceType === "raw" &&
+        fileName && { publicId: `${Date.now()}-${fileName}` }),
     });
 
     return uploaded?.imageUrl || url;
@@ -328,51 +351,85 @@ const rehostAttachment = async (url, resourceType) => {
   }
 };
 
+// One attachment -> { content, messageType, imageUrl }
+// `text` is the message text (only the first attachment uses it).
+const resolveAttachment = async (attachment, text = "") => {
+  let content = text;
+  let messageType = "TEXT";
+  let imageUrl = null;
+
+  const mapped = ATTACHMENT_MAP[attachment?.type];
+  const url = attachment?.payload?.url || null;
+
+  if (mapped) {
+    messageType = mapped.messageType;
+
+    const fileName =
+      mapped.messageType === "DOCUMENT" ? fileNameFromUrl(url) : null;
+
+    imageUrl = await rehostAttachment(url, mapped.resourceType, fileName);
+
+    if (mapped.messageType === "DOCUMENT") {
+      // The chat shows the content as the document name.
+      content = fileName || content || mapped.label;
+    } else if (!content) {
+      content = mapped.label;
+    }
+  } else if (attachment?.type === "location") {
+    if (!content) {
+      content = url ? `📍 Location: ${url}` : "📍 Location shared";
+    }
+  } else if (INSTAGRAM_ATTACHMENT_LABELS[attachment?.type]) {
+    // Instagram shares / story mentions / reels
+    if (!content) {
+      const label = INSTAGRAM_ATTACHMENT_LABELS[attachment.type];
+      content = url ? `${label}: ${url}` : label;
+    }
+  } else if (!content) {
+    content = `[${attachment?.type || "unsupported"} attachment]`;
+  }
+
+  return { content, messageType, imageUrl };
+};
+
+// Returns { content, messageType, imageUrl, extras }
+//   - the first attachment is the main message (same as before)
+//   - extras = every further attachment of the SAME platform message
+//     (e.g. 3 photos sent together) - the webhook saves each as its own
+//     chat message.
 const resolveMessengerContent = async (message) => {
   const attachments = Array.isArray(message?.attachments)
     ? message.attachments
     : [];
-  const first = attachments[0];
 
-  let content = (message?.text || "").trim();
-  let messageType = "TEXT";
-  let imageUrl = null;
+  const text = (message?.text || "").trim();
 
-  if (first) {
-    const mapped = ATTACHMENT_MAP[first.type];
-    const url = first.payload?.url || null;
-
-    if (mapped) {
-      messageType = mapped.messageType;
-      imageUrl = await rehostAttachment(url, mapped.resourceType);
-      if (!content) content = mapped.label;
-    } else if (first.type === "location") {
-      if (!content) {
-        content = url ? `📍 Location: ${url}` : "📍 Location shared";
-      }
-    } else if (INSTAGRAM_ATTACHMENT_LABELS[first.type]) {
-      // Instagram shares / story mentions / reels
-      if (!content) {
-        const label = INSTAGRAM_ATTACHMENT_LABELS[first.type];
-        content = url ? `${label}: ${url}` : label;
-      }
-    } else if (!content) {
-      content = `[${first.type || "unsupported"} attachment]`;
-    }
-
-    if (attachments.length > 1) {
-      content = `${content} (+${attachments.length - 1} more attachment${
-        attachments.length - 1 > 1 ? "s" : ""
-      })`;
-    }
+  if (!attachments.length) {
+    return {
+      content: text || "[Unsupported message]",
+      messageType: "TEXT",
+      imageUrl: null,
+      extras: [],
+    };
   }
 
-  if (!content) content = "[Unsupported message]";
+  const main = await resolveAttachment(attachments[0], text);
 
-  return { content, messageType, imageUrl };
+  const extras = [];
+  for (const attachment of attachments.slice(1)) {
+    extras.push(await resolveAttachment(attachment, ""));
+  }
+
+  return {
+    content: main.content || "[Unsupported message]",
+    messageType: main.messageType,
+    imageUrl: main.imageUrl,
+    extras,
+  };
 };
 
 module.exports = {
   getOrCreateMessengerConversation,
   resolveMessengerContent,
 };
+ 
