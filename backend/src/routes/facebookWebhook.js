@@ -234,6 +234,8 @@
 
 
 
+
+
 // ============================================================
 // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 //
@@ -254,6 +256,7 @@ const { saveIncomingMessage } = require("../helpers/messageHelper");
 const {
   getOrCreateMessengerConversation,
   resolveMessengerContent,
+  rehostAttachment,
 } = require("../helpers/messengerHelper");
 const { INSTAGRAM_CHANNEL } = require("../helpers/instagramHelper");
 const { emitToCompany } = require("../socket");
@@ -297,6 +300,35 @@ router.get("/", (req, res) => {
   console.log("Facebook Page webhook verification failed");
   return res.sendStatus(403);
 });
+
+// ------------------------------------------------------------
+// Media is saved with Meta's temporary link first, so the message shows up
+// in the CRM immediately. Moving the file to Cloudinary (slow) happens here,
+// in the background, and the chat is told when the permanent link is ready.
+// Never throws and is never awaited.
+// ------------------------------------------------------------
+const rehostInBackground = (companyId, conversationId, messageId, pending) => {
+  if (!pending || !messageId) return;
+
+  rehostAttachment(pending.url, pending.resourceType, pending.fileName)
+    .then(async (permanentUrl) => {
+      // rehostAttachment returns the original link when it could not copy
+      if (!permanentUrl || permanentUrl === pending.url) return;
+
+      const updated = await prisma.message.update({
+        where: { id: messageId },
+        data: { imageUrl: permanentUrl },
+      });
+
+      emitToCompany(companyId, "message:update", {
+        conversationId,
+        message: updated,
+      });
+    })
+    .catch((error) => {
+      console.warn("Background media re-host failed:", error.message);
+    });
+};
 
 // ------------------------------------------------------------
 // One event (a person messaged the Page / Instagram account, or the
@@ -348,8 +380,10 @@ const processMessagingEvent = async (page, event, channel) => {
     channel
   );
 
-  const { content, messageType, imageUrl, extras } =
-    await resolveMessengerContent(message);
+  // deferRehost: save + show the message first, copy the file to Cloudinary
+  // afterwards (see rehostInBackground)
+  const { content, messageType, imageUrl, pendingRehost, extras } =
+    await resolveMessengerContent(message, { deferRehost: true });
 
   // ---------- Account owner replied outside the CRM ----------
   if (isEcho) {
@@ -375,6 +409,12 @@ const processMessagingEvent = async (page, event, channel) => {
         conversationId: conversation.id,
         message: echoMessage,
       });
+      rehostInBackground(
+        page.companyId,
+        conversation.id,
+        echoMessage.id,
+        pendingRehost
+      );
 
       // Further attachments of the same platform message (e.g. several photos)
       for (let i = 0; i < extras.length; i += 1) {
@@ -401,6 +441,12 @@ const processMessagingEvent = async (page, event, channel) => {
             conversationId: conversation.id,
             message: extraEcho,
           });
+          rehostInBackground(
+            page.companyId,
+            conversation.id,
+            extraEcho.id,
+            extra.pendingRehost
+          );
         } catch (extraError) {
           if (extraError?.code !== "P2002") throw extraError;
         }
@@ -426,6 +472,12 @@ const processMessagingEvent = async (page, event, channel) => {
     conversationId: conversation.id,
     message: savedMessage,
   });
+  rehostInBackground(
+    page.companyId,
+    conversation.id,
+    savedMessage.id,
+    pendingRehost
+  );
 
   // Further attachments of the same platform message (e.g. several photos):
   // each one becomes its own chat message.
@@ -447,6 +499,12 @@ const processMessagingEvent = async (page, event, channel) => {
         conversationId: conversation.id,
         message: extraSaved,
       });
+      rehostInBackground(
+        page.companyId,
+        conversation.id,
+        extraSaved.id,
+        extra.pendingRehost
+      );
     }
   }
 

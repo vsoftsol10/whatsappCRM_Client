@@ -193,6 +193,7 @@
 
 
 
+
 // ============================================================
 // MESSENGER / INSTAGRAM HELPERS
 //  - getOrCreateMessengerConversation : one conversation per (Page, person)
@@ -353,10 +354,16 @@ const rehostAttachment = async (url, resourceType, fileName) => {
 
 // One attachment -> { content, messageType, imageUrl }
 // `text` is the message text (only the first attachment uses it).
-const resolveAttachment = async (attachment, text = "") => {
+//
+// deferRehost = true: do NOT download/upload the file now (slow). Return the
+// original Meta link as imageUrl so the message can be saved and shown at
+// once, plus `pendingRehost` so the caller can move the file to Cloudinary
+// in the background afterwards.
+const resolveAttachment = async (attachment, text = "", deferRehost = false) => {
   let content = text;
   let messageType = "TEXT";
   let imageUrl = null;
+  let pendingRehost = null;
 
   const mapped = ATTACHMENT_MAP[attachment?.type];
   const url = attachment?.payload?.url || null;
@@ -367,7 +374,14 @@ const resolveAttachment = async (attachment, text = "") => {
     const fileName =
       mapped.messageType === "DOCUMENT" ? fileNameFromUrl(url) : null;
 
-    imageUrl = await rehostAttachment(url, mapped.resourceType, fileName);
+    if (deferRehost) {
+      imageUrl = url;
+      if (url) {
+        pendingRehost = { url, resourceType: mapped.resourceType, fileName };
+      }
+    } else {
+      imageUrl = await rehostAttachment(url, mapped.resourceType, fileName);
+    }
 
     if (mapped.messageType === "DOCUMENT") {
       // The chat shows the content as the document name.
@@ -389,7 +403,7 @@ const resolveAttachment = async (attachment, text = "") => {
     content = `[${attachment?.type || "unsupported"} attachment]`;
   }
 
-  return { content, messageType, imageUrl };
+  return { content, messageType, imageUrl, pendingRehost };
 };
 
 // Returns { content, messageType, imageUrl, extras }
@@ -397,7 +411,7 @@ const resolveAttachment = async (attachment, text = "") => {
 //   - extras = every further attachment of the SAME platform message
 //     (e.g. 3 photos sent together) - the webhook saves each as its own
 //     chat message.
-const resolveMessengerContent = async (message) => {
+const resolveMessengerContent = async (message, { deferRehost = false } = {}) => {
   const attachments = Array.isArray(message?.attachments)
     ? message.attachments
     : [];
@@ -409,21 +423,23 @@ const resolveMessengerContent = async (message) => {
       content: text || "[Unsupported message]",
       messageType: "TEXT",
       imageUrl: null,
+      pendingRehost: null,
       extras: [],
     };
   }
 
-  const main = await resolveAttachment(attachments[0], text);
+  const main = await resolveAttachment(attachments[0], text, deferRehost);
 
   const extras = [];
   for (const attachment of attachments.slice(1)) {
-    extras.push(await resolveAttachment(attachment, ""));
+    extras.push(await resolveAttachment(attachment, "", deferRehost));
   }
 
   return {
     content: main.content || "[Unsupported message]",
     messageType: main.messageType,
     imageUrl: main.imageUrl,
+    pendingRehost: main.pendingRehost,
     extras,
   };
 };
@@ -431,5 +447,6 @@ const resolveMessengerContent = async (message) => {
 module.exports = {
   getOrCreateMessengerConversation,
   resolveMessengerContent,
+  rehostAttachment,
 };
  

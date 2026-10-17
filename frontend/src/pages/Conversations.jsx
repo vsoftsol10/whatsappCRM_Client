@@ -53,6 +53,9 @@ function Conversations({ channel = "WHATSAPP" }) {
     addMessage,
     addMediaMessage,
     clearMessages,
+    appendMessage,
+    messagesConversationId,
+    loading: messagesLoading,
   } = useMessageStore();
 
   // Only show the conversations of this page's channel
@@ -142,7 +145,7 @@ function Conversations({ channel = "WHATSAPP" }) {
   const handleSendMessage = async (content) => {
     if (!selectedConversation) return;
 
-    await addMessage({
+    const response = await addMessage({
       conversationId: selectedConversation.id,
       content,
       sender: "AGENT",
@@ -150,8 +153,15 @@ function Conversations({ channel = "WHATSAPP" }) {
       status: "SENT",
     });
 
-    await fetchMessages(selectedConversation.id);
-    await fetchConversations();
+    // Show the sent message at once; reload only if the API gave none back
+    if (response?.data) {
+      appendMessage(response.data);
+    } else {
+      await fetchMessages(selectedConversation.id);
+    }
+
+    // Refresh the list in the background (does not block the chat)
+    fetchConversations();
   };
 
   // Send image / voice / video / document
@@ -169,8 +179,14 @@ function Conversations({ channel = "WHATSAPP" }) {
       return false;
     }
 
-    await fetchMessages(selectedConversation.id);
-    await fetchConversations();
+    if (result.data) {
+      appendMessage(result.data);
+    } else {
+      await fetchMessages(selectedConversation.id);
+    }
+
+    // Refresh the list in the background (does not block the chat)
+    fetchConversations();
     return true;
   };
 
@@ -213,7 +229,17 @@ function Conversations({ channel = "WHATSAPP" }) {
         {/* Messages */}
         <div className="min-h-0 flex-1">
           <MessageList
-            messages={messages}
+            messages={
+              selectedConversation &&
+              messagesConversationId === selectedConversation.id
+                ? messages
+                : []
+            }
+            loading={
+              !!selectedConversation &&
+              (messagesLoading ||
+                messagesConversationId !== selectedConversation.id)
+            }
           />
         </div>
 

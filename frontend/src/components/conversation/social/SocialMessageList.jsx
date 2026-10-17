@@ -235,7 +235,7 @@ function Bubble({ message, theme, showAvatar, conversation, groupStart, showStat
   );
 }
 
-function SocialMessageList({ theme, conversation, messages = [] }) {
+function SocialMessageList({ theme, conversation, messages = [], loading = false }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -264,7 +264,7 @@ function SocialMessageList({ theme, conversation, messages = [] }) {
 
       {messages.length === 0 && (
         <p className="py-6 text-center text-sm text-[#65676B]">
-          No messages yet
+          {loading ? "Loading messages..." : "No messages yet"}
         </p>
       )}
 

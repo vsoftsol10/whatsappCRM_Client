@@ -36,7 +36,19 @@ export default function useChatSocket() {
         }
       }
 
-      refreshConversations();
+      // Update just this conversation in the list. Only a brand-new
+      // conversation (not in the list yet) needs the list to be loaded.
+      const known = useConversationStore
+        .getState()
+        .applyIncomingMessage(conversationId, message);
+
+      if (!known) refreshConversations();
+    };
+
+    // A message changed on the server (e.g. media moved to permanent storage)
+    const handleMessageUpdate = ({ message } = {}) => {
+      if (!message) return;
+      useMessageStore.getState().applyUpdate(message);
     };
 
     const handleStatus = (payload) => {
@@ -58,12 +70,14 @@ export default function useChatSocket() {
 
     socket.on("connect", handleConnect);
     socket.on("message:new", handleNewMessage);
+    socket.on("message:update", handleMessageUpdate);
     socket.on("message:status", handleStatus);
 
     return () => {
       clearTimeout(refreshTimer);
       socket.off("connect", handleConnect);
       socket.off("message:new", handleNewMessage);
+      socket.off("message:update", handleMessageUpdate);
       socket.off("message:status", handleStatus);
       disconnectSocket();
     };

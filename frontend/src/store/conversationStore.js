@@ -11,6 +11,9 @@ import {
   deleteConversation,
 } from "../api/conversationApi";
 
+// Id of the newest fetchConversations() call (older answers are ignored)
+let latestListFetchId = 0;
+
 const useConversationStore = create((set) => ({
   conversations: [],
   conversation: null,
@@ -30,13 +33,15 @@ const useConversationStore = create((set) => ({
 
   // GET ALL CONVERSATIONS
   fetchConversations: async () => {
+    const requestId = ++latestListFetchId;
+
     try {
       set({ loading: true });
 
       const data = await getConversations();
 
-      console.log("API Response:", data);
-      console.log("Conversations:", data.conversations);
+      // A newer request was started meanwhile - ignore this old answer
+      if (requestId !== latestListFetchId) return;
 
       set({
         conversations: data.conversations,
@@ -44,8 +49,50 @@ const useConversationStore = create((set) => ({
       });
     } catch (error) {
       console.error(error);
-      set({ loading: false });
+      if (requestId === latestListFetchId) set({ loading: false });
     }
+  },
+
+  // REAL-TIME: a message arrived for a conversation we already have in the
+  // list. Update that ONE row (preview, time, unread) and move it to the
+  // top, instead of downloading the whole list again.
+  // Returns false when the conversation is not in the list yet (new chat),
+  // so the caller can load the list.
+  applyIncomingMessage: (conversationId, message) => {
+    let found = false;
+
+    set((state) => {
+      const existing = state.conversations.find(
+        (conversation) => conversation.id === conversationId
+      );
+
+      if (!existing) return state;
+
+      found = true;
+
+      const isOpen = state.selectedConversation?.id === conversationId;
+
+      const updated = {
+        ...existing,
+        lastMessage: message.content,
+        updatedAt: message.createdAt || new Date().toISOString(),
+        unreadCount:
+          message.sender === "CUSTOMER" && !isOpen
+            ? (existing.unreadCount || 0) + 1
+            : existing.unreadCount,
+      };
+
+      return {
+        conversations: [
+          updated,
+          ...state.conversations.filter(
+            (conversation) => conversation.id !== conversationId
+          ),
+        ],
+      };
+    });
+
+    return found;
   },
 
   // GET CONVERSATION BY ID

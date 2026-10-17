@@ -26,8 +26,16 @@ function SocialInbox({ variant = "facebook" }) {
     markAsRead,
   } = useConversationStore();
 
-  const { messages, fetchMessages, addMessage, addMediaMessage, clearMessages } =
-    useMessageStore();
+  const {
+    messages,
+    messagesConversationId,
+    fetchMessages,
+    addMessage,
+    addMediaMessage,
+    clearMessages,
+    appendMessage,
+    loading: messagesLoading,
+  } = useMessageStore();
 
   // Only this channel's conversations
   const channelConversations = useMemo(
@@ -64,7 +72,7 @@ function SocialInbox({ variant = "facebook" }) {
   const handleSendMessage = async (content) => {
     if (!selectedConversation) return;
 
-    await addMessage({
+    const response = await addMessage({
       conversationId: selectedConversation.id,
       content,
       sender: "AGENT",
@@ -72,8 +80,15 @@ function SocialInbox({ variant = "facebook" }) {
       status: "SENT",
     });
 
-    await fetchMessages(selectedConversation.id);
-    await fetchConversations();
+    // Show the sent message at once; reload only if the API gave none back
+    if (response?.data) {
+      appendMessage(response.data);
+    } else {
+      await fetchMessages(selectedConversation.id);
+    }
+
+    // Refresh the list in the background (does not block the chat)
+    fetchConversations();
   };
 
   const handleSendMedia = async (file, caption = "") => {
@@ -90,8 +105,14 @@ function SocialInbox({ variant = "facebook" }) {
       return false;
     }
 
-    await fetchMessages(selectedConversation.id);
-    await fetchConversations();
+    if (result.data) {
+      appendMessage(result.data);
+    } else {
+      await fetchMessages(selectedConversation.id);
+    }
+
+    // Refresh the list in the background (does not block the chat)
+    fetchConversations();
     return true;
   };
 
@@ -135,7 +156,15 @@ function SocialInbox({ variant = "facebook" }) {
               <SocialMessageList
                 theme={theme}
                 conversation={selectedConversation}
-                messages={messages}
+                messages={
+                  messagesConversationId === selectedConversation.id
+                    ? messages
+                    : []
+                }
+                loading={
+                  messagesLoading ||
+                  messagesConversationId !== selectedConversation.id
+                }
               />
             </div>
 
