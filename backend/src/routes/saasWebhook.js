@@ -595,6 +595,7 @@
 
 
 
+
 // ============================================
 // SAAS WHATSAPP WEBHOOK (multi-tenant)
 // ============================================
@@ -1330,11 +1331,14 @@ const processWebhookChange = async (field, value) => {
         try {
           // Only fill in a name for customers who don't already have
           // one — never overwrite data the agent already entered.
+          // (Customer.name is a required field, so "no name" means "".
+          // Filtering `name: null` is not allowed by Prisma and made every
+          // call fail.)
           await prisma.customer.updateMany({
             where: {
               companyId,
               phone: contactPhone,
-              OR: [{ name: null }, { name: "" }],
+              name: "",
             },
             data: { name: fullName },
           });

@@ -267,6 +267,7 @@
 
 
 
+
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
  
@@ -338,7 +339,22 @@ app.use(helmet());
 
 // General API protection. Configure trust proxy correctly in production if
 // running behind a reverse proxy so client IP-based limits are accurate.
+// The CRM screen itself makes many calls (chat list, messages, status...), so
+// the general limit is higher than before (was 300 per 15 min, which a few
+// busy agents behind one IP could hit). Override with API_RATE_LIMIT_MAX.
+// Meta's webhooks are NOT limited here: they have their own signature check,
+// and limiting them could make incoming messages arrive late or get lost.
 app.use("/api", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.API_RATE_LIMIT_MAX) || 3000,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skip: (req) => /^\/(webhook|saas\/webhook|facebook\/webhook)(\/|$)/.test(req.path),
+  message: { success: false, message: "Too many requests. Please try again later." },
+}));
+
+// Login / password routes keep the original strict limit (300 per 15 min).
+app.use("/api/auth", rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: "draft-7",
@@ -358,6 +374,13 @@ app.use(
       if (!origin || allowedFrontendOrigins.includes(origin.replace(/\/$/, ""))) {
         return callback(null, true);
       }
+      // Show WHICH origin was blocked, so it can be added to FRONTEND_URL
+      console.warn(
+        "CORS blocked origin:",
+        origin,
+        "| allowed:",
+        allowedFrontendOrigins.join(", ")
+      );
       return callback(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
