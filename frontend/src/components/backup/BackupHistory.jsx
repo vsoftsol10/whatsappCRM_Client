@@ -1,6 +1,7 @@
 import {
   Download,
   FileArchive,
+  FileSpreadsheet,
   AlertCircle,
   CheckCircle2,
   Clock,
@@ -204,25 +205,51 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
                   </td>
 
                   <td className="px-5 py-4 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onDownload(backup)}
-                      disabled={
-                        backup.status !== "COMPLETED" ||
-                        downloadingId === backup.id
-                      }
-                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-green-200 hover:bg-green-50 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {downloadingId === backup.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="h-4 w-4" />
-                      )}
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {/* EXCEL - for normal users */}
+                      <button
+                        type="button"
+                        onClick={() => onDownload(backup, "xlsx")}
+                        disabled={
+                          backup.status !== "COMPLETED" ||
+                          Boolean(downloadingId)
+                        }
+                        title="Readable file that opens in Excel"
+                        className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {downloadingId === `${backup.id}:xlsx` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileSpreadsheet className="h-4 w-4" />
+                        )}
 
-                      {downloadingId === backup.id
-                        ? "Downloading..."
-                        : "Download"}
-                    </button>
+                        {downloadingId === `${backup.id}:xlsx`
+                          ? "Downloading..."
+                          : "Excel"}
+                      </button>
+
+                      {/* ZIP (JSON) - technical / restore */}
+                      <button
+                        type="button"
+                        onClick={() => onDownload(backup, "zip")}
+                        disabled={
+                          backup.status !== "COMPLETED" ||
+                          Boolean(downloadingId)
+                        }
+                        title="Technical backup (JSON files) for developers"
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-green-200 hover:bg-green-50 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {downloadingId === `${backup.id}:zip` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+
+                        {downloadingId === `${backup.id}:zip`
+                          ? "Downloading..."
+                          : "ZIP (JSON)"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

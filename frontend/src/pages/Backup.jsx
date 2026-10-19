@@ -143,12 +143,15 @@ const Backup = () => {
 
   // =========================================================
   // DOWNLOAD BACKUP
-  // GET /api/backups/:id/download
+  // format = "xlsx" -> GET /api/backups/:id/download/excel (readable)
+  // format = "zip"  -> GET /api/backups/:id/download (JSON, technical)
   // =========================================================
 
-  const handleDownload = async (backup) => {
+  const handleDownload = async (backup, format = "xlsx") => {
+    const isExcel = format === "xlsx";
+
     try {
-      setDownloadingId(backup.id);
+      setDownloadingId(`${backup.id}:${format}`);
       setError("");
 
       const token = getToken();
@@ -158,7 +161,9 @@ const Backup = () => {
       }
 
       const response = await fetch(
-        `${API_URL}/api/backups/${backup.id}/download`,
+        `${API_URL}/api/backups/${backup.id}/download${
+          isExcel ? "/excel" : ""
+        }`,
         {
           method: "GET",
           headers: {
@@ -183,7 +188,7 @@ const Backup = () => {
         throw new Error(message);
       }
 
-      // Convert response to ZIP blob
+      // Convert response to file blob
       const blob = await response.blob();
 
       if (!blob || blob.size === 0) {
@@ -202,9 +207,12 @@ const Backup = () => {
 
       link.href = url;
 
-      link.download =
-        backup.fileName ||
-        `vatup-backup-${backup.id}.zip`;
+      const zipName =
+        backup.fileName || `vatup-backup-${backup.id}.zip`;
+
+      link.download = isExcel
+        ? zipName.replace(/\.zip$/i, ".xlsx")
+        : zipName;
 
       document.body.appendChild(link);
 

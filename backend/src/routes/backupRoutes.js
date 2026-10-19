@@ -5,6 +5,7 @@ const {
   getBackups,
   getBackupById,
   downloadBackup,
+  downloadBackupExcel,
 } = require("../controllers/backupController");
 
 // Change this path to your actual authentication middleware
@@ -26,7 +27,15 @@ router.get("/", authMiddleware, adminOnly, getBackups);
 // Get one backup
 router.get("/:id", authMiddleware, adminOnly, getBackupById);
 
-// Download backup
+// Download backup (ZIP with JSON - technical / restore)
 router.get("/:id/download", authMiddleware, adminOnly, downloadBackup);
+
+// Download backup as Excel (readable for normal users)
+router.get(
+  "/:id/download/excel",
+  authMiddleware,
+  adminOnly,
+  downloadBackupExcel
+);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const archiver = require("archiver");
 const fs = require("fs");
 const path = require("path");
+const { buildBackupExcelBuffer } = require("./backupExcelService");
 
 /**
  * Create a manual CRM backup for one company.
@@ -27,6 +28,11 @@ const createManualBackup = async (companyId, createdById) => {
             startedAt,
         },
     });
+
+    // Declared here (not inside try) so the catch block can delete
+    // half-written files if the backup fails.
+    let zipPath = null;
+    let excelPath = null;
 
     try {
         // =====================================================
@@ -156,6 +162,7 @@ const createManualBackup = async (companyId, createdById) => {
                     customerId: true,
                     whatsappAccountId: true,
                     phone: true,
+                    contactName: true,
                     status: true,
                     channel: true,
                     lastMessage: true,
@@ -594,6 +601,44 @@ const createManualBackup = async (companyId, createdById) => {
         };
 
         // =====================================================
+        // 21B. BUILD READABLE EXCEL (for non-technical users)
+        // =====================================================
+        // If this fails we still keep the normal JSON backup.
+
+        let excelBuffer = null;
+
+        try {
+            excelBuffer = buildBackupExcelBuffer({
+                company,
+                users,
+                whatsappAccounts,
+                customers,
+                conversations,
+                messages,
+                campaigns,
+                campaignRecipients,
+                templates,
+                templateRecipients,
+                leads,
+                leadWorkNotes,
+                deals,
+                dealActivities,
+                tasks,
+                taskWorkNotes,
+                tickets,
+                ticketWorkNotes,
+                userNotifications,
+                crmAuditLogs,
+                backupCreatedAt: metadata.createdAt,
+            });
+        } catch (excelError) {
+            console.error(
+                "Excel export build failed (JSON backup will continue):",
+                excelError
+            );
+        }
+
+        // =====================================================
         // 22. CREATE BACKUP DIRECTORY
         // =====================================================
 
@@ -611,7 +656,7 @@ const createManualBackup = async (companyId, createdById) => {
         const fileName =
             `vatup-backup-${company.companyId}-${Date.now()}.zip`;
 
-        const zipPath = path.join(
+        zipPath = path.join(
             backupDirectory,
             fileName
         );
@@ -717,6 +762,13 @@ const createManualBackup = async (companyId, createdById) => {
                 "metadata.json",
                 metadata
             );
+
+            // Readable copy for normal users (opens in Excel)
+            if (excelBuffer) {
+                archive.append(excelBuffer, {
+                    name: "backup/CRM-Backup-Readable.xlsx",
+                });
+            }
 
             addJson(
                 "company.json",
@@ -844,6 +896,17 @@ const createManualBackup = async (companyId, createdById) => {
         }
 
         // =====================================================
+        // 24B. SAVE EXCEL NEXT TO THE ZIP
+        // =====================================================
+        // Same name, .xlsx extension. The download-excel endpoint
+        // finds it from the zip path, so no database change needed.
+
+        if (excelBuffer) {
+            excelPath = zipPath.replace(/\.zip$/i, ".xlsx");
+            fs.writeFileSync(excelPath, excelBuffer);
+        }
+
+        // =====================================================
         // 25. UPDATE BACKUP RECORD
         // =====================================================
 
@@ -921,11 +984,12 @@ const createManualBackup = async (companyId, createdById) => {
         // ---------------------------------------------
 
         try {
-            if (
-                typeof zipPath !== "undefined" &&
-                fs.existsSync(zipPath)
-            ) {
+            if (zipPath && fs.existsSync(zipPath)) {
                 fs.unlinkSync(zipPath);
+            }
+
+            if (excelPath && fs.existsSync(excelPath)) {
+                fs.unlinkSync(excelPath);
             }
         } catch (fileError) {
             console.error(

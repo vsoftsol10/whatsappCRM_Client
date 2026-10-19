@@ -172,6 +172,71 @@ const downloadBackup = async (req, res) => {
 };
 
 //////////////////////////////////////////////////////
+// DOWNLOAD BACKUP AS EXCEL (readable, no JSON)
+//////////////////////////////////////////////////////
+
+const downloadBackupExcel = async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+    const { id } = req.params;
+
+    if (!companyId) {
+      return res.status(401).json({
+        success: false,
+        message: "Company information not found",
+      });
+    }
+
+    const backup = await prisma.backup.findFirst({
+      where: {
+        id,
+        companyId,
+        status: "COMPLETED",
+      },
+      select: {
+        id: true,
+        fileName: true,
+        storagePath: true,
+      },
+    });
+
+    if (!backup || !backup.storagePath) {
+      return res.status(404).json({
+        success: false,
+        message: "Backup not found",
+      });
+    }
+
+    // The Excel file is saved next to the ZIP with the same name
+    const excelPath = backup.storagePath.replace(/\.zip$/i, ".xlsx");
+
+    if (!fs.existsSync(excelPath)) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Excel version is not available for this older backup. Please create a new backup to get the Excel file.",
+      });
+    }
+
+    const excelFileName = (backup.fileName || `backup-${backup.id}.zip`)
+      .replace(/\.zip$/i, ".xlsx");
+
+    res.download(excelPath, excelFileName, (error) => {
+      if (error) {
+        console.error("Backup Excel download error:", error);
+      }
+    });
+  } catch (error) {
+    console.error("Download backup Excel error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to download Excel backup",
+    });
+  }
+};
+
+//////////////////////////////////////////////////////
 // GET BACKUP DETAILS
 //////////////////////////////////////////////////////
 
@@ -232,4 +297,5 @@ module.exports = {
   getBackups,
   getBackupById,
   downloadBackup,
+  downloadBackupExcel,
 };
