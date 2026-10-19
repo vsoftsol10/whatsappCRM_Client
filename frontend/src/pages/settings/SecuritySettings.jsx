@@ -8,6 +8,7 @@
 // } from "lucide-react";
 
 // import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
+// import FacebookMessengerCard from "../../components/facebook/FacebookMessengerCard";
 // import { useAuthStore } from "../../store/authStore";
 // import ChangePasswordModal from "../../components/common/ChangePasswordModal";
 // import ConfirmModal from "../../components/common/ConfirmModal";
@@ -240,6 +241,10 @@
 
 //       </div>
 
+//       {/* Facebook Messenger Card */}
+
+//       <FacebookMessengerCard isAdmin={isAdmin} />
+
 //       <ChangePasswordModal
 //         isOpen={showChangePassword}
 //         onClose={() => setShowChangePassword(false)}
@@ -265,6 +270,7 @@
 // }
 
 // export default SecuritySettings;
+
 
 
 
@@ -413,7 +419,7 @@ function SecuritySettings() {
 
       {/* WhatsApp Business Card */}
 
-      <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+      <div data-tour="whatsapp-card" className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
 
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
 

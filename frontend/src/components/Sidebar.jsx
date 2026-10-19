@@ -231,6 +231,7 @@
 
 
 
+
 // src/components/Sidebar.jsx
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -252,6 +253,7 @@ function LinkItem({ item, onClose, nested = false }) {
   return (
     <NavLink
       to={item.path}
+      data-tour={item.key}
       onClick={onClose}
       className={({ isActive }) =>
         `${itemBase} ${nested ? "h-9 pl-3 text-sm" : ""} ${itemState(isActive)}`
@@ -281,6 +283,7 @@ function ParentItem({ item, isOpen, hasActiveChild, onToggle, onClose }) {
       <button
         type="button"
         onClick={onToggle}
+        data-tour={item.key}
         aria-expanded={isOpen}
         className={`${itemBase} w-full justify-between ${
           hasActiveChild ? "text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"

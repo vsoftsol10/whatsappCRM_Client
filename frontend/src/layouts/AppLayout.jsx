@@ -1,5 +1,4 @@
 
-
 // import { useEffect, useState } from "react";
 // import { Outlet, useLocation } from "react-router-dom";
 // import Sidebar from "../components/Sidebar";
@@ -24,6 +23,8 @@
 
 //   const fullWidthPages = [
 //     "/conversations",
+//     "/facebook-conversations",
+//     "/instagram-conversations",
 //     "/tickets",
 //     "/settings",
 //   ];
@@ -67,6 +68,7 @@ import Sidebar from "../components/Sidebar";
 import TopHeader from "../components/header/TopHeader";
 import { useAuthStore } from "../store/authStore";
 import useChatSocket from "../hooks/useChatSocket";
+import ProductTour from "../components/tour/ProductTour";
 
 function AppLayout() {
   const location = useLocation();
@@ -76,6 +78,13 @@ function AppLayout() {
 
   // Live chat updates (new messages, delivery ticks) on every page
   useChatSocket();
+
+  // Product tour can open/close the mobile sidebar
+  useEffect(() => {
+    const onSidebar = (e) => setIsSidebarOpen(!!e.detail?.open);
+    window.addEventListener("vatup-tour:sidebar", onSidebar);
+    return () => window.removeEventListener("vatup-tour:sidebar", onSidebar);
+  }, []);
 
   // Top up the logged-in user with the latest info (company name, etc.)
   // once per app session, without forcing a re-login.
@@ -95,6 +104,8 @@ function AppLayout() {
 
   return (
     <div className="h-screen overflow-hidden bg-gray-100">
+      <ProductTour />
+
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -118,3 +129,4 @@ function AppLayout() {
 }
 
 export default AppLayout;
+
