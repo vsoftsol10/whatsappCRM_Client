@@ -102,77 +102,7 @@ const getBackups = async (req, res) => {
 };
 
 //////////////////////////////////////////////////////
-// DOWNLOAD BACKUP
-//////////////////////////////////////////////////////
-
-const downloadBackup = async (req, res) => {
-  try {
-    const companyId = req.user.companyId;
-    const { id } = req.params;
-
-    if (!companyId) {
-      return res.status(401).json({
-        success: false,
-        message: "Company information not found",
-      });
-    }
-
-    const backup = await prisma.backup.findFirst({
-      where: {
-        id,
-        companyId,
-        status: "COMPLETED",
-      },
-      select: {
-        id: true,
-        fileName: true,
-        storagePath: true,
-        fileSize: true,
-      },
-    });
-
-    if (!backup) {
-      return res.status(404).json({
-        success: false,
-        message: "Backup not found",
-      });
-    }
-
-    if (!backup.storagePath) {
-      return res.status(404).json({
-        success: false,
-        message: "Backup file is not available",
-      });
-    }
-
-    if (!fs.existsSync(backup.storagePath)) {
-      return res.status(404).json({
-        success: false,
-        message: "Backup file no longer exists",
-      });
-    }
-
-    res.download(
-      backup.storagePath,
-      backup.fileName,
-      (error) => {
-        if (error) {
-          console.error("Backup download error:", error);
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Download backup error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to download backup",
-    });
-  }
-};
-
-//////////////////////////////////////////////////////
-// DOWNLOAD BACKUP AS EXCEL (readable, no JSON)
+// DOWNLOAD BACKUP (Excel only)
 //////////////////////////////////////////////////////
 
 const downloadBackupExcel = async (req, res) => {
@@ -207,14 +137,17 @@ const downloadBackupExcel = async (req, res) => {
       });
     }
 
-    // The Excel file is saved next to the ZIP with the same name
-    const excelPath = backup.storagePath.replace(/\.zip$/i, ".xlsx");
+    // New backups are stored directly as .xlsx.
+    // Older backups were .zip with an .xlsx saved next to them.
+    const excelPath = /\.xlsx$/i.test(backup.storagePath)
+      ? backup.storagePath
+      : backup.storagePath.replace(/\.zip$/i, ".xlsx");
 
     if (!fs.existsSync(excelPath)) {
       return res.status(404).json({
         success: false,
         message:
-          "Excel version is not available for this older backup. Please create a new backup to get the Excel file.",
+          "Excel file is not available for this older backup. Please create a new backup.",
       });
     }
 
@@ -296,6 +229,5 @@ module.exports = {
   createBackup,
   getBackups,
   getBackupById,
-  downloadBackup,
   downloadBackupExcel,
 };

@@ -1,5 +1,4 @@
 const prisma = require("../config/prisma");
-const archiver = require("archiver");
 const fs = require("fs");
 const path = require("path");
 const { buildBackupExcelBuffer } = require("./backupExcelService");
@@ -30,8 +29,7 @@ const createManualBackup = async (companyId, createdById) => {
     });
 
     // Declared here (not inside try) so the catch block can delete
-    // half-written files if the backup fails.
-    let zipPath = null;
+    // a half-written file if the backup fails.
     let excelPath = null;
 
     try {
@@ -560,86 +558,37 @@ const createManualBackup = async (companyId, createdById) => {
             });
 
         // =====================================================
-        // 21. METADATA
+        // 21. BUILD EXCEL FILE
         // =====================================================
+        // The backup is saved ONLY as a readable Excel (.xlsx) file.
+        // No ZIP and no JSON files are created.
 
-        const metadata = {
-            backupVersion: "1.0",
-            backupType: "MANUAL",
-            createdAt: new Date().toISOString(),
-
-            company: {
-                id: company.id,
-                companyId: company.companyId,
-                companyName: company.companyName,
-            },
-
-            counts: {
-                users: users.length,
-                whatsappAccounts: whatsappAccounts.length,
-                customers: customers.length,
-                conversations: conversations.length,
-                messages: messages.length,
-                campaigns: campaigns.length,
-                campaignRecipients:
-                    campaignRecipients.length,
-                templates: templates.length,
-                templateRecipients:
-                    templateRecipients.length,
-                leads: leads.length,
-                leadWorkNotes: leadWorkNotes.length,
-                deals: deals.length,
-                dealActivities: dealActivities.length,
-                tasks: tasks.length,
-                taskWorkNotes: taskWorkNotes.length,
-                tickets: tickets.length,
-                ticketWorkNotes: ticketWorkNotes.length,
-                userNotifications:
-                    userNotifications.length,
-                crmAuditLogs: crmAuditLogs.length,
-            },
-        };
+        const excelBuffer = buildBackupExcelBuffer({
+            company,
+            users,
+            whatsappAccounts,
+            customers,
+            conversations,
+            messages,
+            campaigns,
+            campaignRecipients,
+            templates,
+            templateRecipients,
+            leads,
+            leadWorkNotes,
+            deals,
+            dealActivities,
+            tasks,
+            taskWorkNotes,
+            tickets,
+            ticketWorkNotes,
+            userNotifications,
+            crmAuditLogs,
+            backupCreatedAt: new Date().toISOString(),
+        });
 
         // =====================================================
-        // 21B. BUILD READABLE EXCEL (for non-technical users)
-        // =====================================================
-        // If this fails we still keep the normal JSON backup.
-
-        let excelBuffer = null;
-
-        try {
-            excelBuffer = buildBackupExcelBuffer({
-                company,
-                users,
-                whatsappAccounts,
-                customers,
-                conversations,
-                messages,
-                campaigns,
-                campaignRecipients,
-                templates,
-                templateRecipients,
-                leads,
-                leadWorkNotes,
-                deals,
-                dealActivities,
-                tasks,
-                taskWorkNotes,
-                tickets,
-                ticketWorkNotes,
-                userNotifications,
-                crmAuditLogs,
-                backupCreatedAt: metadata.createdAt,
-            });
-        } catch (excelError) {
-            console.error(
-                "Excel export build failed (JSON backup will continue):",
-                excelError
-            );
-        }
-
-        // =====================================================
-        // 22. CREATE BACKUP DIRECTORY
+        // 22. SAVE EXCEL FILE
         // =====================================================
 
         const backupDirectory = path.join(
@@ -654,256 +603,31 @@ const createManualBackup = async (companyId, createdById) => {
         }
 
         const fileName =
-            `vatup-backup-${company.companyId}-${Date.now()}.zip`;
+            `vatup-backup-${company.companyId}-${Date.now()}.xlsx`;
 
-        zipPath = path.join(
+        excelPath = path.join(
             backupDirectory,
             fileName
         );
 
-        // =====================================================
-        // 23. CREATE ZIP FILE
-        // =====================================================
-
-        await new Promise((resolve, reject) => {
-            const output = fs.createWriteStream(zipPath);
-
-            /*
-             * IMPORTANT:
-             * Your installed archiver package exports:
-             *
-             * {
-             *   Archiver,
-             *   JsonArchive,
-             *   TarArchive,
-             *   ZipArchive
-             * }
-             *
-             * Therefore we create ZipArchive directly.
-             */
-            const archive = new archiver.ZipArchive({
-                zlib: {
-                    level: 9,
-                },
-            });
-
-            let settled = false;
-
-            const resolveOnce = () => {
-                if (!settled) {
-                    settled = true;
-                    resolve();
-                }
-            };
-
-            const rejectOnce = (error) => {
-                if (!settled) {
-                    settled = true;
-                    reject(error);
-                }
-            };
-
-            // -------------------------------------------------
-            // OUTPUT EVENTS
-            // -------------------------------------------------
-
-            output.on("close", () => {
-                console.log(
-                    `Backup ZIP created successfully: ${fileName}`
-                );
-
-                console.log(
-                    `Backup size: ${archive.pointer()} bytes`
-                );
-
-                resolveOnce();
-            });
-
-            output.on("error", (error) => {
-                rejectOnce(error);
-            });
-
-            // -------------------------------------------------
-            // ARCHIVE EVENTS
-            // -------------------------------------------------
-
-            archive.on("error", (error) => {
-                rejectOnce(error);
-            });
-
-            // -------------------------------------------------
-            // CONNECT ARCHIVE TO OUTPUT
-            // -------------------------------------------------
-
-            archive.pipe(output);
-
-            // -------------------------------------------------
-            // JSON HELPER
-            // -------------------------------------------------
-
-            const addJson = (jsonFileName, data) => {
-                archive.append(
-                    JSON.stringify(
-                        data,
-                        null,
-                        2
-                    ),
-                    {
-                        name: `backup/${jsonFileName}`,
-                    }
-                );
-            };
-
-            // -------------------------------------------------
-            // ADD BACKUP FILES
-            // -------------------------------------------------
-
-            addJson(
-                "metadata.json",
-                metadata
-            );
-
-            // Readable copy for normal users (opens in Excel)
-            if (excelBuffer) {
-                archive.append(excelBuffer, {
-                    name: "backup/CRM-Backup-Readable.xlsx",
-                });
-            }
-
-            addJson(
-                "company.json",
-                company
-            );
-
-            addJson(
-                "users.json",
-                users
-            );
-
-            addJson(
-                "whatsapp-accounts.json",
-                whatsappAccounts
-            );
-
-            addJson(
-                "customers.json",
-                customers
-            );
-
-            addJson(
-                "conversations.json",
-                conversations
-            );
-
-            addJson(
-                "messages.json",
-                messages
-            );
-
-            addJson(
-                "campaigns.json",
-                campaigns
-            );
-
-            addJson(
-                "campaign-recipients.json",
-                campaignRecipients
-            );
-
-            addJson(
-                "templates.json",
-                templates
-            );
-
-            addJson(
-                "template-recipients.json",
-                templateRecipients
-            );
-
-            addJson(
-                "leads.json",
-                leads
-            );
-
-            addJson(
-                "lead-work-notes.json",
-                leadWorkNotes
-            );
-
-            addJson(
-                "deals.json",
-                deals
-            );
-
-            addJson(
-                "deal-activities.json",
-                dealActivities
-            );
-
-            addJson(
-                "tasks.json",
-                tasks
-            );
-
-            addJson(
-                "task-work-notes.json",
-                taskWorkNotes
-            );
-
-            addJson(
-                "tickets.json",
-                tickets
-            );
-
-            addJson(
-                "ticket-work-notes.json",
-                ticketWorkNotes
-            );
-
-            addJson(
-                "user-notifications.json",
-                userNotifications
-            );
-
-            addJson(
-                "crm-audit-logs.json",
-                crmAuditLogs
-            );
-
-            // -------------------------------------------------
-            // FINALIZE
-            // -------------------------------------------------
-
-            archive.finalize();
-        });
+        fs.writeFileSync(excelPath, excelBuffer);
 
         // =====================================================
-        // 24. CHECK ZIP FILE
+        // 23. CHECK EXCEL FILE
         // =====================================================
 
-        if (!fs.existsSync(zipPath)) {
+        if (!fs.existsSync(excelPath)) {
             throw new Error(
-                "Backup ZIP file was not created"
+                "Backup Excel file was not created"
             );
         }
 
-        const stats = fs.statSync(zipPath);
+        const stats = fs.statSync(excelPath);
 
         if (stats.size === 0) {
             throw new Error(
-                "Backup ZIP file is empty"
+                "Backup Excel file is empty"
             );
-        }
-
-        // =====================================================
-        // 24B. SAVE EXCEL NEXT TO THE ZIP
-        // =====================================================
-        // Same name, .xlsx extension. The download-excel endpoint
-        // finds it from the zip path, so no database change needed.
-
-        if (excelBuffer) {
-            excelPath = zipPath.replace(/\.zip$/i, ".xlsx");
-            fs.writeFileSync(excelPath, excelBuffer);
         }
 
         // =====================================================
@@ -921,7 +645,7 @@ const createManualBackup = async (companyId, createdById) => {
                 data: {
                     status: "COMPLETED",
                     fileName,
-                    storagePath: zipPath,
+                    storagePath: excelPath,
                     fileSize: BigInt(stats.size),
                     completedAt,
                 },
@@ -952,7 +676,7 @@ const createManualBackup = async (companyId, createdById) => {
         );
 
         console.log(
-            `Path: ${zipPath}`
+            `Path: ${excelPath}`
         );
 
         console.log(
@@ -965,7 +689,7 @@ const createManualBackup = async (companyId, createdById) => {
 
         return {
             backup: completedBackup,
-            filePath: zipPath,
+            filePath: excelPath,
             fileName,
             size: stats.size,
         };
@@ -980,14 +704,10 @@ const createManualBackup = async (companyId, createdById) => {
         );
 
         // ---------------------------------------------
-        // Remove partially-created ZIP if it exists
+        // Remove partially-created Excel file if it exists
         // ---------------------------------------------
 
         try {
-            if (zipPath && fs.existsSync(zipPath)) {
-                fs.unlinkSync(zipPath);
-            }
-
             if (excelPath && fs.existsSync(excelPath)) {
                 fs.unlinkSync(excelPath);
             }

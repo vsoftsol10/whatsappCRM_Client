@@ -4,7 +4,6 @@ const {
   createBackup,
   getBackups,
   getBackupById,
-  downloadBackup,
   downloadBackupExcel,
 } = require("../controllers/backupController");
 
@@ -27,10 +26,7 @@ router.get("/", authMiddleware, adminOnly, getBackups);
 // Get one backup
 router.get("/:id", authMiddleware, adminOnly, getBackupById);
 
-// Download backup (ZIP with JSON - technical / restore)
-router.get("/:id/download", authMiddleware, adminOnly, downloadBackup);
-
-// Download backup as Excel (readable for normal users)
+// Download backup (Excel only)
 router.get(
   "/:id/download/excel",
   authMiddleware,

@@ -1,6 +1,4 @@
 import {
-  Download,
-  FileArchive,
   FileSpreadsheet,
   AlertCircle,
   CheckCircle2,
@@ -75,7 +73,7 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-          <FileArchive className="h-7 w-7 text-gray-500" />
+          <FileSpreadsheet className="h-7 w-7 text-gray-500" />
         </div>
 
         <h3 className="mt-4 text-lg font-semibold text-gray-900">
@@ -144,15 +142,17 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                        <FileArchive className="h-5 w-5 text-gray-600" />
+                        <FileSpreadsheet className="h-5 w-5 text-gray-600" />
                       </div>
 
                       <div className="min-w-0">
                         <p
                           className="max-w-[260px] truncate text-sm font-medium text-gray-900"
-                          title={backup.fileName || ""}
+                          title={(backup.fileName || "").replace(/\.zip$/i, ".xlsx")}
                         >
-                          {backup.fileName || "Backup file"}
+                          {backup.fileName
+                            ? backup.fileName.replace(/\.zip$/i, ".xlsx")
+                            : "Backup file"}
                         </p>
 
                         <p className="mt-1 text-xs text-gray-500">
@@ -205,51 +205,25 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
                   </td>
 
                   <td className="px-5 py-4 text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      {/* EXCEL - for normal users */}
-                      <button
-                        type="button"
-                        onClick={() => onDownload(backup, "xlsx")}
-                        disabled={
-                          backup.status !== "COMPLETED" ||
-                          Boolean(downloadingId)
-                        }
-                        title="Readable file that opens in Excel"
-                        className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {downloadingId === `${backup.id}:xlsx` ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <FileSpreadsheet className="h-4 w-4" />
-                        )}
+                    <button
+                      type="button"
+                      onClick={() => onDownload(backup)}
+                      disabled={
+                        backup.status !== "COMPLETED" ||
+                        Boolean(downloadingId)
+                      }
+                      className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {downloadingId === backup.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileSpreadsheet className="h-4 w-4" />
+                      )}
 
-                        {downloadingId === `${backup.id}:xlsx`
-                          ? "Downloading..."
-                          : "Excel"}
-                      </button>
-
-                      {/* ZIP (JSON) - technical / restore */}
-                      <button
-                        type="button"
-                        onClick={() => onDownload(backup, "zip")}
-                        disabled={
-                          backup.status !== "COMPLETED" ||
-                          Boolean(downloadingId)
-                        }
-                        title="Technical backup (JSON files) for developers"
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-green-200 hover:bg-green-50 hover:text-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {downloadingId === `${backup.id}:zip` ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4" />
-                        )}
-
-                        {downloadingId === `${backup.id}:zip`
-                          ? "Downloading..."
-                          : "ZIP (JSON)"}
-                      </button>
-                    </div>
+                      {downloadingId === backup.id
+                        ? "Downloading..."
+                        : "Download Excel"}
+                    </button>
                   </td>
                 </tr>
               );
