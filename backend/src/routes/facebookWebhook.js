@@ -235,7 +235,6 @@
 
 
 
-
 // ============================================================
 // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 //
@@ -518,9 +517,26 @@ const processMessagingEvent = async (page, event, channel) => {
 router.post("/", async (req, res) => {
   const body = req.body;
 
+  // DIAGNOSTIC LOG: if this line never shows in Render when you message the
+  // Page, Meta is NOT calling this server (problem is in the Meta app
+  // dashboard / Page subscription, not in this code).
+  console.log(
+    "META WEBHOOK RECEIVED:",
+    "object=" + body?.object,
+    "entries=" + (Array.isArray(body?.entry) ? body.entry.length : 0),
+    "ids=" + (body?.entry || []).map((e) => e?.id).join(","),
+    "fields=" +
+      (body?.entry || [])
+        .map((e) =>
+          e?.messaging ? "messaging" : Object.keys(e || {}).join("/")
+        )
+        .join(",")
+  );
+
   // Only Facebook Page and Instagram events belong on this URL.
   const objectType = body?.object;
   if (objectType !== "page" && objectType !== "instagram") {
+    console.log("META WEBHOOK ignored, unknown object:", objectType);
     return res.sendStatus(404);
   }
 
@@ -532,7 +548,10 @@ router.post("/", async (req, res) => {
 
   for (const entry of entries) {
     const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
-    if (!events.length) continue;
+    if (!events.length) {
+      console.log("META WEBHOOK entry has no messaging events:", entry?.id, Object.keys(entry || {}).join(","));
+      continue;
+    }
 
     try {
       // Facebook: entry.id is the Page ID.
