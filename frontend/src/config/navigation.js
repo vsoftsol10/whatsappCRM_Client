@@ -1,5 +1,6 @@
 
 // // src/config/navigation.js
+// import { FaWhatsapp, FaFacebook, FaInstagram } from "react-icons/fa";
 // import {
 //   LayoutDashboard,
 //   MessageCircle,
@@ -34,7 +35,16 @@
 //     id: "main",
 //     items: [
 //       { key: "dashboard", name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-//       { key: "conversations", name: "Conversations", path: "/conversations", icon: MessageCircle },
+//       {
+//         key: "conversations",
+//         name: "Conversations",
+//         icon: MessageCircle,
+//         children: [
+//           { key: "conversations-whatsapp", name: "WhatsApp", path: "/conversations", icon: FaWhatsapp },
+//           { key: "conversations-facebook", name: "Facebook", path: "/facebook-conversations", icon: FaFacebook },
+//           { key: "conversations-instagram", name: "Instagram", path: "/instagram-conversations", icon: FaInstagram },
+//         ],
+//       },
 //     ],
 //   },
 //   {
@@ -164,19 +174,8 @@ export const navGroups = [
   {
     id: "system",
     items: [
-      {
-        key: "settings",
-        name: "Settings",
-        icon: Settings,
-        children: [
-          { key: "security", name: "Security", path: "/settings/security", icon: Lock },
-          { key: "integrations", name: "Integrations", path: "/settings/integrations", icon: Plug },
-          { key: "backup", name: "Backup & Restore", path: "/backup", icon: Database, roles: ["ADMIN"] },
-          { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
-          { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
-          { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
-        ],
-      },
+      // Sidebar shows ONE "Settings" link. Its sections live as tabs inside the page (see settingsTabs).
+      { key: "settings", name: "Settings", path: "/settings", icon: Settings },
     ],
   },
 ];
@@ -199,3 +198,16 @@ export function filterByRole(groups, role) {
     }))
     .filter((group) => group.items.length > 0);
 }
+
+// Tabs shown at the top of the Settings page (src/layouts/SettingsLayout.jsx).
+// Also used by the header "Search pages..." box so every section stays searchable.
+export const settingsTabs = [
+  { key: "security", name: "Security", path: "/settings/security", icon: Lock },
+  { key: "integrations", name: "Integrations", path: "/settings/integrations", icon: Plug },
+  { key: "backup", name: "Backup & Restore", path: "/settings/backup", icon: Database, roles: ["ADMIN"] },
+  { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
+  { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
+  { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
+];
+
+export const filterTabsByRole = (tabs, role) => tabs.filter((tab) => canSee(tab, role));

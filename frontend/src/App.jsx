@@ -1,5 +1,4 @@
 
-
 // import React from "react";
 // import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -16,6 +15,8 @@
 // import Campaigns from "./pages/Campaigns";
 // import TicketsPage from "./pages/TicketsPage";
 // import Conversations from "./pages/Conversations";
+// import FacebookConversations from "./pages/FacebookConversations";
+// import InstagramConversations from "./pages/InstagramConversations";
 // import Tasks from "./pages/Task";
 // //import Products from "./pages/Products";
 // //import DealsPage from "./pages/DealsPage";
@@ -77,7 +78,11 @@
 //             {/* =================================================
 //                 CRM
 //             ================================================== */}
-//             <Route path="/conversations" element={<Conversations />} />
+//             <Route path="/conversations" element={<Conversations channel="WHATSAPP" key="WHATSAPP" />} />
+
+//             <Route path="/facebook-conversations" element={<FacebookConversations />} />
+
+//             <Route path="/instagram-conversations" element={<InstagramConversations />} />
 
 //             <Route path="/customers" element={<Customers />} />
 
@@ -153,15 +158,13 @@
 
 
 
-
-
-
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { useAuthStore } from "./store/authStore";
 
 import AppLayout from "./layouts/AppLayout";
+import SettingsLayout from "./layouts/SettingsLayout";
 import SaasSupportPage from "./pages/settings/SaasSupportPage";
 import Integrations from "./pages/settings/Integrations";
 import Login from "./pages/Login";
@@ -262,18 +265,35 @@ function App() {
 
             {/* =================================================
                 SETTINGS
+                One sidebar link -> one page with tabs (SettingsLayout)
             ================================================== */}
-            <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
-
-            <Route path="/settings/integrations" element={<Integrations />} />
+            <Route path="/settings" element={<Navigate to="/settings/security" replace />} />
 
             <Route path="/settings/profile" element={<ProfileSettings />} />
-
-            <Route path="/settings/security" element={<SecuritySettings />} />
 
             <Route path="/settings/plans" element={<Plans />} />
 
             <Route path="/change-password" element={<ChangePassword />} />
+
+            {/* old URL kept so existing bookmarks still work */}
+            <Route path="/backup" element={<Navigate to="/settings/backup" replace />} />
+
+            <Route element={<SettingsLayout />}>
+              <Route path="/settings/security" element={<SecuritySettings />} />
+
+              <Route path="/settings/integrations" element={<Integrations />} />
+
+              {/* ADMIN-only tabs */}
+              <Route element={<AdminRoute />}>
+                <Route path="/settings/backup" element={<Backup />} />
+
+                <Route path="/settings/support" element={<SaasSupportPage />} />
+
+                <Route path="/settings/audit-logs" element={<AuditLogs />} />
+
+                <Route path="/settings/ai-auto-reply" element={<AiAutoReply />} />
+              </Route>
+            </Route>
 
             {/* =================================================
                 ADMIN ROUTES
@@ -284,13 +304,6 @@ function App() {
               <Route path="/employees/edit/:id" element={<EditEmployee />} />
 
               <Route path="/employees/:id" element={<ViewEmployee />} />
-
-              <Route path="/settings/support" element={<SaasSupportPage />} />
-
-              <Route path="/settings/audit-logs" element={<AuditLogs />} />
-
-              <Route path="/settings/ai-auto-reply" element={<AiAutoReply />} />
-              <Route path="/backup" element={<Backup />} />
             </Route>
           </Route>
         </Route>

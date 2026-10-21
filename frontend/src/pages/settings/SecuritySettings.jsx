@@ -143,7 +143,7 @@
 
 //       {/* WhatsApp Business Card */}
 
-//       <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+//       <div data-tour="whatsapp-card" className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
 
 //         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
 
@@ -279,7 +279,6 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Lock,
-  ChevronRight,
   MessageCircle,
 } from "lucide-react";
 
@@ -357,45 +356,33 @@ function SecuritySettings() {
   };
 
   return (
-    <div className="crm-page bg-slate-50">
+    <div>
 
-      {/* Header */}
+      {/* Password Card */}
 
-      <div className="mb-8">
-        <h1 className="crm-title text-slate-900">
-          Security Settings
-        </h1>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
 
-        <p className="mt-2 text-slate-500">
-          Manage your account password and security settings.
-        </p>
-      </div>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 
-      {/* Password & Security Card */}
+          <div className="flex items-center gap-4">
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-
-          <div className="flex items-start gap-4">
-
-            <div className="rounded-2xl bg-[#DCF8C6] p-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-green-50">
 
               <Lock
-                size={28}
-                className="text-[#25D366]"
+                size={24}
+                className="text-green-600"
               />
 
             </div>
 
             <div>
 
-              <h2 className="text-xl font-bold text-slate-900">
-                Password & Security
+              <h2 className="text-lg font-bold text-slate-900">
+                Password
               </h2>
 
-              <p className="mt-2 text-sm text-slate-500">
-                Keep your account secure by updating your password regularly.
+              <p className="mt-0.5 text-sm text-slate-500">
+                Update it regularly to keep your account secure.
               </p>
 
             </div>
@@ -405,15 +392,25 @@ function SecuritySettings() {
           <button
             type="button"
             onClick={() => setShowChangePassword(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-6 py-3 font-semibold text-black transition hover:bg-[#128C7E]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-3 font-semibold text-white shadow-md shadow-green-600/20 transition hover:bg-green-700"
           >
-            Change Password
-
-            <ChevronRight size={18} />
+            Change password
           </button>
 
         </div>
 
+      </div>
+
+      {/* Connected channels heading */}
+
+      <div className="mt-10">
+        <h2 className="text-xl font-bold text-slate-900">
+          Connected channels
+        </h2>
+
+        <p className="mt-1 text-sm text-slate-500">
+          Messages from these channels arrive in Conversations.
+        </p>
       </div>
 
 
