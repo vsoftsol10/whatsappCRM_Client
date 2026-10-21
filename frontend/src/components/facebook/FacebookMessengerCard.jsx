@@ -225,7 +225,7 @@
 //   };
 
 //   return (
-//     <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+//     <div data-tour="facebook-instagram-card" className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
 //       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
 //         <div className="flex items-start gap-4">
 //           <div className="rounded-2xl bg-[#E7F0FF] p-4">
@@ -465,9 +465,6 @@
 
 
 
-
-
-
 import { useEffect, useState, useCallback } from "react";
 import { FaFacebookMessenger, FaInstagram } from "react-icons/fa";
 
@@ -695,27 +692,41 @@ function FacebookMessengerCard({ isAdmin = false }) {
   };
 
   return (
-    <div data-tour="facebook-instagram-card" className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+    <div
+      data-tour="facebook-instagram-card"
+      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+    >
+      {/* Header: icon + text on the left, actions on the right */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="rounded-2xl bg-[#E7F0FF] p-4">
-            <FaFacebookMessenger size={28} className="text-[#1877F2]" />
+        <div className="flex min-w-0 flex-1 items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#E7F0FF]">
+            <FaFacebookMessenger size={26} className="text-[#1877F2]" />
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-slate-900">
               Facebook & Instagram
             </h2>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
               {isAdmin
                 ? "Connect with Facebook to receive Messenger messages (and Instagram DMs if your Instagram is linked to the Page). No Facebook? Connect your Instagram professional account directly."
                 : "Facebook Pages connected to this CRM. Only an admin can connect or change them."}
             </p>
 
-            <div className="mt-3 flex items-center gap-2">
+            <div
+              className={`mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                loadingPages
+                  ? "bg-slate-100 text-slate-600"
+                  : needsReconnect
+                  ? "bg-amber-50 text-amber-700"
+                  : hasPages
+                  ? "bg-blue-50 text-blue-700"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
               <span
-                className={`h-2.5 w-2.5 rounded-full ${
+                className={`h-2 w-2 rounded-full ${
                   loadingPages
                     ? "bg-slate-300"
                     : needsReconnect
@@ -725,20 +736,17 @@ function FacebookMessengerCard({ isAdmin = false }) {
                     : "bg-slate-400"
                 }`}
               />
-
-              <span className="text-sm font-medium text-slate-500">
-                {loadingPages
-                  ? "Checking..."
-                  : needsReconnect
-                  ? "Reconnect needed"
-                  : hasPages
-                  ? `Connected (${pages.length} Page${pages.length > 1 ? "s" : ""})`
-                  : "Not Connected"}
-              </span>
+              {loadingPages
+                ? "Checking..."
+                : needsReconnect
+                ? "Reconnect needed"
+                : hasPages
+                ? `Connected (${pages.length} Page${pages.length > 1 ? "s" : ""})`
+                : "Not Connected"}
             </div>
 
             {!isAdmin && !loadingPages && !hasPages && (
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-3 text-sm text-slate-500">
                 No Facebook Page is connected yet. Please ask your admin to
                 connect one.
               </p>
@@ -746,16 +754,16 @@ function FacebookMessengerCard({ isAdmin = false }) {
           </div>
         </div>
 
-        {/* Connect button: ADMIN only */}
+        {/* Connect buttons: ADMIN only */}
         {isAdmin && (
-          <div className="flex flex-col gap-3">
+          <div className="flex w-full shrink-0 flex-col gap-3 lg:w-72">
             <button
               type="button"
               onClick={handleConnect}
               disabled={connecting || !sdkReady}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1877F2] px-6 py-3 font-semibold text-white transition hover:bg-[#145DBF] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1877F2] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#145DBF] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <FaFacebookMessenger size={18} />
+              <FaFacebookMessenger size={16} />
               {connecting
                 ? "Connecting..."
                 : needsReconnect
@@ -765,7 +773,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
                 : "Connect Facebook"}
             </button>
 
-            <div className="flex items-center gap-3 text-xs text-slate-400">
+            <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-slate-400">
               <span className="h-px flex-1 bg-slate-200" />
               or
               <span className="h-px flex-1 bg-slate-200" />
@@ -775,14 +783,15 @@ function FacebookMessengerCard({ isAdmin = false }) {
               type="button"
               onClick={handleConnectInstagram}
               disabled={connectingInstagram}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] px-6 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <FaInstagram size={18} />
+              <FaInstagram size={16} />
               {connectingInstagram
                 ? "Opening Instagram..."
                 : "Connect Instagram (no Facebook)"}
             </button>
-            <p className="max-w-[260px] text-xs text-slate-400">
+
+            <p className="text-center text-xs text-slate-400">
               Needs a Business or Creator Instagram account.
             </p>
           </div>
@@ -828,78 +837,108 @@ function FacebookMessengerCard({ isAdmin = false }) {
 
       {/* Connected Pages */}
       {hasPages && (
-        <div className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-200">
-          {pages.map((page) => (
-            <div
-              key={page.id}
-              className="flex items-center justify-between gap-4 px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-slate-800">
-                  {page.pageName ||
-                    (page.connectionType === "INSTAGRAM_LOGIN"
-                      ? "Instagram account"
-                      : `Page ${page.pageId}`)}
-                </p>
-                <p
-                  className={`text-xs font-medium ${
-                    page.status === "RECONNECT_NEEDED"
-                      ? "text-amber-600"
-                      : "text-slate-500"
-                  }`}
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Connected accounts
+          </p>
+
+          <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+            {pages.map((page) => {
+              const isInstagramLogin = page.connectionType === "INSTAGRAM_LOGIN";
+              const needsReconnectRow = page.status === "RECONNECT_NEEDED";
+
+              return (
+                <div
+                  key={page.id}
+                  className="flex flex-col gap-3 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  {page.status === "RECONNECT_NEEDED"
-                    ? "Reconnect needed — access was removed or expired"
-                    : "Connected"}
-                </p>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        isInstagramLogin ? "bg-pink-50" : "bg-[#E7F0FF]"
+                      }`}
+                    >
+                      {isInstagramLogin ? (
+                        <FaInstagram size={18} className="text-[#DD2A7B]" />
+                      ) : (
+                        <FaFacebookMessenger
+                          size={18}
+                          className="text-[#1877F2]"
+                        />
+                      )}
+                    </div>
 
-                {page.connectionType === "INSTAGRAM_LOGIN" && (
-                  <p className="text-xs text-slate-500">
-                    Connected directly with Instagram (no Facebook)
-                  </p>
-                )}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate font-semibold text-slate-800">
+                          {page.pageName ||
+                            (isInstagramLogin
+                              ? "Instagram account"
+                              : `Page ${page.pageId}`)}
+                        </p>
 
-                {page.hasInstagram ? (
-                  <p className="text-xs font-medium text-pink-600">
-                    Instagram:{" "}
-                    {page.instagramUsername
-                      ? `@${page.instagramUsername}`
-                      : "linked"}
-                  </p>
-                ) : (
-                  <p className="text-xs text-slate-400">
-                    Instagram: not linked. To receive Instagram DMs, link a
-                    professional Instagram account to this Page, then click
-                    "Add / Update Pages".
-                  </p>
-                )}
-              </div>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            needsReconnectRow
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-green-50 text-green-700"
+                          }`}
+                        >
+                          {needsReconnectRow
+                            ? "Reconnect needed — access was removed or expired"
+                            : "Connected"}
+                        </span>
+                      </div>
 
-              {isAdmin && (
-                <div className="flex shrink-0 items-center gap-2">
-                  {page.connectionType === "INSTAGRAM_LOGIN" &&
-                    page.status === "RECONNECT_NEEDED" && (
+                      {isInstagramLogin && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Connected directly with Instagram (no Facebook)
+                        </p>
+                      )}
+
+                      {page.hasInstagram ? (
+                        <p className="mt-1 text-xs font-medium text-pink-600">
+                          Instagram:{" "}
+                          {page.instagramUsername
+                            ? `@${page.instagramUsername}`
+                            : "linked"}
+                        </p>
+                      ) : (
+                        <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-400">
+                          Instagram: not linked. To receive Instagram DMs, link
+                          a professional Instagram account to this Page, then
+                          click "Add / Update Pages".
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+                      {isInstagramLogin && needsReconnectRow && (
+                        <button
+                          type="button"
+                          onClick={handleConnectInstagram}
+                          disabled={connectingInstagram}
+                          className="h-9 rounded-xl bg-[#DD2A7B] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                        >
+                          Reconnect
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        onClick={handleConnectInstagram}
-                        disabled={connectingInstagram}
-                        className="rounded-xl bg-[#DD2A7B] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                        onClick={() => setPageToDisconnect(page)}
+                        className="h-9 rounded-xl border border-red-300 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                       >
-                        Reconnect
+                        Disconnect
                       </button>
-                    )}
-
-                  <button
-                    type="button"
-                    onClick={() => setPageToDisconnect(page)}
-                    className="rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                  >
-                    Disconnect
-                  </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -930,4 +969,3 @@ function FacebookMessengerCard({ isAdmin = false }) {
 }
 
 export default FacebookMessengerCard;
-
