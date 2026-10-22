@@ -1,9 +1,7 @@
-
 // import { useEffect, useMemo, useRef, useState } from "react";
-// import { X, Search, ImagePlus, CalendarClock, Users, FileText } from "lucide-react";
+// import { X, ImagePlus, CalendarClock, FileText } from "lucide-react";
 // import toast from "react-hot-toast";
 
-// import { getCustomers } from "../../api/customerApi";
 // import useCampaignStore from "../../store/campaignStore";
 
 // // Change this import path if your template API is located elsewhere
@@ -13,6 +11,7 @@
 //   isOpen,
 //   onClose,
 //   aiCampaign,
+//   onCreated, // called with the new campaign after successful creation
 // }) {
 //   const { addCampaign } = useCampaignStore();
 
@@ -20,17 +19,14 @@
 //   // DATA
 //   // ============================================================
 
-//   const [customers, setCustomers] = useState([]);
 //   const [templates, setTemplates] = useState([]);
 
-//   const [loadingCustomers, setLoadingCustomers] = useState(false);
 //   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
 //   // ============================================================
 //   // SELECTION
 //   // ============================================================
 
-//   const [selectedCustomers, setSelectedCustomers] = useState([]);
 //   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
 //   // ============================================================
@@ -38,7 +34,6 @@
 //   // ============================================================
 
 //   const [submitting, setSubmitting] = useState(false);
-//   const [customerSearch, setCustomerSearch] = useState("");
 
 //   // ============================================================
 //   // IMAGE
@@ -72,10 +67,7 @@
 //       scheduledAt: "",
 //     });
 
-//     setSelectedCustomers([]);
 //     setSelectedTemplateId("");
-
-//     setCustomerSearch("");
 
 //     setImage(null);
 //     setImagePreview("");
@@ -94,7 +86,6 @@
 //   useEffect(() => {
 //     if (!isOpen) return;
 
-//     fetchCustomers();
 //     fetchApprovedTemplates();
 
 //     if (!aiCampaign) {
@@ -126,44 +117,6 @@
 //         aiCampaign.messageContent || "",
 //     }));
 //   }, [aiCampaign]);
-
-//   // ============================================================
-//   // FETCH CUSTOMERS
-//   // ============================================================
-
-//   const fetchCustomers = async () => {
-//     try {
-//       setLoadingCustomers(true);
-
-//       const response = await getCustomers();
-
-//       console.log("Customers Response:", response);
-
-//       let customerList = [];
-
-//       if (Array.isArray(response)) {
-//         customerList = response;
-//       } else if (Array.isArray(response?.data)) {
-//         customerList = response.data;
-//       } else if (Array.isArray(response?.customers)) {
-//         customerList = response.customers;
-//       } else if (
-//         Array.isArray(response?.data?.customers)
-//       ) {
-//         customerList = response.data.customers;
-//       }
-
-//       setCustomers(customerList);
-//     } catch (error) {
-//       console.error("Fetch customers error:", error);
-
-//       toast.error("Failed to load customers.");
-
-//       setCustomers([]);
-//     } finally {
-//       setLoadingCustomers(false);
-//     }
-//   };
 
 //   // ============================================================
 //   // FETCH APPROVED TEMPLATES
@@ -379,82 +332,6 @@
 //   };
 
 //   // ============================================================
-//   // TOGGLE CUSTOMER
-//   // ============================================================
-
-//   const toggleCustomer = (id) => {
-//     setSelectedCustomers((prev) =>
-//       prev.includes(id)
-//         ? prev.filter(
-//             (customerId) =>
-//               customerId !== id
-//           )
-//         : [...prev, id]
-//     );
-//   };
-
-//   // ============================================================
-//   // SELECT ALL
-//   // ============================================================
-
-//   const handleSelectAll = () => {
-//     const allCustomerIds =
-//       filteredCustomers.map(
-//         (customer) => customer.id
-//       );
-
-//     setSelectedCustomers((prev) => [
-//       ...new Set([
-//         ...prev,
-//         ...allCustomerIds,
-//       ]),
-//     ]);
-//   };
-
-//   // ============================================================
-//   // CLEAR ALL
-//   // ============================================================
-
-//   const handleClearAll = () => {
-//     setSelectedCustomers([]);
-//   };
-
-//   // ============================================================
-//   // FILTER CUSTOMERS
-//   // ============================================================
-
-//   const filteredCustomers = useMemo(() => {
-//     const search =
-//       customerSearch
-//         .trim()
-//         .toLowerCase();
-
-//     if (!search) {
-//       return customers;
-//     }
-
-//     return customers.filter((customer) => {
-//       const name =
-//         customer.name
-//           ?.toLowerCase() || "";
-
-//       const phone =
-//         customer.phone
-//           ?.toLowerCase() || "";
-
-//       const email =
-//         customer.email
-//           ?.toLowerCase() || "";
-
-//       return (
-//         name.includes(search) ||
-//         phone.includes(search) ||
-//         email.includes(search)
-//       );
-//     });
-//   }, [customers, customerSearch]);
-
-//   // ============================================================
 //   // VALIDATE SCHEDULE
 //   // ============================================================
 
@@ -571,18 +448,6 @@
 //     }
 
 //     // ==========================================================
-//     // CUSTOMERS
-//     // ==========================================================
-
-//     if (selectedCustomers.length === 0) {
-//       toast.error(
-//         "Please select at least one customer."
-//       );
-
-//       return;
-//     }
-
-//     // ==========================================================
 //     // SCHEDULE
 //     // ==========================================================
 
@@ -623,9 +488,6 @@
 //         scheduledAt:
 //           formData.scheduledAt || "",
 
-//         customerIds:
-//           selectedCustomers,
-
 //         image,
 //       });
 
@@ -643,6 +505,11 @@
 //       resetForm();
 
 //       onClose();
+
+//       // Open the Send Campaign flow for the campaign we just created
+//       if (onCreated) {
+//         onCreated(campaign);
+//       }
 //     } catch (error) {
 //       console.error(
 //         "Create campaign failed:",
@@ -715,7 +582,7 @@
 //               </h2>
 
 //               <p className="mt-1 text-sm text-gray-700">
-//                 Send an approved WhatsApp template to your audience
+//                 Create a campaign using an approved WhatsApp template
 //               </p>
 //             </div>
 
@@ -1194,194 +1061,6 @@
 //             </div>
 
 //             {/* ==================================================
-//                 AUDIENCE
-//             ================================================== */}
-
-//             <div>
-
-//               <div className="mb-3 flex items-center justify-between">
-
-//                 <div>
-
-//                   <div className="flex items-center gap-2">
-
-//                     <Users
-//                       size={18}
-//                       className="text-[#128C7E]"
-//                     />
-
-//                     <label className="font-medium text-gray-700">
-//                       Campaign Audience
-//                       <span className="text-red-500">
-//                         {" "}*
-//                       </span>
-//                     </label>
-
-//                   </div>
-
-//                   <p className="mt-1 text-xs text-gray-500">
-//                     Select customers who should receive this campaign.
-//                   </p>
-
-//                 </div>
-
-//                 <span className="rounded-full bg-[#DCF8C6] px-3 py-1 text-sm font-semibold text-[#128C7E]">
-//                   {selectedCustomers.length} selected
-//                 </span>
-
-//               </div>
-
-//               {/* Search */}
-
-//               <div className="relative mb-3">
-
-//                 <Search
-//                   size={18}
-//                   className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-//                 />
-
-//                 <input
-//                   type="text"
-//                   value={customerSearch}
-//                   onChange={(e) =>
-//                     setCustomerSearch(
-//                       e.target.value
-//                     )
-//                   }
-//                   placeholder="Search customers by name, phone or email..."
-//                   disabled={submitting}
-//                   className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-4 outline-none focus:border-[#25D366] disabled:bg-gray-100"
-//                 />
-
-//               </div>
-
-//               {/* Audience actions */}
-
-//               <div className="mb-3 flex gap-2">
-
-//                 <button
-//                   type="button"
-//                   onClick={handleSelectAll}
-//                   disabled={
-//                     submitting ||
-//                     filteredCustomers.length === 0
-//                   }
-//                   className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-//                 >
-//                   Select All
-//                 </button>
-
-//                 <button
-//                   type="button"
-//                   onClick={handleClearAll}
-//                   disabled={
-//                     submitting ||
-//                     selectedCustomers.length === 0
-//                   }
-//                   className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-//                 >
-//                   Clear All
-//                 </button>
-
-//               </div>
-
-//               {/* Customer list */}
-
-//               <div className="rounded-xl border border-gray-300 bg-gray-50 p-4">
-
-//                 {loadingCustomers ? (
-
-//                   <div className="py-10 text-center text-gray-500">
-//                     Loading customers...
-//                   </div>
-
-//                 ) : filteredCustomers.length === 0 ? (
-
-//                   <div className="py-10 text-center text-gray-500">
-
-//                     <Users
-//                       size={30}
-//                       className="mx-auto mb-2 text-gray-400"
-//                     />
-
-//                     <p>
-//                       No customers found.
-//                     </p>
-
-//                   </div>
-
-//                 ) : (
-
-//                   <div className="max-h-64 space-y-1 overflow-y-auto">
-
-//                     {filteredCustomers.map(
-//                       (customer) => {
-
-//                         const isSelected =
-//                           selectedCustomers.includes(
-//                             customer.id
-//                           );
-
-//                         return (
-//                           <label
-//                             key={customer.id}
-//                             className={`flex items-center gap-3 rounded-lg p-3 transition ${
-//                               submitting
-//                                 ? "cursor-not-allowed opacity-60"
-//                                 : "cursor-pointer hover:bg-white"
-//                             } ${
-//                               isSelected
-//                                 ? "bg-green-50"
-//                                 : ""
-//                             }`}
-//                           >
-
-//                             <input
-//                               type="checkbox"
-//                               checked={isSelected}
-//                               onChange={() =>
-//                                 toggleCustomer(
-//                                   customer.id
-//                                 )
-//                               }
-//                               disabled={submitting}
-//                               className="h-4 w-4 accent-[#25D366]"
-//                             />
-
-//                             <div className="min-w-0 flex-1">
-
-//                               <p className="truncate font-medium text-gray-800">
-//                                 {customer.name ||
-//                                   "Unnamed Customer"}
-//                               </p>
-
-//                               <p className="text-sm text-gray-500">
-//                                 {customer.phone ||
-//                                   "No phone number"}
-//                               </p>
-
-//                             </div>
-
-//                             {isSelected && (
-//                               <span className="text-xs font-semibold text-[#128C7E]">
-//                                 Selected
-//                               </span>
-//                             )}
-
-//                           </label>
-//                         );
-//                       }
-//                     )}
-
-//                   </div>
-
-//                 )}
-
-//               </div>
-
-//             </div>
-
-//             {/* ==================================================
 //                 CAMPAIGN SUMMARY
 //             ================================================== */}
 
@@ -1391,7 +1070,7 @@
 //                 Campaign Summary
 //               </h4>
 
-//               <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+//               <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
 
 //                 <div>
 //                   <p className="text-gray-500">
@@ -1401,16 +1080,6 @@
 //                   <p className="font-medium text-gray-800">
 //                     {selectedTemplate?.name ||
 //                       "Not selected"}
-//                   </p>
-//                 </div>
-
-//                 <div>
-//                   <p className="text-gray-500">
-//                     Audience
-//                   </p>
-
-//                   <p className="font-medium text-gray-800">
-//                     {selectedCustomers.length} customers
 //                   </p>
 //                 </div>
 
@@ -1505,16 +1174,17 @@
 
 
 
-
-
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, ImagePlus, CalendarClock, FileText } from "lucide-react";
+import { X, ImagePlus, CalendarClock, FileText, Search, Users } from "lucide-react";
 import toast from "react-hot-toast";
 
 import useCampaignStore from "../../store/campaignStore";
 
 // Change this import path if your template API is located elsewhere
 import { getTemplates } from "../../api/templateApi";
+
+// NEW: used to load the customer list for the audience picker
+import { getCustomers } from "../../api/customerApi";
 
 export default function CreateCampaignModal({
   isOpen,
@@ -1537,6 +1207,15 @@ export default function CreateCampaignModal({
   // ============================================================
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
+  // ============================================================
+  // CUSTOMERS (NEW) - who will receive this campaign
+  // ============================================================
+
+  const [customers, setCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   // ============================================================
   // UI STATE
@@ -1578,6 +1257,9 @@ export default function CreateCampaignModal({
 
     setSelectedTemplateId("");
 
+    setSelectedCustomers([]);
+    setCustomerSearch("");
+
     setImage(null);
     setImagePreview("");
 
@@ -1596,6 +1278,7 @@ export default function CreateCampaignModal({
     if (!isOpen) return;
 
     fetchApprovedTemplates();
+    fetchCustomers();
 
     if (!aiCampaign) {
       resetForm();
@@ -1841,6 +1524,92 @@ export default function CreateCampaignModal({
   };
 
   // ============================================================
+  // FETCH CUSTOMERS (NEW)
+  // ============================================================
+
+  const fetchCustomers = async () => {
+    try {
+      setLoadingCustomers(true);
+
+      const response = await getCustomers();
+
+      let customerList = [];
+
+      if (Array.isArray(response)) {
+        customerList = response;
+      } else if (Array.isArray(response?.data)) {
+        customerList = response.data;
+      } else if (Array.isArray(response?.customers)) {
+        customerList = response.customers;
+      } else if (Array.isArray(response?.data?.customers)) {
+        customerList = response.data.customers;
+      }
+
+      setCustomers(customerList);
+    } catch (error) {
+      console.error("Fetch customers error:", error);
+
+      toast.error("Failed to load customers.");
+
+      setCustomers([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  // ============================================================
+  // TOGGLE ONE CUSTOMER (NEW)
+  // ============================================================
+
+  const toggleCustomer = (id) => {
+    setSelectedCustomers((prev) =>
+      prev.includes(id)
+        ? prev.filter((customerId) => customerId !== id)
+        : [...prev, id]
+    );
+  };
+
+  // ============================================================
+  // FILTER CUSTOMERS BY SEARCH (NEW)
+  // ============================================================
+
+  const filteredCustomers = useMemo(() => {
+    const search = customerSearch.trim().toLowerCase();
+
+    if (!search) {
+      return customers;
+    }
+
+    return customers.filter((customer) => {
+      const name = customer.name?.toLowerCase() || "";
+      const phone = customer.phone?.toLowerCase() || "";
+      const email = customer.email?.toLowerCase() || "";
+
+      return (
+        name.includes(search) ||
+        phone.includes(search) ||
+        email.includes(search)
+      );
+    });
+  }, [customers, customerSearch]);
+
+  // ============================================================
+  // SELECT ALL / CLEAR ALL (NEW)
+  // ============================================================
+
+  const handleSelectAll = () => {
+    const allCustomerIds = filteredCustomers.map((customer) => customer.id);
+
+    setSelectedCustomers((prev) => [
+      ...new Set([...prev, ...allCustomerIds]),
+    ]);
+  };
+
+  const handleClearAll = () => {
+    setSelectedCustomers([]);
+  };
+
+  // ============================================================
   // VALIDATE SCHEDULE
   // ============================================================
 
@@ -1964,6 +1733,17 @@ export default function CreateCampaignModal({
       return;
     }
 
+    // NEW: a scheduled campaign is sent automatically, so it must
+    // know WHO to send to. (A draft can still be created without
+    // customers, exactly as before.)
+    if (formData.scheduledAt && selectedCustomers.length === 0) {
+      toast.error(
+        "Please select at least one customer for the scheduled campaign."
+      );
+
+      return;
+    }
+
     // ==========================================================
     // START
     // ==========================================================
@@ -1994,8 +1774,14 @@ export default function CreateCampaignModal({
         messageContent:
           formData.messageContent.trim(),
 
-        scheduledAt:
-          formData.scheduledAt || "",
+        // NEW: send a real UTC time so the server schedules the
+        // exact moment you picked (not shifted by timezone).
+        scheduledAt: formData.scheduledAt
+          ? new Date(formData.scheduledAt).toISOString()
+          : "",
+
+        // NEW: the customers who will receive the campaign
+        customerIds: selectedCustomers,
 
         image,
       });
@@ -2015,8 +1801,10 @@ export default function CreateCampaignModal({
 
       onClose();
 
-      // Open the Send Campaign flow for the campaign we just created
-      if (onCreated) {
+      // Open the Send Campaign flow for the campaign we just created.
+      // NEW: skipped for scheduled campaigns - they send automatically
+      // at the chosen time, so there is nothing to send manually now.
+      if (onCreated && !formData.scheduledAt) {
         onCreated(campaign);
       }
     } catch (error) {
@@ -2404,6 +2192,127 @@ export default function CreateCampaignModal({
               )}
 
             {/* ==================================================
+                AUDIENCE (NEW)
+            ================================================== */}
+
+            <div>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Users size={18} className="text-[#128C7E]" />
+
+                    <label className="font-medium text-gray-700">
+                      Campaign Audience
+                      {formData.scheduledAt && (
+                        <span className="text-red-500"> *</span>
+                      )}
+                    </label>
+                  </div>
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select customers who should receive this campaign.
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-[#DCF8C6] px-3 py-1 text-sm font-semibold text-[#128C7E]">
+                  {selectedCustomers.length} selected
+                </span>
+              </div>
+
+              <div className="relative mb-3">
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Search customers by name, phone or email..."
+                  disabled={submitting}
+                  className="w-full rounded-lg border border-gray-300 py-3 pl-10 pr-4 outline-none focus:border-[#25D366] disabled:bg-gray-100"
+                />
+              </div>
+
+              <div className="mb-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  disabled={submitting || filteredCustomers.length === 0}
+                  className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Select All
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  disabled={submitting || selectedCustomers.length === 0}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-gray-300 bg-gray-50 p-4">
+                {loadingCustomers ? (
+                  <div className="py-10 text-center text-gray-500">
+                    Loading customers...
+                  </div>
+                ) : filteredCustomers.length === 0 ? (
+                  <div className="py-10 text-center text-gray-500">
+                    <Users size={30} className="mx-auto mb-2 text-gray-400" />
+                    <p>No customers found.</p>
+                  </div>
+                ) : (
+                  <div className="max-h-64 space-y-1 overflow-y-auto">
+                    {filteredCustomers.map((customer) => {
+                      const isSelected = selectedCustomers.includes(
+                        customer.id
+                      );
+
+                      return (
+                        <label
+                          key={customer.id}
+                          className={`flex items-center gap-3 rounded-lg p-3 transition ${
+                            submitting
+                              ? "cursor-not-allowed opacity-60"
+                              : "cursor-pointer hover:bg-white"
+                          } ${isSelected ? "bg-green-50" : ""}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCustomer(customer.id)}
+                            disabled={submitting}
+                            className="h-4 w-4 accent-[#25D366]"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-gray-800">
+                              {customer.name || "Unnamed Customer"}
+                            </p>
+
+                            <p className="text-sm text-gray-500">
+                              {customer.phone || "No phone number"}
+                            </p>
+                          </div>
+
+                          {isSelected && (
+                            <span className="text-xs font-semibold text-[#128C7E]">
+                              Selected
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ==================================================
                 SCHEDULE
             ================================================== */}
 
@@ -2439,7 +2348,9 @@ export default function CreateCampaignModal({
               />
 
               <p className="mt-1 text-xs text-gray-500">
-                Leave empty to create the campaign as a draft.
+                Leave empty to create the campaign as a draft. If you pick a
+                date and time, the campaign is sent automatically to the
+                selected customers at that time.
               </p>
 
             </div>
@@ -2599,8 +2510,18 @@ export default function CreateCampaignModal({
 
                   <p className="font-medium text-gray-800">
                     {formData.scheduledAt
-                      ? "Scheduled"
+                      ? new Date(formData.scheduledAt).toLocaleString()
                       : "Draft"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-gray-500">
+                    Audience
+                  </p>
+
+                  <p className="font-medium text-gray-800">
+                    {selectedCustomers.length} customer(s)
                   </p>
                 </div>
 

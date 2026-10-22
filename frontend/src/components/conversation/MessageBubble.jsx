@@ -1,4 +1,3 @@
-
 // import { useState, useRef, useEffect } from "react";
 // import {
 //   FaCheck,
@@ -11,6 +10,7 @@
 // } from "react-icons/fa";
 // import useMessageStore from "../../store/messageStore";
 // import ConfirmModal from "../common/ConfirmModal";
+// import LinkifiedText from "./LinkifiedText";
 
 // function MessageBubble({ message }) {
 //   const isSender = message.sender?.toUpperCase() === "AGENT";
@@ -216,7 +216,7 @@
 //             message.content &&
 //             !(message.imageUrl && message.messageType === "DOCUMENT") && (
 //               <p className="break-words text-sm leading-relaxed whitespace-pre-wrap">
-//                 {message.content}
+//                 <LinkifiedText text={message.content} linkClassName="text-blue-600" />
 //               </p>
 //             )
 //           )}
@@ -261,7 +261,6 @@
 
 
 
-
 import { useState, useRef, useEffect } from "react";
 import {
   FaCheck,
@@ -278,6 +277,12 @@ import LinkifiedText from "./LinkifiedText";
 
 function MessageBubble({ message }) {
   const isSender = message.sender?.toUpperCase() === "AGENT";
+
+  // NEW: messages sent from OUR side (a human agent, a campaign, or the AI bot)
+  // show on the RIGHT. Only CUSTOMER messages show on the LEFT.
+  // isSender (AGENT only) is still used for the edit/delete menu, so the
+  // bot's messages cannot be edited or deleted by mistake.
+  const isOutgoing = ["AGENT", "BOT"].includes(message.sender?.toUpperCase());
 
   const [showMenu, setShowMenu] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -357,12 +362,12 @@ function MessageBubble({ message }) {
     <>
     <div
       className={`group mb-2 flex ${
-        isSender ? "justify-end" : "justify-start"
+        isOutgoing ? "justify-end" : "justify-start"
       }`}
     >
       <div
         className={`relative max-w-[88%] rounded-2xl shadow-sm sm:max-w-[72%] ${
-          isSender
+          isOutgoing
             ? "rounded-br-md bg-[#DCF8C6] text-[#111827]"
             : "rounded-bl-md bg-white text-gray-800"
         }`}
@@ -487,7 +492,7 @@ function MessageBubble({ message }) {
 
           <div
             className={`mt-2 flex items-center justify-end gap-1 text-[11px] ${
-              isSender ? "text-[#6B7280]" : "text-gray-500"
+              isOutgoing ? "text-[#6B7280]" : "text-gray-500"
             }`}
           >
             {message.isEdited && !isEditing && (
@@ -501,7 +506,7 @@ function MessageBubble({ message }) {
               })}
             </span>
 
-            {isSender && renderStatusIcon()}
+            {isOutgoing && renderStatusIcon()}
           </div>
         </div>
       </div>
