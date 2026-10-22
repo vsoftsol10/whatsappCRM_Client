@@ -972,6 +972,8 @@
 // }
 
 
+
+
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
@@ -985,6 +987,7 @@ import {
   RotateCcw,
   Save,
   Send,
+  UserPlus,
   Zap,
 } from "lucide-react";
 
@@ -1020,6 +1023,8 @@ const EMPTY_PROFILE = {
 
 const EMPTY_FORM = {
   isEnabled: false,
+  leadCaptureEnabled: false,
+  leadAssigneeId: "",
   businessProfile: EMPTY_PROFILE,
   systemPrompt: "",
   historyLimit: 10,
@@ -1027,6 +1032,8 @@ const EMPTY_FORM = {
 
 const toForm = (settings) => ({
   isEnabled: settings.isEnabled,
+  leadCaptureEnabled: Boolean(settings.leadCaptureEnabled),
+  leadAssigneeId: settings.leadAssigneeId || "",
   businessProfile: { ...EMPTY_PROFILE, ...(settings.businessProfile || {}) },
   systemPrompt: settings.systemPrompt || "",
   historyLimit: settings.historyLimit || 10,
@@ -1141,6 +1148,7 @@ export default function AiAutoReply() {
   const [saved, setSaved] = useState(null); // settings as stored on the server
   const [form, setForm] = useState(EMPTY_FORM);
   const [companyName, setCompanyName] = useState("");
+  const [employees, setEmployees] = useState([]);
 
   const [saving, setSaving] = useState(false);
 
@@ -1161,6 +1169,7 @@ export default function AiAutoReply() {
         setSaved(data.settings);
         setForm(toForm(data.settings));
         setCompanyName(data.companyName || "");
+        setEmployees(data.employees || []);
       } catch (error) {
         console.error(error);
         setLoadError(
@@ -1221,6 +1230,8 @@ export default function AiAutoReply() {
 
       const data = await updateAiSettings({
         isEnabled: form.isEnabled,
+        leadCaptureEnabled: form.leadCaptureEnabled,
+        leadAssigneeId: form.leadAssigneeId || null,
         businessProfile: form.businessProfile,
         systemPrompt: form.systemPrompt,
         historyLimit: Number(form.historyLimit),
@@ -1506,6 +1517,57 @@ export default function AiAutoReply() {
                   <span>50</span>
                 </div>
               </Field>
+            </div>
+          </Card>
+
+          {/* ---------- LEAD CAPTURE ---------- */}
+          <Card
+            icon={UserPlus}
+            title="Lead capture"
+            subtitle="When a new person asks about your products or services, the AI creates a lead in your CRM so your team can follow up."
+            action={
+              <Toggle
+                checked={form.leadCaptureEnabled}
+                onChange={(value) => update({ leadCaptureEnabled: value })}
+                label="Create leads automatically"
+              />
+            }
+          >
+            <div className="space-y-5">
+              <Field
+                label="Assign new leads to"
+                hint="Admins are always notified of a new lead. If you pick nobody, an admin assigns it later from the Leads page."
+              >
+                <select
+                  value={form.leadAssigneeId}
+                  onChange={(e) => update({ leadAssigneeId: e.target.value })}
+                  disabled={!form.leadCaptureEnabled}
+                  className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  <option value="">Unassigned</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <ul className="space-y-1.5 text-xs text-slate-500">
+                <li>
+                  Only real enquiries become leads, not greetings, spam or
+                  support questions.
+                </li>
+                <li>
+                  Existing customers, and numbers that already have a lead from
+                  the last 30 days, are skipped.
+                </li>
+                <li>
+                  New leads show the source &ldquo;WhatsApp AI&rdquo; on your
+                  Leads page, with a short summary of what the customer wants.
+                </li>
+                <li>Works while AI auto-reply is on for the chat.</li>
+              </ul>
             </div>
           </Card>
         </div>

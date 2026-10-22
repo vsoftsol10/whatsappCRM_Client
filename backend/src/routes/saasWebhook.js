@@ -1,4 +1,3 @@
-
 // // ============================================
 // // SAAS WHATSAPP WEBHOOK (multi-tenant)
 // // ============================================
@@ -27,6 +26,7 @@
 
 // const { sendTextMessage } = require("../services/whatsappService");
 // const { getAutoReply } = require("../services/aiService");
+// const { handleAiHandoff } = require("../services/ai/handoffService");
 // const { canCompanySendMessages } = require("../utils/companyAccess");
 // const { emitToCompany } = require("../socket");
 
@@ -169,6 +169,11 @@
 //     conversationId,
 //     message: botMessage,
 //   });
+
+//   // The AI asked for a human: switch the bot off and notify the team.
+//   if (result.handoff) {
+//     await handleAiHandoff(conversation);
+//   }
 
 //   console.log("SaaS auto-reply sent:", botMessage.id);
 //   return "done";
@@ -910,6 +915,8 @@
 // module.exports = router;
 
 
+
+
 // ============================================
 // SAAS WHATSAPP WEBHOOK (multi-tenant)
 // ============================================
@@ -939,6 +946,7 @@ const {
 const { sendTextMessage } = require("../services/whatsappService");
 const { getAutoReply } = require("../services/aiService");
 const { handleAiHandoff } = require("../services/ai/handoffService");
+const { captureLeadFromChat } = require("../services/ai/leadCaptureService");
 const { canCompanySendMessages } = require("../utils/companyAccess");
 const { emitToCompany } = require("../socket");
 
@@ -1086,6 +1094,12 @@ const attemptAutoReply = async (conversationId) => {
   if (result.handoff) {
     await handleAiHandoff(conversation);
   }
+
+  // Turn a genuine enquiry into a CRM lead. Runs in the background and
+  // never blocks or breaks the reply.
+  captureLeadFromChat(conversation.id).catch((err) => {
+    console.error("Lead capture pipeline failed:", err);
+  });
 
   console.log("SaaS auto-reply sent:", botMessage.id);
   return "done";

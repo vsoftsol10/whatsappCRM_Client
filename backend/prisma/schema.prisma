@@ -1471,6 +1471,9 @@ model AiSettings {
   // How many previous messages (both sides) to send as context
   historyLimit Int @default(10)
 
+  leadCaptureEnabled Boolean @default(false)
+  leadAssigneeId     String?
+
   // Last failure of the auto-reply pipeline, shown on the settings page
   lastError   String?
   lastErrorAt DateTime?

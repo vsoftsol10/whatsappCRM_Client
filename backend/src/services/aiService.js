@@ -413,6 +413,7 @@
 // };
 
 
+
 const axios = require("axios");
 const prisma = require("../config/prisma");
 
@@ -501,6 +502,8 @@ const serializeSettings = (settings) => ({
   businessProfile: readProfile(settings.businessProfile),
   systemPrompt: settings.systemPrompt,
   historyLimit: settings.historyLimit,
+  leadCaptureEnabled: Boolean(settings.leadCaptureEnabled),
+  leadAssigneeId: settings.leadAssigneeId || null,
   lastError: settings.lastError,
   lastErrorAt: settings.lastErrorAt,
   updatedAt: settings.updatedAt,
@@ -676,6 +679,7 @@ const callProvider = async ({
   baseUrl,
   systemPrompt,
   messages,
+  rawSystem = false,
 }) => {
   const provider = getProvider(providerId);
 
@@ -684,7 +688,8 @@ const callProvider = async ({
   if (!model) throw new AiError("Model name is required");
 
   const { url, httpsAgent } = await resolveTarget(provider, baseUrl);
-  const system = `${systemPrompt}${WHATSAPP_RULES}`;
+  // rawSystem = background jobs (e.g. lead capture) that are not WhatsApp replies
+  const system = rawSystem ? systemPrompt : `${systemPrompt}${WHATSAPP_RULES}`;
 
   let text;
 
@@ -878,6 +883,27 @@ const testAutoReply = async (companyId, overrides = {}) => {
   }
 };
 
+// ============================================
+// ONE-OFF COMPLETION (background jobs)
+// ============================================
+// For jobs that are not a WhatsApp reply, e.g. lead capture. Uses the same
+// platform AI, but WITHOUT the WhatsApp reply rules or the hand-off marker.
+// Throws on failure; the caller decides what to do.
+const completeOnce = async ({ systemPrompt, messages }) => {
+  const platform = getPlatformAi();
+
+  if (!platform.available) throw new AiError(platform.error);
+
+  return callProvider({
+    providerId: platform.providerId,
+    model: platform.model,
+    apiKey: platform.apiKey,
+    systemPrompt,
+    messages,
+    rawSystem: true,
+  });
+};
+
 module.exports = {
   getPlatformAi,
   findSettings,
@@ -886,4 +912,5 @@ module.exports = {
   getAutoReply,
   testAutoReply,
   splitHandoff,
+  completeOnce,
 };

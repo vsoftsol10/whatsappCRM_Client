@@ -318,6 +318,7 @@
 // };
 
 
+
 const prisma = require("../config/prisma");
 
 const {
@@ -375,10 +376,18 @@ const getAiSettings = async (req, res) => {
       select: { companyName: true },
     });
 
+    // Employees a new AI lead can be assigned to (same rule as manual leads)
+    const employees = await prisma.user.findMany({
+      where: { companyId: req.user.companyId, role: "USER", status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
     return res.status(200).json({
       success: true,
       settings: serializeSettings(settings),
       companyName: company?.companyName || "",
+      employees,
     });
   } catch (error) {
     console.error("Get AI settings error:", error);
@@ -394,7 +403,8 @@ const getAiSettings = async (req, res) => {
 // PATCH /api/ai-settings
 // ============================================
 // Body (all optional): isEnabled, businessProfile, systemPrompt (extra
-// instructions, may be empty), historyLimit
+// instructions, may be empty), historyLimit, leadCaptureEnabled,
+// leadAssigneeId (employee id or null)
 // The AI provider, model and key are platform-wide (server .env) and
 // cannot be changed from here.
 const updateAiSettings = async (req, res) => {
@@ -448,6 +458,32 @@ const updateAiSettings = async (req, res) => {
       }
 
       data.isEnabled = body.isEnabled;
+    }
+
+    // ---------- lead capture ----------
+    if (body.leadCaptureEnabled !== undefined) {
+      if (typeof body.leadCaptureEnabled !== "boolean") {
+        return badRequest(res, "leadCaptureEnabled must be true or false");
+      }
+
+      data.leadCaptureEnabled = body.leadCaptureEnabled;
+    }
+
+    if (body.leadAssigneeId !== undefined) {
+      const assigneeId = body.leadAssigneeId ? String(body.leadAssigneeId) : null;
+
+      if (assigneeId) {
+        const employee = await prisma.user.findFirst({
+          where: { id: assigneeId, companyId, role: "USER", status: "ACTIVE" },
+          select: { id: true },
+        });
+
+        if (!employee) {
+          return badRequest(res, "Invalid employee selected for new leads");
+        }
+      }
+
+      data.leadAssigneeId = assigneeId;
     }
 
     // ---------- can it actually run? ----------
