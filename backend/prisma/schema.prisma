@@ -1463,6 +1463,11 @@ model AiSettings {
 
   systemPrompt String @default("You are a helpful, friendly customer support assistant for this business. Keep replies short, clear, and polite. If you don't know the answer or the customer wants a human, say you'll connect them to the team.")
 
+  // Structured business details the AI prompt is built from:
+  // { businessName, description, workingHours, location, contact,
+  //   languages, policies, tone }. The text above stays as extra instructions.
+  businessProfile Json?
+
   // How many previous messages (both sides) to send as context
   historyLimit Int @default(10)
 

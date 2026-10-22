@@ -1,7 +1,17 @@
 
+// // ============================================
+// // SAAS WHATSAPP WEBHOOK (multi-tenant)
+// // ============================================
+// // This is the ONLY webhook URL that should be registered in the
+// // Meta App Dashboard for this app: /api/saas/webhook. It looks up
+// // the WhatsApp account per-request by phone_number_id, which the
+// // legacy single-tenant routes/webhook.js (env-var based) cannot do.
+// // ============================================
+
 // const express = require("express");
 // const router = express.Router();
 // const prisma = require("../config/prisma");
+// const { findAccountByDisplayPhone } = require("../utils/whatsappAccountMatcher");
 
 // const {
 //   getOrCreateSaaSConversation,
@@ -14,6 +24,174 @@
 // const {
 //   resolveMessageContent,
 // } = require("../helpers/whatsappMediaHelper");
+
+// const { sendTextMessage } = require("../services/whatsappService");
+// const { getAutoReply } = require("../services/aiService");
+// const { canCompanySendMessages } = require("../utils/companyAccess");
+// const { emitToCompany } = require("../socket");
+
+// // ============================================
+// // AI AUTO-REPLY (multi-tenant)
+// // ============================================
+// // Ported from the legacy routes/webhook.js so customers' bots work on
+// // the active /api/saas/webhook URL. The AI settings (provider, key,
+// // on/off) are read PER COMPANY inside getAutoReply, and the reply is
+// // sent from the same WhatsApp number the customer wrote to.
+// //
+// // Runs AFTER this webhook has answered Meta (fire-and-forget), so a
+// // slow or failed AI call never delays message delivery.
+// //
+// // Safeguards:
+// //  - the company's subscription must be active (not expired/inactive)
+// //  - the WhatsApp number must still be CONNECTED
+// //  - one reply pipeline per conversation at a time
+// //  - if the customer writes again while the AI is thinking, the stale
+// //    reply is dropped and regenerated with the full context
+// //  - the bot switch is re-checked right before sending, so an agent
+// //    who takes over mid-generation is never talked over
+// //  - the BOT message stores Meta's message id so delivery status
+// //    updates work and the Coexistence echo handler does not mistake
+// //    it for a manual agent message (which would switch the bot off)
+// const activeReplies = new Set();
+// const MAX_REGENERATIONS = 3;
+
+// const attemptAutoReply = async (conversationId) => {
+//   const conversation = await prisma.conversation.findUnique({
+//     where: { id: conversationId },
+//     include: { customer: true, whatsappAccount: true },
+//   });
+
+//   if (!conversation || !conversation.botEnabled) return "done";
+
+//   // Expired / inactive companies cannot send messages — this includes
+//   // AI auto-replies. Incoming messages are still saved (view-only).
+//   if (!(await canCompanySendMessages(conversation.companyId))) {
+//     console.log(
+//       "AI auto-reply skipped: company subscription is inactive or expired. companyId:",
+//       conversation.companyId
+//     );
+//     return "done";
+//   }
+
+//   const recipientPhone = conversation.phone || conversation.customer?.phone;
+//   if (!recipientPhone) {
+//     console.error("Cannot send AI auto-reply: conversation has no phone number");
+//     return "done";
+//   }
+
+//   // Reply from the number this chat belongs to; fall back to the
+//   // company's connected number if the chat was never linked to one.
+//   let whatsappAccount = conversation.whatsappAccount;
+//   if (!whatsappAccount) {
+//     whatsappAccount = await prisma.whatsAppAccount.findFirst({
+//       where: { companyId: conversation.companyId, status: "CONNECTED" },
+//     });
+//   }
+
+//   if (!whatsappAccount || whatsappAccount.status !== "CONNECTED") {
+//     console.log("AI auto-reply skipped: no connected WhatsApp account for this chat");
+//     return "done";
+//   }
+
+//   // Latest customer message at the moment we start generating
+//   const latestCustomerMessage = await prisma.message.findFirst({
+//     where: { conversationId, sender: "CUSTOMER" },
+//     orderBy: { createdAt: "desc" },
+//   });
+
+//   if (!latestCustomerMessage) return "done";
+
+//   const result = await getAutoReply(conversationId);
+
+//   if (!result.success) {
+//     console.error("AI did not return a reply:", result.error);
+//     return "done";
+//   }
+
+//   // Customer wrote again while the AI was thinking -> throw this reply
+//   // away and answer the whole burst of messages in one go.
+//   const newerCustomerMessages = await prisma.message.count({
+//     where: {
+//       conversationId,
+//       sender: "CUSTOMER",
+//       createdAt: { gt: latestCustomerMessage.createdAt },
+//     },
+//   });
+
+//   if (newerCustomerMessages > 0) return "stale";
+
+//   // Re-check: an agent may have taken over (bot switched off), or the
+//   // number may have been disconnected while we were waiting.
+//   const fresh = await prisma.conversation.findUnique({
+//     where: { id: conversationId },
+//     select: { botEnabled: true },
+//   });
+
+//   if (!fresh || !fresh.botEnabled) return "done";
+
+//   const freshAccount = await prisma.whatsAppAccount.findUnique({
+//     where: { id: whatsappAccount.id },
+//     select: { status: true },
+//   });
+
+//   if (!freshAccount || freshAccount.status !== "CONNECTED") return "done";
+
+//   const sendResult = await sendTextMessage(
+//     recipientPhone,
+//     result.reply,
+//     whatsappAccount
+//   );
+
+//   if (!sendResult.success) {
+//     console.error("Failed to send AI auto-reply on WhatsApp:", sendResult.error);
+//     return "done";
+//   }
+
+//   const metaMessageId = sendResult.data?.messages?.[0]?.id || undefined;
+
+//   const botMessage = await prisma.message.create({
+//     data: {
+//       conversationId,
+//       content: result.reply,
+//       sender: "BOT",
+//       messageType: "TEXT",
+//       status: "SENT",
+//       metaMessageId,
+//     },
+//   });
+
+//   await prisma.conversation.update({
+//     where: { id: conversationId },
+//     data: { lastMessage: result.reply },
+//   });
+
+//   emitToCompany(conversation.companyId, "message:new", {
+//     conversationId,
+//     message: botMessage,
+//   });
+
+//   console.log("SaaS auto-reply sent:", botMessage.id);
+//   return "done";
+// };
+
+// const triggerAutoReply = async (conversationId) => {
+//   if (activeReplies.has(conversationId)) {
+//     // A pipeline is already running for this chat. It will notice the
+//     // newer customer message and regenerate, so nothing to do here.
+//     return;
+//   }
+
+//   activeReplies.add(conversationId);
+
+//   try {
+//     for (let i = 0; i < MAX_REGENERATIONS; i++) {
+//       const outcome = await attemptAutoReply(conversationId);
+//       if (outcome !== "stale") break;
+//     }
+//   } finally {
+//     activeReplies.delete(conversationId);
+//   }
+// };
 
 // // ============================================
 // // TEST ROUTE
@@ -47,20 +225,41 @@
 // // ============================================
 // // RECEIVE WEBHOOK EVENTS
 // // ============================================
-// router.post("/", async (req, res) => {
+// // ============================================
+// // RETRY OR DROP?
+// //
+// // If we answer 500, Meta re-sends the webhook (for up to 7 days). That is
+// // what we WANT for temporary problems (database down / timed out): the
+// // message is not lost, and the duplicate check keeps it from being saved
+// // twice. For a payload that can never succeed (bad data, unknown account)
+// // retrying would loop forever and Meta may disable the webhook, so those
+// // are logged and answered with 200.
+// // ============================================
+// const TRANSIENT_PRISMA_CODES = new Set([
+//   "P1001", // cannot reach database server
+//   "P1002", // database server timed out
+//   "P1008", // operations timed out
+//   "P1017", // server closed the connection
+//   "P2024", // timed out getting a connection from the pool
+//   "P2028", // transaction API error
+// ]);
+
+// const isTransientError = (error) => {
+//   if (!error) return false;
+//   if (TRANSIENT_PRISMA_CODES.has(error.code)) return true;
+//   if (error.name === "PrismaClientInitializationError") return true;
+//   if (error.name === "PrismaClientRustPanicError") return true;
+//   return ["ECONNRESET", "ETIMEDOUT", "ECONNREFUSED", "EAI_AGAIN"].includes(
+//     error.code
+//   );
+// };
+
+// // ============================================
+// // PROCESS ONE "change" OF A WEBHOOK
+// // (the body of the old POST handler, unchanged except where marked NEW)
+// // ============================================
+// const processWebhookChange = async (field, value) => {
 //   try {
-//     console.log(
-//       "========== SAAS WHATSAPP WEBHOOK =========="
-//     );
-
-//     const entry = req.body.entry?.[0];
-//     const change = entry?.changes?.[0];
-//     const field = change?.field;
-//     const value = change?.value;
-
-//     if (!value) {
-//       return res.sendStatus(200);
-//     }
 
 //     // ============================================
 //     // TEMPLATE STATUS UPDATE (Approved / Rejected / Paused / Disabled)
@@ -96,7 +295,7 @@
 //         }
 //       }
 
-//       return res.sendStatus(200);
+//       return;
 //     }
 
 //     // ============================================
@@ -116,19 +315,20 @@
 //       console.log("SaaS account_update event:", event, displayPhoneNumber);
 
 //       if (!displayPhoneNumber) {
-//         return res.sendStatus(200);
+//         return;
 //       }
 
-//       const account = await prisma.whatsAppAccount.findFirst({
-//         where: { displayPhoneNumber },
-//       });
+//       // Digit-based match, so "919876543210" finds "+91 98765 43210".
+//       const account = await findAccountByDisplayPhone(displayPhoneNumber);
 
 //       if (!account) {
 //         console.log(
 //           "No WhatsApp account found for account_update phone_number:",
-//           displayPhoneNumber
+//           displayPhoneNumber,
+//           "Payload:",
+//           JSON.stringify(value)
 //         );
-//         return res.sendStatus(200);
+//         return;
 //       }
 
 //       try {
@@ -153,16 +353,25 @@
 //         }
 
 //         if (event === "ACCOUNT_RECONNECTED") {
-//           await prisma.whatsAppAccount.update({
-//             where: { id: account.id },
-//             data: { status: "CONNECTED", disconnectedAt: null },
-//           });
+//           // A disconnect from the CRM deletes the stored token, so without
+//           // a token we must NOT show "Connected" — the admin has to reconnect.
+//           if (!account.whatsappAccessToken) {
+//             console.log(
+//               "ACCOUNT_RECONNECTED ignored — no stored access token for account",
+//               account.id
+//             );
+//           } else {
+//             await prisma.whatsAppAccount.update({
+//               where: { id: account.id },
+//               data: { status: "CONNECTED", disconnectedAt: null },
+//             });
+//           }
 //         }
 //       } catch (error) {
 //         console.error("Failed to process account_update webhook:", error);
 //       }
 
-//       return res.sendStatus(200);
+//       return;
 //     }
 
 //     // ============================================
@@ -182,7 +391,7 @@
 //         "No phone_number_id found in webhook"
 //       );
 
-//       return res.sendStatus(200);
+//       return;
 //     }
 
 //     // ============================================
@@ -203,7 +412,7 @@
 //         phoneNumberId
 //       );
 
-//       return res.sendStatus(200);
+//       return;
 //     }
 
 //     const companyId =
@@ -224,67 +433,138 @@
 //     // INCOMING MESSAGE
 //     // ============================================
 
-//     const message = value.messages?.[0];
+//     // NEW: Meta can put several messages in one webhook, so loop over ALL of
+//     // them (before, only messages[0] was handled and the rest were lost).
+//     const incomingMessages = Array.isArray(value.messages)
+//       ? value.messages
+//       : [];
 
-//     if (message) {
-//       const customerPhone = message.from;
+//     let transientFailure = null;
 
-//       const text =
-//         message.text?.body ||
-//         message.button?.text ||
-//         message.interactive?.button_reply?.title ||
-//         message.interactive?.list_reply?.title ||
-//         `[${message.type || "unsupported"} message]`;
+//     for (const message of incomingMessages) {
+//       try {
+//         const customerPhone = message.from;
 
-//       console.log(
-//         "Customer Phone:",
-//         customerPhone
-//       );
+//         if (!customerPhone) {
+//           continue;
+//         }
 
-//       console.log(
-//         "Message:",
-//         text
-//       );
+//         // NEW: duplicate check. Meta re-sends a webhook when we answer slowly
+//         // or with an error. The message id is unique, so skip if we have it.
+//         if (message.id) {
+//           const alreadySaved = await prisma.message.findUnique({
+//             where: { metaMessageId: message.id },
+//             select: { id: true },
+//           });
 
-//       // ============================================
-//       // GET / CREATE CONVERSATION
-//       // ============================================
+//           if (alreadySaved) {
+//             console.log("Duplicate webhook message skipped:", message.id);
+//             continue;
+//           }
+//         }
 
-//       const conversation =
-//         await getOrCreateSaaSConversation(
-//           companyId,
-//           whatsappAccountId,
+//         // NEW: images, audio, video, documents and stickers are downloaded
+//         // and stored (same helper already used for echoes and history sync).
+//         // Before, they were saved as the text "[image message]".
+//         // Text / button / list replies behave exactly as before.
+//         const { content: text, messageType, imageUrl } =
+//           await resolveMessageContent(
+//             message,
+//             whatsappAccount.whatsappAccessToken ||
+//               process.env.META_SYSTEM_USER_TOKEN
+//           );
+
+//         console.log(
+//           "Customer Phone:",
 //           customerPhone
 //         );
 
-//       console.log(
-//         "Conversation ID:",
-//         conversation.id
-//       );
+//         console.log(
+//           "Message:",
+//           text
+//         );
 
-//       if (conversation.customer) {
+//         // ============================================
+//         // GET / CREATE CONVERSATION
+//         // ============================================
+
+//         const conversation =
+//           await getOrCreateSaaSConversation(
+//             companyId,
+//             whatsappAccountId,
+//             customerPhone
+//           );
+
 //         console.log(
-//           "Customer:",
-//           conversation.customer.name
+//           "Conversation ID:",
+//           conversation.id
 //         );
-//       } else {
+
+//         if (conversation.customer) {
+//           console.log(
+//             "Customer:",
+//             conversation.customer.name
+//           );
+//         } else {
+//           console.log(
+//             "Customer: Not linked yet"
+//           );
+//         }
+
+//         // ============================================
+//         // SAVE MESSAGE (with Meta's id, for duplicate protection)
+//         // ============================================
+
+//         const savedMessage = await saveIncomingMessage(
+//           conversation.id,
+//           text,
+//           {
+//             metaMessageId: message.id,
+//             messageType,
+//             imageUrl,
+//           }
+//         );
+
+//         // null = a parallel delivery already saved it
+//         if (!savedMessage) {
+//           continue;
+//         }
+
 //         console.log(
-//           "Customer: Not linked yet"
+//           "SaaS incoming message saved successfully"
 //         );
+
+//         emitToCompany(companyId, "message:new", {
+//           conversationId: conversation.id,
+//           message: savedMessage,
+//         });
+
+//         // Only fires when this specific chat has the bot ON. The company's
+//         // AI settings (enabled / provider / key) are checked inside
+//         // getAutoReply. Not awaited, so Meta gets its 200 right away.
+//         if (conversation.botEnabled) {
+//           triggerAutoReply(conversation.id).catch((err) => {
+//             console.error("SaaS auto-reply pipeline failed:", err);
+//           });
+//         }
+//       } catch (error) {
+//         // One bad message must not stop the rest of the batch.
+//         console.error(
+//           "Failed to process incoming message:",
+//           message?.id,
+//           error
+//         );
+
+//         if (isTransientError(error)) {
+//           transientFailure = error;
+//         }
 //       }
+//     }
 
-//       // ============================================
-//       // SAVE MESSAGE
-//       // ============================================
-
-//       await saveIncomingMessage(
-//         conversation.id,
-//         text
-//       );
-
-//       console.log(
-//         "SaaS incoming message saved successfully"
-//       );
+//     // Temporary failure (e.g. database down): let Meta retry the whole
+//     // webhook. Messages already saved are skipped by the duplicate check.
+//     if (transientFailure) {
+//       throw transientFailure;
 //     }
 
 //     // ============================================
@@ -328,6 +608,12 @@
 //                 : undefined,
 //               failureReason,
 //             },
+//           });
+
+//           emitToCompany(companyId, "message:status", {
+//             metaMessageId,
+//             status: newStatus ? newStatus.toUpperCase() : undefined,
+//             failureReason,
 //           });
 //         } catch (error) {
 //           console.error(
@@ -377,7 +663,7 @@
 //             customerPhone
 //           );
 
-//           await prisma.message.create({
+//           const echoMessage = await prisma.message.create({
 //             data: {
 //               conversationId: conversation.id,
 //               content,
@@ -387,6 +673,11 @@
 //               status: "SENT",
 //               metaMessageId: echo.id || undefined,
 //             },
+//           });
+
+//           emitToCompany(companyId, "message:new", {
+//             conversationId: conversation.id,
+//             message: echoMessage,
 //           });
 
 //           await prisma.conversation.update({
@@ -443,11 +734,14 @@
 //         try {
 //           // Only fill in a name for customers who don't already have
 //           // one — never overwrite data the agent already entered.
+//           // (Customer.name is a required field, so "no name" means "".
+//           // Filtering `name: null` is not allowed by Prisma and made every
+//           // call fail.)
 //           await prisma.customer.updateMany({
 //             where: {
 //               companyId,
 //               phone: contactPhone,
-//               OR: [{ name: null }, { name: "" }],
+//               name: "",
 //             },
 //             data: { name: fullName },
 //           });
@@ -563,37 +857,57 @@
 //       }
 //     }
 
-//     // ============================================
-//     // ALWAYS RETURN 200 TO META
-//     // ============================================
-
-//     return res.sendStatus(200);
-
 //   } catch (error) {
 //     console.error(
-//       "SAAS WEBHOOK ERROR:",
+//       "SAAS WEBHOOK ERROR (field: " + field + "):",
 //       error
 //     );
 
-//     /*
-//      * For production we generally want to acknowledge
-//      * webhook events quickly. Logging the error allows
-//      * us to investigate without causing Meta to retry
-//      * endlessly.
-//      */
-
-//     return res.sendStatus(200);
+//     throw error;
 //   }
+// };
+
+// router.post("/", async (req, res) => {
+//   console.log(
+//     "========== SAAS WHATSAPP WEBHOOK =========="
+//   );
+
+//   // NEW: handle EVERY entry and EVERY change in the payload.
+//   // Before, only entry[0].changes[0] was processed.
+//   const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
+
+//   let retryNeeded = false;
+
+//   for (const entry of entries) {
+//     const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+
+//     for (const change of changes) {
+//       if (!change?.value) {
+//         continue;
+//       }
+
+//       try {
+//         await processWebhookChange(change.field, change.value);
+//       } catch (error) {
+//         if (isTransientError(error)) {
+//           // answer 500 below so Meta sends this webhook again
+//           retryNeeded = true;
+//         } else {
+//           // Cannot succeed on retry. Keep the payload in the logs so it
+//           // can be replayed by hand, and acknowledge it.
+//           console.error(
+//             "SAAS WEBHOOK: dropping change that cannot be processed. Payload:",
+//             JSON.stringify(change)
+//           );
+//         }
+//       }
+//     }
+//   }
+
+//   return res.sendStatus(retryNeeded ? 500 : 200);
 // });
 
 // module.exports = router;
-
-
-
-
-
-
-
 
 
 // ============================================
@@ -624,6 +938,7 @@ const {
 
 const { sendTextMessage } = require("../services/whatsappService");
 const { getAutoReply } = require("../services/aiService");
+const { handleAiHandoff } = require("../services/ai/handoffService");
 const { canCompanySendMessages } = require("../utils/companyAccess");
 const { emitToCompany } = require("../socket");
 
@@ -766,6 +1081,11 @@ const attemptAutoReply = async (conversationId) => {
     conversationId,
     message: botMessage,
   });
+
+  // The AI asked for a human: switch the bot off and notify the team.
+  if (result.handoff) {
+    await handleAiHandoff(conversation);
+  }
 
   console.log("SaaS auto-reply sent:", botMessage.id);
   return "done";
