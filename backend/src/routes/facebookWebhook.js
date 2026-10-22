@@ -1,3 +1,4 @@
+
 // // ============================================================
 // // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 // //
@@ -18,6 +19,7 @@
 // const {
 //   getOrCreateMessengerConversation,
 //   resolveMessengerContent,
+//   rehostAttachment,
 // } = require("../helpers/messengerHelper");
 // const { INSTAGRAM_CHANNEL } = require("../helpers/instagramHelper");
 // const { emitToCompany } = require("../socket");
@@ -61,6 +63,35 @@
 //   console.log("Facebook Page webhook verification failed");
 //   return res.sendStatus(403);
 // });
+
+// // ------------------------------------------------------------
+// // Media is saved with Meta's temporary link first, so the message shows up
+// // in the CRM immediately. Moving the file to Cloudinary (slow) happens here,
+// // in the background, and the chat is told when the permanent link is ready.
+// // Never throws and is never awaited.
+// // ------------------------------------------------------------
+// const rehostInBackground = (companyId, conversationId, messageId, pending) => {
+//   if (!pending || !messageId) return;
+
+//   rehostAttachment(pending.url, pending.resourceType, pending.fileName)
+//     .then(async (permanentUrl) => {
+//       // rehostAttachment returns the original link when it could not copy
+//       if (!permanentUrl || permanentUrl === pending.url) return;
+
+//       const updated = await prisma.message.update({
+//         where: { id: messageId },
+//         data: { imageUrl: permanentUrl },
+//       });
+
+//       emitToCompany(companyId, "message:update", {
+//         conversationId,
+//         message: updated,
+//       });
+//     })
+//     .catch((error) => {
+//       console.warn("Background media re-host failed:", error.message);
+//     });
+// };
 
 // // ------------------------------------------------------------
 // // One event (a person messaged the Page / Instagram account, or the
@@ -112,9 +143,10 @@
 //     channel
 //   );
 
-//   const { content, messageType, imageUrl } = await resolveMessengerContent(
-//     message
-//   );
+//   // deferRehost: save + show the message first, copy the file to Cloudinary
+//   // afterwards (see rehostInBackground)
+//   const { content, messageType, imageUrl, pendingRehost, extras } =
+//     await resolveMessengerContent(message, { deferRehost: true });
 
 //   // ---------- Account owner replied outside the CRM ----------
 //   if (isEcho) {
@@ -140,6 +172,48 @@
 //         conversationId: conversation.id,
 //         message: echoMessage,
 //       });
+//       rehostInBackground(
+//         page.companyId,
+//         conversation.id,
+//         echoMessage.id,
+//         pendingRehost
+//       );
+
+//       // Further attachments of the same platform message (e.g. several photos)
+//       for (let i = 0; i < extras.length; i += 1) {
+//         const extra = extras[i];
+//         try {
+//           const extraEcho = await prisma.message.create({
+//             data: {
+//               conversationId: conversation.id,
+//               content: extra.content,
+//               sender: "AGENT",
+//               messageType: extra.messageType,
+//               imageUrl: extra.imageUrl,
+//               status: "SENT",
+//               metaMessageId: `${message.mid}#${i + 2}`,
+//             },
+//           });
+
+//           await prisma.conversation.update({
+//             where: { id: conversation.id },
+//             data: { lastMessage: extra.content },
+//           });
+
+//           emitToCompany(page.companyId, "message:new", {
+//             conversationId: conversation.id,
+//             message: extraEcho,
+//           });
+//           rehostInBackground(
+//             page.companyId,
+//             conversation.id,
+//             extraEcho.id,
+//             extra.pendingRehost
+//           );
+//         } catch (extraError) {
+//           if (extraError?.code !== "P2002") throw extraError;
+//         }
+//       }
 //     } catch (error) {
 //       if (error?.code === "P2002") return; // saved by a parallel request
 //       throw error;
@@ -161,6 +235,41 @@
 //     conversationId: conversation.id,
 //     message: savedMessage,
 //   });
+//   rehostInBackground(
+//     page.companyId,
+//     conversation.id,
+//     savedMessage.id,
+//     pendingRehost
+//   );
+
+//   // Further attachments of the same platform message (e.g. several photos):
+//   // each one becomes its own chat message.
+//   for (let i = 0; i < extras.length; i += 1) {
+//     const extra = extras[i];
+
+//     const extraSaved = await saveIncomingMessage(
+//       conversation.id,
+//       extra.content,
+//       {
+//         metaMessageId: `${message.mid}#${i + 2}`,
+//         messageType: extra.messageType,
+//         imageUrl: extra.imageUrl,
+//       }
+//     );
+
+//     if (extraSaved) {
+//       emitToCompany(page.companyId, "message:new", {
+//         conversationId: conversation.id,
+//         message: extraSaved,
+//       });
+//       rehostInBackground(
+//         page.companyId,
+//         conversation.id,
+//         extraSaved.id,
+//         extra.pendingRehost
+//       );
+//     }
+//   }
 
 //   // FUTURE: AI auto-reply for Messenger / Instagram plugs in here
 //   // (same idea as triggerAutoReply() in saasWebhook.js).
@@ -172,9 +281,26 @@
 // router.post("/", async (req, res) => {
 //   const body = req.body;
 
+//   // DIAGNOSTIC LOG: if this line never shows in Render when you message the
+//   // Page, Meta is NOT calling this server (problem is in the Meta app
+//   // dashboard / Page subscription, not in this code).
+//   console.log(
+//     "META WEBHOOK RECEIVED:",
+//     "object=" + body?.object,
+//     "entries=" + (Array.isArray(body?.entry) ? body.entry.length : 0),
+//     "ids=" + (body?.entry || []).map((e) => e?.id).join(","),
+//     "fields=" +
+//       (body?.entry || [])
+//         .map((e) =>
+//           e?.messaging ? "messaging" : Object.keys(e || {}).join("/")
+//         )
+//         .join(",")
+//   );
+
 //   // Only Facebook Page and Instagram events belong on this URL.
 //   const objectType = body?.object;
 //   if (objectType !== "page" && objectType !== "instagram") {
+//     console.log("META WEBHOOK ignored, unknown object:", objectType);
 //     return res.sendStatus(404);
 //   }
 
@@ -186,7 +312,10 @@
 
 //   for (const entry of entries) {
 //     const events = Array.isArray(entry?.messaging) ? entry.messaging : [];
-//     if (!events.length) continue;
+//     if (!events.length) {
+//       console.log("META WEBHOOK entry has no messaging events:", entry?.id, Object.keys(entry || {}).join(","));
+//       continue;
+//     }
 
 //     try {
 //       // Facebook: entry.id is the Page ID.
@@ -230,23 +359,8 @@
 // });
 
 // module.exports = router;
+ 
 
-
-
-
-
-// ============================================================
-// FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
-//
-// Mounted in server.js as:
-//   app.use("/api/facebook/webhook", verifyMetaWebhookSignature, facebookWebhookRoutes);
-//
-// Meta callback URL:  https://<your-backend-domain>/api/facebook/webhook
-// Use the same URL for the "Page" webhook AND the "Instagram" webhook.
-//
-// Same Meta app as WhatsApp, so the same META_APP_SECRET is used to
-// verify the X-Hub-Signature-256 header (done by verifyMetaWebhookSignature).
-// ============================================================
 const express = require("express");
 const router = express.Router();
 
@@ -259,6 +373,11 @@ const {
 } = require("../helpers/messengerHelper");
 const { INSTAGRAM_CHANNEL } = require("../helpers/instagramHelper");
 const { emitToCompany } = require("../socket");
+
+// NEW: AI auto-reply for Messenger / Instagram (works like WhatsApp)
+const {
+  triggerSocialAutoReply,
+} = require("../services/ai/socialAutoReply");
 
 // Same transient-error list the WhatsApp webhook uses: for these we answer
 // 500 so Meta re-sends the event instead of losing the message.
@@ -507,8 +626,14 @@ const processMessagingEvent = async (page, event, channel) => {
     }
   }
 
-  // FUTURE: AI auto-reply for Messenger / Instagram plugs in here
-  // (same idea as triggerAutoReply() in saasWebhook.js).
+  // AI auto-reply for Messenger / Instagram (same idea as
+  // triggerAutoReply() in saasWebhook.js). NOT awaited on purpose: Meta
+  // must get its 200 answer quickly, the AI works in the background.
+  // It does nothing unless the company's AI is on and this chat's Bot
+  // switch is ON.
+  triggerSocialAutoReply(conversation.id).catch((error) => {
+    console.error("Social AI auto-reply trigger failed:", error);
+  });
 };
 
 // ------------------------------------------------------------
@@ -595,4 +720,3 @@ router.post("/", async (req, res) => {
 });
 
 module.exports = router;
- 

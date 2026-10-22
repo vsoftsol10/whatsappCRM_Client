@@ -1,3 +1,4 @@
+
 // import { useEffect, useRef, useState } from "react";
 // import {
 //   FaEllipsisH,
@@ -8,6 +9,7 @@
 // } from "react-icons/fa";
 // import useMessageStore from "../../../store/messageStore";
 // import ConfirmModal from "../../common/ConfirmModal";
+// import LinkifiedText from "../LinkifiedText";
 // import SocialAvatar from "./SocialAvatar";
 // import { getContactName, formatDayLabel } from "./socialTheme";
 
@@ -198,7 +200,7 @@
 //             ) : (
 //               showText && (
 //                 <p className="whitespace-pre-wrap break-words px-3.5 py-2 text-[15px] leading-snug">
-//                   {message.content}
+//                   <LinkifiedText text={message.content} />
 //                 </p>
 //               )
 //             )}
@@ -322,7 +324,12 @@ import LinkifiedText from "../LinkifiedText";
 import SocialAvatar from "./SocialAvatar";
 import { getContactName, formatDayLabel } from "./socialTheme";
 
-const isAgent = (message) => message.sender?.toUpperCase() === "AGENT";
+// NEW: our side = a human agent OR the AI bot. Both show on the RIGHT.
+const isAgent = (message) =>
+  ["AGENT", "BOT"].includes(message.sender?.toUpperCase());
+
+// Only a human agent's messages can be edited / deleted (not the bot's).
+const isHumanAgent = (message) => message.sender?.toUpperCase() === "AGENT";
 
 const sameDay = (a, b) => {
   const x = new Date(a);
@@ -399,7 +406,7 @@ function Bubble({ message, theme, showAvatar, conversation, groupStart, showStat
         )}
 
         {/* Hover menu (agent messages only) */}
-        {sender && !isEditing && (
+        {sender && isHumanAgent(message) && !isEditing && (
           <div ref={menuRef} className="relative order-first self-center">
             <button
               onClick={() => setShowMenu((prev) => !prev)}

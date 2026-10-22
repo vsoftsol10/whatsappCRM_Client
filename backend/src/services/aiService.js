@@ -414,6 +414,8 @@
 
 
 
+
+
 const axios = require("axios");
 const prisma = require("../config/prisma");
 
@@ -447,6 +449,16 @@ Formatting rules (always follow):
 Human hand-off:
 - If you cannot answer from the business information, or the customer asks for a human or agent, or wants to complain, negotiate, pay or get a refund, write a short polite reply saying the team will contact them shortly, and end that reply with the exact text ${HANDOFF_MARKER}
 - Use ${HANDOFF_MARKER} only in those cases and never explain it.`;
+
+// NEW: rules for the channel the reply is sent on. WhatsApp keeps the
+// exact rules above. Instagram / Messenger use the same rules, with the
+// channel name changed and a shorter length (their messages are shorter).
+const rulesForChannel = (channel) => {
+  if (!channel || channel === "WhatsApp") return WHATSAPP_RULES;
+
+  return `${WHATSAPP_RULES.replace("inside WhatsApp", `inside ${channel}`)}
+- Keep the whole reply under 800 characters, because ${channel} limits the message length.`;
+};
 
 // An error whose message is safe to show to the customer-facing UI.
 class AiError extends Error {}
@@ -680,6 +692,7 @@ const callProvider = async ({
   systemPrompt,
   messages,
   rawSystem = false,
+  channel, // NEW (optional): "Instagram" | "Messenger"; empty = WhatsApp
 }) => {
   const provider = getProvider(providerId);
 
@@ -689,7 +702,7 @@ const callProvider = async ({
 
   const { url, httpsAgent } = await resolveTarget(provider, baseUrl);
   // rawSystem = background jobs (e.g. lead capture) that are not WhatsApp replies
-  const system = rawSystem ? systemPrompt : `${systemPrompt}${WHATSAPP_RULES}`;
+  const system = rawSystem ? systemPrompt : `${systemPrompt}${rulesForChannel(channel)}`;
 
   let text;
 
@@ -767,7 +780,7 @@ const clearFailure = (companyId) =>
 // handoff = true when the AI wants a human to take over this chat.
 // Uses the company's own settings (on/off, prompt, history) but the
 // platform's AI provider, model and key.
-const getAutoReply = async (conversationId) => {
+const getAutoReply = async (conversationId, options = {}) => {
   let companyId = null;
   let apiKey = null;
 
@@ -825,6 +838,7 @@ const getAutoReply = async (conversationId) => {
       apiKey,
       systemPrompt,
       messages: history,
+      channel: options.channel, // NEW: undefined for WhatsApp = unchanged
     });
 
     const { reply, handoff } = splitHandoff(raw);
