@@ -10,6 +10,11 @@
 // } = require("../helpers/saasConversationHelper");
 // const { logAction } = require("../services/auditLogService");
 // const { deleteMetaTemplate } = require("../services/metaTemplateDelete");
+// // 👈 NEW: WhatsApp template buttons (call / website / quick reply / copy code)
+// const {
+//   validateTemplateButtons,
+//   buildButtonSendComponents,
+// } = require("../utils/templateButtons");
 // // 👈 NEW: reuses the same Cloudinary upload helper campaignController
 // // already uses for campaign images — just pointed at its own folder
 // // so template header samples don't mix in with campaign images.
@@ -45,6 +50,7 @@
 //       content,
 //       footerContent,
 //       bodyExamples, // 👈 NEW
+//       buttons, // 👈 NEW
 //     } = req.body;
 
 //     // ----------------------------------------------------------
@@ -127,6 +133,15 @@
 //     // CREATE TEMPLATE
 //     // ----------------------------------------------------------
 
+//     const buttonCheck = validateTemplateButtons(buttons, category);
+
+//     if (buttonCheck.error) {
+//       return res.status(400).json({
+//         success: false,
+//         message: buttonCheck.error,
+//       });
+//     }
+
 //     const template = await prisma.template.create({
 //       data: {
 //         companyId: req.user.companyId,
@@ -152,6 +167,8 @@
 //         // 👈 NEW: store sample values as-is (Prisma Json field).
 //         // undefined if none were sent, so Prisma just skips setting it.
 //         bodyExamples: Array.isArray(bodyExamples) ? bodyExamples : undefined,
+//         // 👈 NEW: validated buttons ([] when none)
+//         buttons: buttonCheck.buttons,
 
 //         // IMPORTANT:
 //         // New templates always start as DRAFT.
@@ -372,6 +389,7 @@
 //       content,
 //       footerContent,
 //       bodyExamples, // 👈 NEW
+//       buttons, // 👈 NEW
 //     } = req.body;
 
 //     // ----------------------------------------------------------
@@ -483,6 +501,15 @@
 //     // UPDATE
 //     // ----------------------------------------------------------
 
+//     const buttonCheck = validateTemplateButtons(buttons, category);
+
+//     if (buttonCheck.error) {
+//       return res.status(400).json({
+//         success: false,
+//         message: buttonCheck.error,
+//       });
+//     }
+
 //     const template = await prisma.template.update({
 //       where: {
 //         id,
@@ -509,6 +536,8 @@
 
 //         // 👈 NEW
 //         bodyExamples: Array.isArray(bodyExamples) ? bodyExamples : undefined,
+//         // 👈 NEW: if the client did not send buttons, keep the old ones
+//         buttons: buttons === undefined ? undefined : buttonCheck.buttons,
 
 //         // Any modification puts the template back into draft.
 //         status: "DRAFT",
@@ -837,7 +866,9 @@
 //           customer.phone,
 //           metaTemplateName,
 //           template.language,
-//           variables
+//           variables,
+//           // 👈 NEW: extra parameters for a copy-code button (else empty)
+//           buildButtonSendComponents(template.buttons)
 //         );
 
 //         let sendStatus = "FAILED";
@@ -1194,6 +1225,19 @@
 //     // CONFIRM COMPANY HAS A CONNECTED WHATSAPP ACCOUNT
 //     // ----------------------------------------------------------
 
+//     // 👈 NEW: re-check the saved buttons before sending them to Meta
+//     const savedButtonCheck = validateTemplateButtons(
+//       template.buttons,
+//       template.category
+//     );
+
+//     if (savedButtonCheck.error) {
+//       return res.status(400).json({
+//         success: false,
+//         message: savedButtonCheck.error,
+//       });
+//     }
+
 //     const whatsappAccount = await prisma.whatsAppAccount.findFirst({
 //       where: {
 //         companyId: req.user.companyId,
@@ -1250,6 +1294,7 @@
 //       bodyText: template.content,
 //       bodyExamples: template.bodyExamples,
 //       footerContent: template.footerContent,
+//       buttons: savedButtonCheck.buttons, // 👈 NEW
 //     });
 
 //     // 👈 DEBUG — print exactly what Meta (or our own catch block) returned
@@ -1380,7 +1425,6 @@
 //   uploadTemplateHeaderImage,
 //   submitTemplateForApproval,
 // };
-
 
 
 
@@ -2286,6 +2330,12 @@ const sendTemplate = async (req, res) => {
             status: sendStatus,
 
             metaMessageId,
+
+            // 👈 NEW: keep the template's buttons so the chat can show them
+            buttons:
+              Array.isArray(template.buttons) && template.buttons.length > 0
+                ? template.buttons
+                : undefined,
           },
         });
 

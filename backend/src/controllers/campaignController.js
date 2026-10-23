@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 
 // const {
@@ -18,6 +19,8 @@
 // } = require("../helpers/saasConversationHelper");
 
 // const { logAction } = require("../services/auditLogService");
+// // 👈 NEW: extra parameters needed to send a template with a copy-code button
+// const { buildButtonSendComponents } = require("../utils/templateButtons");
 
 // // =====================================================
 // // build the text that was ACTUALLY sent, for local display
@@ -107,6 +110,11 @@
 
 //       const templateParams = allPossibleParams.slice(0, variableCount);
 
+//       // 👈 NEW: empty unless the template has a copy-code button
+//       const buttonComponents = buildButtonSendComponents(
+//         campaign.template.buttons
+//       );
+
 //       if (campaign.imageUrl) {
 //         result = await sendCampaignImageTemplate(
 //           customer.phone,
@@ -114,7 +122,8 @@
 //           campaign.imageUrl,
 //           templateParams,
 //           campaign.template.language || "en_US",
-//           whatsappAccount
+//           whatsappAccount,
+//           buttonComponents // 👈 NEW
 //         );
 //       } else {
 //         result = await sendTemplateMessage(
@@ -122,7 +131,8 @@
 //           campaign.template.name,
 //           templateParams,
 //           whatsappAccount,
-//           campaign.template.language || "en_US"
+//           campaign.template.language || "en_US",
+//           buttonComponents // 👈 NEW
 //         );
 //       }
 
@@ -1480,6 +1490,12 @@ const sendToRecipients = async (
             messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
             status: "SENT",
             metaMessageId,
+            // 👈 NEW: keep the template's buttons so the chat can show them
+            buttons:
+              Array.isArray(campaign.template.buttons) &&
+              campaign.template.buttons.length > 0
+                ? campaign.template.buttons
+                : undefined,
           },
         });
 

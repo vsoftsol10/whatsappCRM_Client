@@ -687,6 +687,11 @@ model Message {
 
   imageUrl String?
 
+  // 👈 NEW: the template's buttons (call / website / quick reply / copy code),
+  // saved with a template message so the chat can show them. Null for
+  // normal messages.
+  buttons Json?
+
   metaMessageId String? @unique
 
   failureReason String?
@@ -751,6 +756,10 @@ model Lead {
 
   assignedToId String?
 
+  // Facebook / Instagram leads created by the AI (both optional)
+  channel        String? // "MESSENGER" or "INSTAGRAM"
+  conversationId String? // the chat this lead came from
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -763,6 +772,7 @@ model Lead {
 
   @@index([companyId])
   @@index([assignedToId])
+  @@index([companyId, conversationId])
 }
 
 //////////////////////////////////////////////////////
