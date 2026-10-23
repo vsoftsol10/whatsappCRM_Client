@@ -1,4 +1,3 @@
-
 // const prisma = require("../config/prisma");
 
 // const {
@@ -1182,6 +1181,128 @@
 //   }
 // };
 
+// // =====================================================
+// // PROCESS SCHEDULED CAMPAIGNS  (ADD AT THE VERY END of
+// // backend/src/controllers/campaignController.js)
+// // =====================================================
+// // Called every minute by jobs/campaignScheduler.js.
+// // Finds SCHEDULED campaigns whose time has arrived and sends them
+// // using the SAME sendToRecipients() loop used by the Send button.
+// // No req/res needed - it runs in the background.
+
+// const markScheduledCampaignFailed = async (campaign, reason) => {
+//   await prisma.campaign.update({
+//     where: { id: campaign.id },
+//     data: { status: "FAILED", completedAt: new Date() },
+//   });
+
+//   notifyAdmins({
+//     companyId: campaign.companyId,
+//     title: "Scheduled Campaign Failed",
+//     message: `${campaign.name} could not be sent: ${reason}`,
+//     type: "CAMPAIGN",
+//   }).catch(console.error);
+// };
+
+// exports.processScheduledCampaigns = async () => {
+//   const dueCampaigns = await prisma.campaign.findMany({
+//     where: {
+//       status: "SCHEDULED",
+//       scheduledAt: { lte: new Date() },
+//     },
+//     select: { id: true },
+//     orderBy: { scheduledAt: "asc" },
+//     take: 20,
+//   });
+
+//   for (const due of dueCampaigns) {
+//     // CLAIM the campaign. Only one run can change SCHEDULED -> SENDING,
+//     // so it can never be sent twice (even with two server instances).
+//     const claimed = await prisma.campaign.updateMany({
+//       where: { id: due.id, status: "SCHEDULED" },
+//       data: { status: "SENDING", startedAt: new Date() },
+//     });
+
+//     if (claimed.count === 0) continue;
+
+//     let campaign = null;
+
+//     try {
+//       campaign = await prisma.campaign.findUnique({
+//         where: { id: due.id },
+//         include: {
+//           template: true,
+//           recipients: { include: { customer: true } },
+//         },
+//       });
+
+//       if (!campaign) continue;
+
+//       if (!campaign.template || campaign.template.status !== "APPROVED") {
+//         await markScheduledCampaignFailed(
+//           campaign,
+//           "template is missing or not approved."
+//         );
+//         continue;
+//       }
+
+//       if (!campaign.recipients || campaign.recipients.length === 0) {
+//         await markScheduledCampaignFailed(campaign, "no customers selected.");
+//         continue;
+//       }
+
+//       const whatsappAccount = await prisma.whatsAppAccount.findFirst({
+//         where: { companyId: campaign.companyId, status: "CONNECTED" },
+//       });
+
+//       if (!whatsappAccount) {
+//         await markScheduledCampaignFailed(
+//           campaign,
+//           "no connected WhatsApp account."
+//         );
+//         continue;
+//       }
+
+//       const { sentCount, failedCount } = await sendToRecipients(
+//         campaign,
+//         campaign.recipients,
+//         whatsappAccount,
+//         campaign.companyId
+//       );
+
+//       await prisma.campaign.update({
+//         where: { id: campaign.id },
+//         data: {
+//           status: sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED",
+//           completedAt: new Date(),
+//           sentCount,
+//           failedCount,
+//           deliveredCount: 0,
+//           readCount: 0,
+//           totalRecipients: campaign.recipients.length,
+//           audienceCount: campaign.recipients.length,
+//         },
+//       });
+
+//       notifyAdmins({
+//         companyId: campaign.companyId,
+//         title: "Scheduled Campaign Sent",
+//         message: `${campaign.name}: ${sentCount} sent, ${failedCount} failed.`,
+//         type: "CAMPAIGN",
+//       }).catch(console.error);
+//     } catch (error) {
+//       console.error(`Scheduled campaign ${due.id} failed:`, error);
+
+//       await prisma.campaign
+//         .update({
+//           where: { id: due.id },
+//           data: { status: "FAILED", completedAt: new Date() },
+//         })
+//         .catch(console.error);
+//     }
+//   }
+// };
+ 
 
 
 
@@ -1206,6 +1327,8 @@ const {
 } = require("../helpers/saasConversationHelper");
 
 const { logAction } = require("../services/auditLogService");
+// 👈 NEW: extra parameters needed to send a template with a copy-code button
+const { buildButtonSendComponents } = require("../utils/templateButtons");
 
 // =====================================================
 // build the text that was ACTUALLY sent, for local display
@@ -1295,6 +1418,11 @@ const sendToRecipients = async (
 
       const templateParams = allPossibleParams.slice(0, variableCount);
 
+      // 👈 NEW: empty unless the template has a copy-code button
+      const buttonComponents = buildButtonSendComponents(
+        campaign.template.buttons
+      );
+
       if (campaign.imageUrl) {
         result = await sendCampaignImageTemplate(
           customer.phone,
@@ -1302,7 +1430,8 @@ const sendToRecipients = async (
           campaign.imageUrl,
           templateParams,
           campaign.template.language || "en_US",
-          whatsappAccount
+          whatsappAccount,
+          buttonComponents // 👈 NEW
         );
       } else {
         result = await sendTemplateMessage(
@@ -1310,7 +1439,8 @@ const sendToRecipients = async (
           campaign.template.name,
           templateParams,
           whatsappAccount,
-          campaign.template.language || "en_US"
+          campaign.template.language || "en_US",
+          buttonComponents // 👈 NEW
         );
       }
 

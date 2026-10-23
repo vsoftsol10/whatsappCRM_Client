@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { X, Loader2, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
+// 👈 NEW: buttons (call / website / quick reply / copy code)
+import TemplateButtonsEditor, {
+  validateTemplateButtons,
+} from "./TemplateButtonsEditor";
 
 import useTemplateStore from "../../store/templateStore";
 
@@ -24,10 +28,10 @@ export default function EditTemplateModal({
     headerType: "NONE",
     headerContent: "",
     content: "",
-    footerContent: "",
-  });
-
-  const [errors, setErrors] = useState({});
+ footerContent: "",
+ buttons: [], // 👈 NEW
+ });
+ const [errors, setErrors] = useState({});
   const [updating, setUpdating] = useState(false);
 
   // ==================================================
@@ -46,7 +50,8 @@ export default function EditTemplateModal({
         headerContent: template.headerContent || "",
         content: template.content || "",
         footerContent: template.footerContent || "",
-      });
+ buttons: Array.isArray(template.buttons) ? template.buttons : [], // 👈 NEW
+ });
 
       setErrors({});
     }
@@ -156,6 +161,17 @@ export default function EditTemplateModal({
       return;
     }
 
+    // 👈 NEW: check the buttons before saving
+    const buttonError = validateTemplateButtons(
+      formData.buttons,
+      formData.category
+    );
+
+    if (buttonError) {
+      toast.error(buttonError);
+      return;
+    }
+
     try {
       setUpdating(true);
 
@@ -191,7 +207,8 @@ export default function EditTemplateModal({
             : null,
         content: formData.content.trim(),
         footerContent: formData.footerContent.trim() || null,
-      });
+ buttons: formData.buttons, // 👈 NEW
+ });
 
       toast.success("Template updated successfully!");
 
@@ -660,6 +677,18 @@ Thank you for shopping with us.`}
                 disabled={updating || !isEditable}
                 placeholder="Example: Thank you for choosing us."
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] disabled:cursor-not-allowed disabled:bg-gray-100"
+              />
+            </div>
+
+            {/* BUTTONS — NEW */}
+            <div className="border-t pt-5">
+              <TemplateButtonsEditor
+                value={formData.buttons}
+                onChange={(buttons) =>
+                  setFormData((prev) => ({ ...prev, buttons }))
+                }
+                category={formData.category}
+                disabled={updating || !isEditable}
               />
             </div>
 

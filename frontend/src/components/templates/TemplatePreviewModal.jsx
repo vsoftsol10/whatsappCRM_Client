@@ -1,4 +1,6 @@
 import { X, FileText } from "lucide-react";
+// 👈 NEW
+import { TemplateButtonsPreview } from "./TemplateButtonsEditor";
 
 export default function TemplatePreviewModal({
   isOpen,
@@ -106,8 +108,11 @@ export default function TemplatePreviewModal({
 
             <div className="min-h-[180px] whitespace-pre-wrap break-words rounded-xl bg-[#DCF8C6] p-5 text-gray-700">
               {template.content}
-            </div>
-          </div>
+ </div>
+
+ {/* 👈 NEW: buttons */}
+ <TemplateButtonsPreview buttons={template.buttons} />
+ </div>
 
           <div className="border-t pt-4 text-sm text-gray-500">
             Created :

@@ -930,6 +930,11 @@ model Template {
   // e.g. ["Rahul", "ORD1234"] for {{1}} and {{2}}.
   bodyExamples Json?
 
+  // 👈 NEW: buttons shown under the message (call / website / quick reply /
+  // copy code). Stored as a JSON array, e.g.
+  // [{ "type": "URL", "text": "Pay Now", "url": "https://..." }]
+  buttons Json?
+
   status TemplateStatus @default(DRAFT)
 
   purpose  TemplatePurpose @default(CUSTOM)
