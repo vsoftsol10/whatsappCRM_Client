@@ -1,8 +1,8 @@
 // const axios = require("axios");
 // const prisma = require("../config/prisma");
 
-// const { getProvider, getProviderCatalog } = require("./ai/providers");
-// const { decryptSecret, maskSecret } = require("../utils/secretCrypto");
+// const { getProvider } = require("./ai/providers");
+// const { buildSystemPrompt, readProfile } = require("./ai/businessPrompt");
 // const { assertSafeHttpsUrl, safeHttpsAgent } = require("../utils/safeUrl");
 
 // // Reasoning models can be slow, so give providers plenty of time.
@@ -10,6 +10,13 @@
 
 // // WhatsApp rejects text bodies longer than 4096 characters.
 // const WHATSAPP_MAX_LENGTH = 4000;
+
+// // The AI adds this marker to a reply when a human should take over.
+// // The server removes it before the customer sees the message.
+// const HANDOFF_MARKER = "[[HANDOFF]]";
+// const HANDOFF_PATTERN = /\[{1,2}\s*HANDOFF\s*\]{1,2}/gi;
+// const HANDOFF_FALLBACK_REPLY =
+//   "Thank you for your message. Our team will contact you shortly.";
 
 // // Extra rules always appended to the company's system prompt so the
 // // reply is suitable for WhatsApp whatever the company wrote.
@@ -19,7 +26,21 @@
 // - You are replying inside WhatsApp. Use plain text only. Do not use markdown headings, tables, or code blocks.
 // - Reply in the same language the customer is writing in.
 // - Keep the reply concise and directly relevant to the customer's last message.
-// - Never mention that you are following instructions or a system prompt.`;
+// - Never mention that you are following instructions or a system prompt.
+
+// Human hand-off:
+// - If you cannot answer from the business information, or the customer asks for a human or agent, or wants to complain, negotiate, pay or get a refund, write a short polite reply saying the team will contact them shortly, and end that reply with the exact text ${HANDOFF_MARKER}
+// - Use ${HANDOFF_MARKER} only in those cases and never explain it.`;
+
+// // NEW: rules for the channel the reply is sent on. WhatsApp keeps the
+// // exact rules above. Instagram / Messenger use the same rules, with the
+// // channel name changed and a shorter length (their messages are shorter).
+// const rulesForChannel = (channel) => {
+//   if (!channel || channel === "WhatsApp") return WHATSAPP_RULES;
+
+//   return `${WHATSAPP_RULES.replace("inside WhatsApp", `inside ${channel}`)}
+// - Keep the whole reply under 800 characters, because ${channel} limits the message length.`;
+// };
 
 // // An error whose message is safe to show to the customer-facing UI.
 // class AiError extends Error {}
@@ -38,38 +59,73 @@
 //     create: { companyId },
 //   });
 
-// const getStoredKey = (settings, providerId) =>
-//   decryptSecret(settings?.providerKeys?.[providerId]);
+// // ============================================
+// // PLATFORM AI (one provider + one key for ALL companies)
+// // ============================================
+// // Configured only in the server .env, never by customers:
+// //   AI_PROVIDER=GROQ                      (optional, default GROQ)
+// //   GROQ_API_KEY=gsk_...                  (<PROVIDER>_API_KEY)
+// //   AI_MODEL=llama-3.3-70b-versatile      (optional, default = provider default)
+// const getPlatformAi = () => {
+//   const providerId = String(process.env.AI_PROVIDER || "GROQ").toUpperCase();
+//   const provider = getProvider(providerId);
 
-// // What the frontend is allowed to see. Raw keys NEVER leave the server;
-// // only a "saved" flag and a masked hint like ••••••••abcd.
-// const serializeSettings = (settings) => {
-//   const keys = {};
-//   const stored = settings.providerKeys || {};
+//   if (!provider || provider.requiresBaseUrl) {
+//     return { available: false, error: "AI_PROVIDER in the server .env is not valid" };
+//   }
 
-//   for (const providerId of Object.keys(stored)) {
-//     const plain = decryptSecret(stored[providerId]);
+//   const apiKey = String(process.env[`${provider.id}_API_KEY`] || "").trim();
 
-//     keys[providerId] = {
-//       saved: Boolean(plain),
-//       // saved but unreadable (e.g. server secret changed) -> ask to re-enter
-//       needsReentry: !plain,
-//       hint: plain ? maskSecret(plain) : "",
-//     };
+//   if (!apiKey) {
+//     return { available: false, error: `${provider.id}_API_KEY is missing in the server .env` };
 //   }
 
 //   return {
-//     isEnabled: settings.isEnabled,
-//     provider: settings.provider,
-//     model: settings.model,
-//     baseUrl: settings.baseUrl || "",
-//     systemPrompt: settings.systemPrompt,
-//     historyLimit: settings.historyLimit,
-//     lastError: settings.lastError,
-//     lastErrorAt: settings.lastErrorAt,
-//     updatedAt: settings.updatedAt,
-//     keys,
+//     available: true,
+//     provider,
+//     providerId: provider.id,
+//     model: String(process.env.AI_MODEL || "").trim() || provider.defaultModel,
+//     apiKey,
 //   };
+// };
+
+// // What the frontend is allowed to see. Provider, model and key are
+// // platform details and are never sent to customers.
+// const serializeSettings = (settings) => ({
+//   isEnabled: settings.isEnabled,
+//   businessProfile: readProfile(settings.businessProfile),
+//   systemPrompt: settings.systemPrompt,
+//   historyLimit: settings.historyLimit,
+//   leadCaptureEnabled: Boolean(settings.leadCaptureEnabled),
+//   leadAssigneeId: settings.leadAssigneeId || null,
+//   lastError: settings.lastError,
+//   lastErrorAt: settings.lastErrorAt,
+//   updatedAt: settings.updatedAt,
+//   aiAvailable: getPlatformAi().available,
+// });
+
+// // ============================================
+// // SYSTEM PROMPT FOR A COMPANY
+// // ============================================
+// // Built from the company's business profile + its extra instructions.
+// // Overrides let the settings page test values that are not saved yet.
+// const composeSystemPrompt = async (companyId, settings, overrides = {}) => {
+//   const company = await prisma.company.findUnique({
+//     where: { id: companyId },
+//     select: { companyName: true },
+//   });
+
+//   return buildSystemPrompt({
+//     companyName: company?.companyName,
+//     profile:
+//       overrides.businessProfile !== undefined
+//         ? overrides.businessProfile
+//         : settings.businessProfile,
+//     extraInstructions:
+//       overrides.systemPrompt !== undefined
+//         ? overrides.systemPrompt
+//         : settings.systemPrompt,
+//   });
 // };
 
 // // ============================================
@@ -135,13 +191,13 @@
 //   if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
 //     message = "The AI provider took too long to respond. Please try again.";
 //   } else if (!error.response && (error.code === "ENOTFOUND" || error.code === "ECONNREFUSED" || error.code === "EAI_AGAIN")) {
-//     message = "Could not reach the AI provider. Check the Base URL / network.";
+//     message = "Could not reach the AI service. Please try again shortly.";
 //   } else if (status === 401 || status === 403) {
-//     message = `The API key was rejected or does not have access${detail ? ` — ${detail}` : "."}`;
+//     message = "The AI service is temporarily unavailable.";
 //   } else if (status === 404) {
-//     message = `Model or endpoint not found. Check the model name${detail ? ` — ${detail}` : "."}`;
+//     message = "The AI service is temporarily unavailable.";
 //   } else if (status === 429) {
-//     message = `Rate limit or quota exceeded on the AI account${detail ? ` — ${detail}` : "."}`;
+//     message = "The AI service is busy right now. Please try again shortly.";
 //   } else if (status === 400) {
 //     message = `The provider rejected the request${detail ? ` — ${detail}` : "."}`;
 //   } else if (status) {
@@ -153,7 +209,31 @@
 //   // Never echo the secret back, even if a provider includes it.
 //   if (apiKey) message = message.split(apiKey).join("***");
 
+//   // Customers only see the short message; the platform owner needs the
+//   // real provider detail (wrong key, quota, bad model) in the server log.
+//   if (status || detail) {
+//     let logged = `AI provider error ${status || ""} ${detail}`.trim();
+//     if (apiKey) logged = logged.split(apiKey).join("***");
+//     console.error(logged);
+//   }
+
 //   return message;
+// };
+
+// // ============================================
+// // HAND-OFF MARKER
+// // ============================================
+// // Returns { reply, handoff }: the reply without the marker, and whether
+// // the AI asked for a human to take over.
+// const splitHandoff = (text) => {
+//   const raw = String(text || "");
+//   const handoff = new RegExp(HANDOFF_PATTERN.source, "i").test(raw);
+
+//   if (!handoff) return { reply: raw.trim(), handoff: false };
+
+//   const reply = raw.replace(HANDOFF_PATTERN, "").trim();
+
+//   return { reply: reply || HANDOFF_FALLBACK_REPLY, handoff: true };
 // };
 
 // // ============================================
@@ -193,6 +273,8 @@
 //   baseUrl,
 //   systemPrompt,
 //   messages,
+//   rawSystem = false,
+//   channel, // NEW (optional): "Instagram" | "Messenger"; empty = WhatsApp
 // }) => {
 //   const provider = getProvider(providerId);
 
@@ -201,7 +283,8 @@
 //   if (!model) throw new AiError("Model name is required");
 
 //   const { url, httpsAgent } = await resolveTarget(provider, baseUrl);
-//   const system = `${systemPrompt}${WHATSAPP_RULES}`;
+//   // rawSystem = background jobs (e.g. lead capture) that are not WhatsApp replies
+//   const system = rawSystem ? systemPrompt : `${systemPrompt}${rulesForChannel(channel)}`;
 
 //   let text;
 
@@ -275,9 +358,11 @@
 // // ============================================
 // // AUTO-REPLY FOR A CONVERSATION
 // // ============================================
-// // Returns { success: true, reply } or { success: false, error }.
-// // Uses the settings + key of the company that owns the conversation.
-// const getAutoReply = async (conversationId) => {
+// // Returns { success: true, reply, handoff } or { success: false, error }.
+// // handoff = true when the AI wants a human to take over this chat.
+// // Uses the company's own settings (on/off, prompt, history) but the
+// // platform's AI provider, model and key.
+// const getAutoReply = async (conversationId, options = {}) => {
 //   let companyId = null;
 //   let apiKey = null;
 
@@ -299,13 +384,16 @@
 //       return { success: false, error: "AI auto-reply is disabled for this company" };
 //     }
 
-//     apiKey = getStoredKey(settings, settings.provider);
+//     const platform = getPlatformAi();
 
-//     if (!apiKey) {
-//       const message = `No API key saved for ${settings.provider}`;
+//     if (!platform.available) {
+//       console.error("AI auto-reply unavailable:", platform.error);
+//       const message = "The AI service is temporarily unavailable.";
 //       await recordFailure(companyId, message);
 //       return { success: false, error: message };
 //     }
+
+//     apiKey = platform.apiKey;
 
 //     const recentMessages = await prisma.message.findMany({
 //       where: { conversationId },
@@ -324,18 +412,22 @@
 //       return { success: false, error: "Latest message is not from the customer" };
 //     }
 
-//     const reply = await callProvider({
-//       providerId: settings.provider,
-//       model: settings.model,
+//     const systemPrompt = await composeSystemPrompt(companyId, settings);
+
+//     const raw = await callProvider({
+//       providerId: platform.providerId,
+//       model: platform.model,
 //       apiKey,
-//       baseUrl: settings.baseUrl,
-//       systemPrompt: settings.systemPrompt,
+//       systemPrompt,
 //       messages: history,
+//       channel: options.channel, // NEW: undefined for WhatsApp = unchanged
 //     });
+
+//     const { reply, handoff } = splitHandoff(raw);
 
 //     if (settings.lastError) await clearFailure(companyId);
 
-//     return { success: true, reply };
+//     return { success: true, reply, handoff };
 //   } catch (error) {
 //     const message = friendlyError(error, apiKey);
 
@@ -348,69 +440,77 @@
 // };
 
 // // ============================================
-// // TEST CONNECTION (from the settings page)
+// // TEST (from the settings page)
 // // ============================================
-// // Works with unsaved form values: `overrides` may carry provider,
-// // model, baseUrl, apiKey and systemPrompt exactly as typed. A blank
-// // apiKey falls back to the key already saved for that provider.
+// // Works with the unsaved values typed on the page: `overrides` may carry
+// // businessProfile, systemPrompt and message. Always runs on the platform AI.
 // const testAutoReply = async (companyId, overrides = {}) => {
-//   let apiKey = null;
+//   const platform = getPlatformAi();
 
 //   try {
 //     const settings = await getOrCreateSettings(companyId);
 
-//     const providerId = String(overrides.provider || settings.provider).toUpperCase();
-//     const provider = getProvider(providerId);
-
-//     if (!provider) return { success: false, error: "Unknown AI provider" };
-
-//     const model = (overrides.model || "").trim() || settings.model;
-//     const baseUrl = overrides.baseUrl ?? settings.baseUrl;
-//     const systemPrompt = (overrides.systemPrompt || "").trim() || settings.systemPrompt;
-
-//     apiKey =
-//       (typeof overrides.apiKey === "string" && overrides.apiKey.trim()) ||
-//       getStoredKey(settings, providerId);
-
-//     if (!apiKey) {
-//       return { success: false, error: `Add an API key for ${provider.name} first` };
+//     if (!platform.available) {
+//       console.error("AI test unavailable:", platform.error);
+//       return { success: false, error: "The AI service is temporarily unavailable." };
 //     }
 
-//     const sample =
-//       (overrides.message || "").trim() || "Hi, I need some help.";
+//     const systemPrompt = await composeSystemPrompt(companyId, settings, {
+//       businessProfile: overrides.businessProfile,
+//       systemPrompt: overrides.systemPrompt,
+//     });
+//     const sample = (overrides.message || "").trim() || "Hi, I need some help.";
 
 //     const startedAt = Date.now();
 
-//     const reply = await callProvider({
-//       providerId,
-//       model,
-//       apiKey,
-//       baseUrl,
+//     const raw = await callProvider({
+//       providerId: platform.providerId,
+//       model: platform.model,
+//       apiKey: platform.apiKey,
 //       systemPrompt,
 //       messages: [{ role: "user", content: sample }],
 //     });
 
-//     return {
-//       success: true,
-//       reply,
-//       latencyMs: Date.now() - startedAt,
-//       provider: provider.name,
-//       model,
-//     };
+//     const { reply, handoff } = splitHandoff(raw);
+
+//     return { success: true, reply, handoff, latencyMs: Date.now() - startedAt };
 //   } catch (error) {
-//     return { success: false, error: friendlyError(error, apiKey) };
+//     return { success: false, error: friendlyError(error, platform.apiKey) };
 //   }
 // };
 
+// // ============================================
+// // ONE-OFF COMPLETION (background jobs)
+// // ============================================
+// // For jobs that are not a WhatsApp reply, e.g. lead capture. Uses the same
+// // platform AI, but WITHOUT the WhatsApp reply rules or the hand-off marker.
+// // Throws on failure; the caller decides what to do.
+// const completeOnce = async ({ systemPrompt, messages }) => {
+//   const platform = getPlatformAi();
+
+//   if (!platform.available) throw new AiError(platform.error);
+
+//   return callProvider({
+//     providerId: platform.providerId,
+//     model: platform.model,
+//     apiKey: platform.apiKey,
+//     systemPrompt,
+//     messages,
+//     rawSystem: true,
+//   });
+// };
+
 // module.exports = {
-//   getProviderCatalog,
+//   getPlatformAi,
 //   findSettings,
 //   getOrCreateSettings,
-//   getStoredKey,
 //   serializeSettings,
 //   getAutoReply,
 //   testAutoReply,
+//   splitHandoff,
+//   completeOnce,
 // };
+
 
 
 
@@ -682,6 +782,38 @@ const cleanReplyText = (text) =>
     .trim()
     .slice(0, WHATSAPP_MAX_LENGTH);
 
+// ============================================
+// AI USAGE TRACKING (per company, for super admin)
+// ============================================
+// Writes one AiUsageLog row per successful AI call. Only counts are stored,
+// never the message text. Fire-and-forget: a logging problem must never
+// stop or delay a customer reply.
+const logUsage = ({ companyId, type, channel, providerId, model, usage }) => {
+  try {
+    if (!companyId || !prisma.aiUsageLog) return;
+
+    const inputTokens = Math.max(0, Number(usage?.inputTokens) || 0);
+    const outputTokens = Math.max(0, Number(usage?.outputTokens) || 0);
+
+    prisma.aiUsageLog
+      .create({
+        data: {
+          companyId,
+          type: type || "OTHER",
+          channel: channel || "WhatsApp",
+          provider: String(providerId || ""),
+          model: String(model || ""),
+          inputTokens,
+          outputTokens,
+          totalTokens: Number(usage?.totalTokens) || inputTokens + outputTokens,
+        },
+      })
+      .catch((error) => console.error("AI usage log failed:", error.message));
+  } catch (error) {
+    console.error("AI usage log failed:", error.message);
+  }
+};
+
 // Sends the conversation to the chosen provider and returns reply text.
 // Throws on failure (callers turn it into a friendly message).
 const callProvider = async ({
@@ -693,6 +825,8 @@ const callProvider = async ({
   messages,
   rawSystem = false,
   channel, // NEW (optional): "Instagram" | "Messenger"; empty = WhatsApp
+  companyId, // for usage tracking
+  usageType, // WHATSAPP_REPLY | SOCIAL_REPLY | LEAD_CAPTURE | TEST
 }) => {
   const provider = getProvider(providerId);
 
@@ -705,6 +839,7 @@ const callProvider = async ({
   const system = rawSystem ? systemPrompt : `${systemPrompt}${rulesForChannel(channel)}`;
 
   let text;
+  let usage = null;
 
   if (provider.type === "anthropic") {
     const response = await axios.post(
@@ -725,6 +860,11 @@ const callProvider = async ({
       .filter((block) => block.type === "text")
       .map((block) => block.text)
       .join("\n");
+
+    usage = {
+      inputTokens: response.data?.usage?.input_tokens,
+      outputTokens: response.data?.usage?.output_tokens,
+    };
   } else {
     const response = await axios.post(
       url,
@@ -745,7 +885,16 @@ const callProvider = async ({
     text = Array.isArray(content)
       ? content.map((part) => part.text || "").join("\n")
       : content;
+
+    usage = {
+      inputTokens: response.data?.usage?.prompt_tokens,
+      outputTokens: response.data?.usage?.completion_tokens,
+      totalTokens: response.data?.usage?.total_tokens,
+    };
   }
+
+  // Tokens were spent even if the reply turns out empty, so log first.
+  logUsage({ companyId, type: usageType, channel, providerId, model, usage });
 
   const reply = cleanReplyText(text);
 
@@ -839,6 +988,8 @@ const getAutoReply = async (conversationId, options = {}) => {
       systemPrompt,
       messages: history,
       channel: options.channel, // NEW: undefined for WhatsApp = unchanged
+      companyId,
+      usageType: options.channel ? "SOCIAL_REPLY" : "WHATSAPP_REPLY",
     });
 
     const { reply, handoff } = splitHandoff(raw);
@@ -887,6 +1038,8 @@ const testAutoReply = async (companyId, overrides = {}) => {
       apiKey: platform.apiKey,
       systemPrompt,
       messages: [{ role: "user", content: sample }],
+      companyId,
+      usageType: "TEST",
     });
 
     const { reply, handoff } = splitHandoff(raw);
@@ -903,7 +1056,7 @@ const testAutoReply = async (companyId, overrides = {}) => {
 // For jobs that are not a WhatsApp reply, e.g. lead capture. Uses the same
 // platform AI, but WITHOUT the WhatsApp reply rules or the hand-off marker.
 // Throws on failure; the caller decides what to do.
-const completeOnce = async ({ systemPrompt, messages }) => {
+const completeOnce = async ({ systemPrompt, messages, companyId, channel }) => {
   const platform = getPlatformAi();
 
   if (!platform.available) throw new AiError(platform.error);
@@ -915,6 +1068,9 @@ const completeOnce = async ({ systemPrompt, messages }) => {
     systemPrompt,
     messages,
     rawSystem: true,
+    companyId,
+    channel,
+    usageType: "LEAD_CAPTURE",
   });
 };
 

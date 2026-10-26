@@ -11,6 +11,9 @@
 
 // const REQUEST_TIMEOUT_MS = 15000;
 
+// // Meta has to download the file before it answers, so attachments get longer.
+// const ATTACHMENT_TIMEOUT_MS = 45000;
+
 // // Page webhook fields every connected Page is subscribed to.
 // //   messages        -> people messaging the Page
 // //   message_echoes  -> messages sent from the Page itself
@@ -282,6 +285,67 @@
 //   }
 // };
 
+// // ---------------------------------------------------------------
+// // ATTACHMENTS (image / video / audio / file)
+// // Meta downloads the file from a PUBLIC https url, so the caller must pass
+// // a stored url (we use the Cloudinary link). Captions cannot ride along with
+// // an attachment on Messenger / Instagram - send them as a separate text.
+// // Returns { success: true, data } or { success: false, error: {...} }
+// // ---------------------------------------------------------------
+// const ATTACHMENT_TYPES = ["image", "video", "audio", "file"];
+
+// const buildAttachmentMessage = (type, url) => ({
+//   attachment: { type, payload: { url, is_reusable: false } },
+// });
+
+// const sendMessengerAttachment = async (pageToken, psid, type, url) => {
+//   if (!ATTACHMENT_TYPES.includes(type) || !url) {
+//     return { success: false, error: { message: "Invalid attachment" } };
+//   }
+
+//   try {
+//     const res = await axios.post(
+//       `${GRAPH}/me/messages`,
+//       {
+//         recipient: { id: psid },
+//         messaging_type: "RESPONSE",
+//         message: buildAttachmentMessage(type, url),
+//       },
+//       {
+//         params: { access_token: pageToken },
+//         timeout: ATTACHMENT_TIMEOUT_MS,
+//       }
+//     );
+//     return { success: true, data: res.data }; // { recipient_id, message_id }
+//   } catch (err) {
+//     return { success: false, error: extractError(err) };
+//   }
+// };
+
+// // Instagram through the linked Page:  POST /{page-id}/messages
+// const sendInstagramAttachment = async (pageToken, pageId, igsid, type, url) => {
+//   if (!ATTACHMENT_TYPES.includes(type) || !url) {
+//     return { success: false, error: { message: "Invalid attachment" } };
+//   }
+
+//   try {
+//     const res = await axios.post(
+//       `${GRAPH}/${pageId}/messages`,
+//       {
+//         recipient: { id: igsid },
+//         message: buildAttachmentMessage(type, url),
+//       },
+//       {
+//         params: { access_token: pageToken },
+//         timeout: ATTACHMENT_TIMEOUT_MS,
+//       }
+//     );
+//     return { success: true, data: res.data };
+//   } catch (err) {
+//     return { success: false, error: extractError(err) };
+//   }
+// };
+
 // // Name / username of the person on Instagram (best effort).
 // const getInstagramUserProfile = async (pageToken, igsid) => {
 //   try {
@@ -317,16 +381,21 @@
 //   subscribePageToApp,
 //   unsubscribePageFromApp,
 //   sendMessengerText,
+//   sendMessengerAttachment,
+//   sendInstagramAttachment,
 //   getUserProfile,
 // };
-
-
+ 
 
 
 // ============================================================
 // FACEBOOK / MESSENGER SERVICE
 // Thin wrapper around the Meta Graph API for Facebook Pages.
 // Nothing here touches the database - it only talks to Meta.
+//
+// DIAGNOSTIC VERSION: all original logic is unchanged. Only logging was
+// added (search for "DIAGNOSTIC") to find out why the Instagram account is
+// not returned when connecting through the Facebook button.
 // ============================================================
 const axios = require("axios");
 
@@ -441,6 +510,71 @@ const extendUserToken = async (userToken) => {
   }
 };
 
+// ---------------------------------------------------------------
+// DIAGNOSTIC (log only - never changes behaviour, never throws)
+// Prints which permissions the token really has, and for which assets
+// (Pages / Instagram accounts) they were granted. This shows whether the
+// Instagram account was shared in the Facebook login dialog.
+// ---------------------------------------------------------------
+const logTokenDiagnostics = async (userToken) => {
+  try {
+    // 1) Permissions granted / declined
+    const permRes = await axios.get(`${GRAPH}/me/permissions`, {
+      params: { access_token: userToken },
+      timeout: REQUEST_TIMEOUT_MS,
+    });
+    const perms = permRes.data?.data || [];
+    const granted = perms.filter((p) => p.status === "granted").map((p) => p.permission);
+    const declined = perms.filter((p) => p.status !== "granted").map((p) => p.permission);
+    console.log("[FB DIAG] granted permissions:", granted.join(", ") || "(none)");
+    if (declined.length) {
+      console.log("[FB DIAG] declined/expired permissions:", declined.join(", "));
+    }
+
+    const needed = [
+      "pages_show_list",
+      "pages_messaging",
+      "pages_manage_metadata",
+      "pages_read_engagement",
+      "instagram_basic",
+      "instagram_manage_messages",
+    ];
+    const missing = needed.filter((n) => !granted.includes(n));
+    if (missing.length) {
+      console.log(
+        "[FB DIAG] MISSING permissions (add them to the Facebook Login for Business Configuration):",
+        missing.join(", ")
+      );
+    }
+
+    // 2) Which assets each permission was granted for (granular scopes)
+    if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+      const dbg = await axios.get(`${GRAPH}/debug_token`, {
+        params: {
+          input_token: userToken,
+          access_token: `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      const granular = dbg.data?.data?.granular_scopes || [];
+      for (const g of granular) {
+        if (
+          g.scope === "instagram_basic" ||
+          g.scope === "instagram_manage_messages" ||
+          g.scope === "pages_show_list"
+        ) {
+          console.log(
+            `[FB DIAG] ${g.scope} granted for asset ids:`,
+            (g.target_ids || []).join(", ") || "(all / none listed)"
+          );
+        }
+      }
+    }
+  } catch (err) {
+    console.log("[FB DIAG] could not read token diagnostics:", extractError(err).message);
+  }
+};
+
 // All Pages the person granted access to, each with its own Page token.
 const getManagedPages = async (userToken) => {
   const pages = [];
@@ -460,6 +594,13 @@ const getManagedPages = async (userToken) => {
     url = res.data?.paging?.next || null;
     params = undefined; // `next` already contains every query param
   }
+
+  // DIAGNOSTIC: log only
+  console.log(
+    "[FB DIAG] pages returned by Meta:",
+    pages.map((p) => `${p.name} (${p.id})`).join(" | ") || "(none)"
+  );
+  await logTokenDiagnostics(userToken);
 
   return pages;
 };
@@ -563,14 +704,43 @@ const getLinkedInstagramAccount = async (pageId, pageToken) => {
       timeout: REQUEST_TIMEOUT_MS,
     });
 
+    // DIAGNOSTIC: log exactly what Meta returned for this Page
+    console.log("[IG lookup]", pageId, JSON.stringify(res.data));
+
     const ig = res.data?.instagram_business_account;
-    if (!ig?.id) return { account: null, error: null };
+    if (!ig?.id) {
+      // DIAGNOSTIC: second look, log only (result is NOT used)
+      try {
+        const alt = await axios.get(`${GRAPH}/${pageId}`, {
+          params: {
+            fields: "connected_instagram_account{id,username}",
+            access_token: pageToken,
+          },
+          timeout: REQUEST_TIMEOUT_MS,
+        });
+        console.log("[IG lookup][connected_instagram_account]", pageId, JSON.stringify(alt.data));
+      } catch (altErr) {
+        console.log(
+          "[IG lookup][connected_instagram_account] failed:",
+          extractError(altErr).message
+        );
+      }
+      console.log(
+        "[IG lookup] No instagram_business_account returned. Most likely: " +
+          "(1) Instagram account was not selected in the Facebook login dialog, " +
+          "(2) instagram_basic / instagram_manage_messages missing in the Configuration, " +
+          "(3) Instagram is not Professional or not linked to this Page."
+      );
+      return { account: null, error: null };
+    }
 
     return {
       account: { id: String(ig.id), username: ig.username || null },
       error: null,
     };
   } catch (err) {
+    // DIAGNOSTIC: log only
+    console.log("[IG lookup] ERROR for page", pageId, JSON.stringify(extractError(err)));
     return { account: null, error: extractError(err) };
   }
 };
@@ -709,4 +879,3 @@ module.exports = {
   sendInstagramAttachment,
   getUserProfile,
 };
- 

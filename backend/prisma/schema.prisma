@@ -54,6 +54,7 @@ model Company {
 
   // Facebook Pages connected for Messenger
   facebookPages FacebookPage[]
+  aiUsageLogs AiUsageLog[]
 
   // SaaS
   subscriptions   Subscription[]
@@ -1836,4 +1837,25 @@ model FacebookPage {
 
   @@index([companyId])
   @@index([status])
+}
+model AiUsageLog {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type    String
+  channel String @default("WhatsApp")
+
+  provider String @default("")
+  model    String @default("")
+
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  totalTokens  Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([createdAt])
 }
