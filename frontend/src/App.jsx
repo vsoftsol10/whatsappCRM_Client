@@ -5,6 +5,7 @@
 // import { useAuthStore } from "./store/authStore";
 
 // import AppLayout from "./layouts/AppLayout";
+// import SettingsLayout from "./layouts/SettingsLayout";
 // import SaasSupportPage from "./pages/settings/SaasSupportPage";
 // import Integrations from "./pages/settings/Integrations";
 // import Login from "./pages/Login";
@@ -105,18 +106,35 @@
 
 //             {/* =================================================
 //                 SETTINGS
+//                 One sidebar link -> one page with tabs (SettingsLayout)
 //             ================================================== */}
-//             <Route path="/settings" element={<Navigate to="/settings/profile" replace />} />
-
-//             <Route path="/settings/integrations" element={<Integrations />} />
+//             <Route path="/settings" element={<Navigate to="/settings/security" replace />} />
 
 //             <Route path="/settings/profile" element={<ProfileSettings />} />
-
-//             <Route path="/settings/security" element={<SecuritySettings />} />
 
 //             <Route path="/settings/plans" element={<Plans />} />
 
 //             <Route path="/change-password" element={<ChangePassword />} />
+
+//             {/* old URL kept so existing bookmarks still work */}
+//             <Route path="/backup" element={<Navigate to="/settings/backup" replace />} />
+
+//             <Route element={<SettingsLayout />}>
+//               <Route path="/settings/security" element={<SecuritySettings />} />
+
+//               <Route path="/settings/integrations" element={<Integrations />} />
+
+//               {/* ADMIN-only tabs */}
+//               <Route element={<AdminRoute />}>
+//                 <Route path="/settings/backup" element={<Backup />} />
+
+//                 <Route path="/settings/support" element={<SaasSupportPage />} />
+
+//                 <Route path="/settings/audit-logs" element={<AuditLogs />} />
+
+//                 <Route path="/settings/ai-auto-reply" element={<AiAutoReply />} />
+//               </Route>
+//             </Route>
 
 //             {/* =================================================
 //                 ADMIN ROUTES
@@ -127,13 +145,6 @@
 //               <Route path="/employees/edit/:id" element={<EditEmployee />} />
 
 //               <Route path="/employees/:id" element={<ViewEmployee />} />
-
-//               <Route path="/settings/support" element={<SaasSupportPage />} />
-
-//               <Route path="/settings/audit-logs" element={<AuditLogs />} />
-
-//               <Route path="/settings/ai-auto-reply" element={<AiAutoReply />} />
-//               <Route path="/backup" element={<Backup />} />
 //             </Route>
 //           </Route>
 //         </Route>
@@ -153,6 +164,7 @@
 // }
 
 // export default App;
+
 
 
 
@@ -184,6 +196,7 @@ import Settings from "./pages/settings/Settings";
 import CustomerProfile from "./pages/CustomerProfile";
 import CampaignDetails from "./pages/CampaignDetails";
 import Templates from "./pages/Templates";
+import Services from "./pages/Services";
 
 import AuditLogs from "./pages/settings/AuditLogs";
 import AiAutoReply from "./pages/settings/AiAutoReply";
@@ -257,6 +270,8 @@ function App() {
             <Route path="/campaigns" element={<Campaigns />} />
 
             <Route path="/templates" element={<Templates />} />
+
+            <Route path="/services" element={<Services />} />
 
             <Route path="/tasks" element={<Tasks />} />
 

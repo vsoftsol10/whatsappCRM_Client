@@ -67,19 +67,8 @@
 //   {
 //     id: "system",
 //     items: [
-//       {
-//         key: "settings",
-//         name: "Settings",
-//         icon: Settings,
-//         children: [
-//           { key: "security", name: "Security", path: "/settings/security", icon: Lock },
-//           { key: "integrations", name: "Integrations", path: "/settings/integrations", icon: Plug },
-//           { key: "backup", name: "Backup & Restore", path: "/backup", icon: Database, roles: ["ADMIN"] },
-//           { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
-//           { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
-//           { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
-//         ],
-//       },
+//       // Sidebar shows ONE "Settings" link. Its sections live as tabs inside the page (see settingsTabs).
+//       { key: "settings", name: "Settings", path: "/settings", icon: Settings },
 //     ],
 //   },
 // ];
@@ -103,6 +92,19 @@
 //     .filter((group) => group.items.length > 0);
 // }
 
+// // Tabs shown at the top of the Settings page (src/layouts/SettingsLayout.jsx).
+// // Also used by the header "Search pages..." box so every section stays searchable.
+// export const settingsTabs = [
+//   { key: "security", name: "Security", path: "/settings/security", icon: Lock },
+//   { key: "integrations", name: "Integrations", path: "/settings/integrations", icon: Plug },
+//   { key: "backup", name: "Backup & Restore", path: "/settings/backup", icon: Database, roles: ["ADMIN"] },
+//   { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
+//   { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
+//   { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
+// ];
+
+// export const filterTabsByRole = (tabs, role) => tabs.filter((tab) => canSee(tab, role));
+
 
 
 
@@ -125,6 +127,7 @@ import {
   LifeBuoy,
   History,
   Bot,
+  Briefcase,
 } from "lucide-react";
 
 // Platform logo, imported so the bundler resolves the file path for you.
@@ -158,6 +161,7 @@ export const navGroups = [
     id: "crm",
     items: [
       { key: "customers", name: "Customers", path: "/customers", icon: Users },
+      { key: "services", name: "Services", path: "/services", icon: Briefcase },
       { key: "leads", name: "Leads", path: "/leads", icon: UserPlus },
       { key: "campaigns", name: "Campaigns", path: "/campaigns", icon: Megaphone },
       { key: "templates", name: "Templates", path: "/templates", icon: FileText },

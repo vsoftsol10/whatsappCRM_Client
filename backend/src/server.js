@@ -1,3 +1,4 @@
+
 // const dns = require("dns");
 // dns.setDefaultResultOrder("ipv4first");
  
@@ -45,6 +46,9 @@
 // const {
 //   startInstagramTokenRefreshJob,
 // } = require("./jobs/instagramTokenRefresh");
+// const {
+//   startCampaignScheduler,
+// } = require("./jobs/campaignScheduler");
  
 // const app = express();
  
@@ -294,11 +298,14 @@
 // httpServer.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 //   startInstagramTokenRefreshJob();
+//   startCampaignScheduler();
 //   console.log(
 //     "FRONTEND_URL:",
 //     process.env.FRONTEND_URL
 //   );
 // });
+
+
 
 
 
@@ -318,6 +325,7 @@ const publicLeadRoutes = require("./routes/publicLeadRoutes");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const customerRoutes = require("./routes/customerRoutes");
+const serviceRoutes = require("./routes/serviceRoutes");
 const integrationRoutes = require("./routes/integrationRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
@@ -461,6 +469,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
  
 app.use("/api/customers", customerRoutes);
+
+app.use("/api/services", serviceRoutes);
  
 app.use("/api/integrations", integrationRoutes);
  

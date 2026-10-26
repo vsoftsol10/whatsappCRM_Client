@@ -1,9 +1,412 @@
 
+// const prisma = require("../config/prisma");
+// const { validateCustomer } = require("../validations/customerValidation");
+// const { normalizeIndianPhone } = require("../utils/phoneUtils");
+// const { logAction } = require("../services/auditLogService");
+// const customerImportService = require("../services/customerImportService");
+
+// const createCustomer = async (req, res) => {
+//   try {
+//     const validation = validateCustomer(req.body);
+
+//     if (!validation.isValid) {
+//       return res.status(400).json({
+//         success: false,
+//         message: validation.message,
+//       });
+//     }
+
+//     const { name, phone, email, company, source, requirements, status } = req.body;
+
+//     //console.log("req.user:", req.user);
+
+//     const normalizedPhone = normalizeIndianPhone(phone);
+
+//     if (!normalizedPhone) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please enter a valid Indian mobile number.",
+//       });
+//     }
+
+//     const { userId, companyId } = req.user;
+
+//     const customer = await prisma.customer.create({
+//       data: {
+//         name,
+//         phone: normalizedPhone,
+//         email,
+//         companyName: company,
+//         source,
+//         requirements,
+//         status,
+
+//         userId,
+//         companyId,
+//       },
+//     });
+
+//     logAction({
+//       req,
+//       action: "CREATE",
+//       module: "CUSTOMER",
+//       entityId: customer.id,
+//       entityName: customer.name,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Customer created successfully",
+//       customer,
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//       error,
+//     });
+//   }
+// };
+
+// const previewCustomerImport = async (req, res) => {
+//   try {
+//     const result = await customerImportService.previewImport(
+//       req.file,
+//       req.user
+//     );
+
+//     return res.status(200).json(result);
+//   } catch (error) {
+//     console.error(
+//       "❌ Customer import preview error:",
+//       error
+//     );
+
+//     return res.status(error.statusCode || 500).json({
+//       success: false,
+//       message:
+//         error.message ||
+//         "Failed to preview customer import.",
+//     });
+//   }
+// };
+
+// const importCustomers = async (req, res) => {
+//   try {
+//     console.log("🔥 IMPORT BODY:", req.body);
+//     console.log("🔥 IMPORT USER:", req.user);
+
+//     const { rows } = req.body || {};
+
+//     if (!Array.isArray(rows) || rows.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "No customer rows received for import.",
+//       });
+//     }
+
+//     const result =
+//       await customerImportService.importCustomers(
+//         rows,
+//         req.user
+//       );
+
+//     return res.status(201).json(result);
+//   } catch (error) {
+//     console.error(
+//       "❌ Customer import error:",
+//       error
+//     );
+
+//     return res.status(error.statusCode || 500).json({
+//       success: false,
+//       message:
+//         error.message ||
+//         "Failed to import customers.",
+//     });
+//   }
+// };
+
+// const getCustomers = async (req, res) => {
+//   try {
+//     const { status, search } = req.query;
+
+//     const where = {
+//       companyId: req.user.companyId
+//     }
+
+//     // Filter by status
+//     if (status) {
+//       where.status = status;
+//     }
+
+//     // Search by name, phone, or email
+//     if (search) {
+//       where.OR = [
+//         {
+//           name: {
+//             contains: search,
+//             mode: "insensitive",
+//           },
+//         },
+//         {
+//           phone: {
+//             contains: search,
+//           },
+//         },
+//         {
+//           email: {
+//             contains: search,
+//             mode: "insensitive",
+//           },
+//         },
+//       ];
+//     }
+
+//     const customers = await prisma.customer.findMany({
+//       where,
+//       orderBy: {
+//         createdAt: "desc",
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       customers,
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+// const getCustomerById = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const customer = await prisma.customer.findFirst({
+//       where: {
+//         id,
+//         companyId: req.user.companyId
+//       }
+//     });
+
+//     if (!customer) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Customer not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       customer,
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+// const updateCustomer = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     const validation = validateCustomer(req.body);
+
+//     if (!validation.isValid) {
+//       return res.status(400).json({
+//         success: false,
+//         message: validation.message,
+//       });
+//     }
+
+//     const existingCustomer = await prisma.customer.findFirst({
+//       where: {
+//         id,
+//         companyId: req.user.companyId
+//       }
+//     });
+
+//     if (!existingCustomer) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Customer not found",
+//       });
+//     }
+
+//     const { name, phone, email, company, source, requirements, status } = req.body;
+
+//     const updatedCustomer = await prisma.customer.update({
+//       where: {
+//         id,
+//       },
+//       data: {
+//         name,
+//         phone,
+//         email,
+//         companyName: company,
+//         source,
+//         requirements,
+//         status,
+//       },
+//     });
+
+//     logAction({
+//       req,
+//       action: "UPDATE",
+//       module: "CUSTOMER",
+//       entityId: updatedCustomer.id,
+//       entityName: updatedCustomer.name,
+//       changes: {
+//         before: {
+//           name: existingCustomer.name,
+//           phone: existingCustomer.phone,
+//           email: existingCustomer.email,
+//           status: existingCustomer.status,
+//         },
+//         after: {
+//           name: updatedCustomer.name,
+//           phone: updatedCustomer.phone,
+//           email: updatedCustomer.email,
+//           status: updatedCustomer.status,
+//         },
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Customer updated successfully",
+//       customer: updatedCustomer,
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+// const deleteCustomer = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+
+//     // Check customer exists
+//     const existingCustomer = await prisma.customer.findFirst({
+//       where: {
+//         id,
+//         companyId: req.user.companyId
+//       }
+//     });
+
+//     if (!existingCustomer) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Customer not found",
+//       });
+//     }
+
+//     // Check if customer has any tickets
+//     const ticket = await prisma.ticket.findFirst({
+//       where: {
+//         customerId: id,
+//       },
+//     });
+
+//     if (ticket) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Cannot delete customer. Delete associated tickets first.",
+//       });
+//     }
+
+//     // Find customer's conversation
+//     const conversation = await prisma.conversation.findUnique({
+//       where: {
+//         customerId: id,
+//       },
+//     });
+
+//     // Delete messages first, then conversation
+//     if (conversation) {
+//       await prisma.message.deleteMany({
+//         where: {
+//           conversationId: conversation.id,
+//         },
+//       });
+
+//       await prisma.conversation.delete({
+//         where: {
+//           id: conversation.id,
+//         },
+//       });
+//     }
+
+//     // Delete customer
+//     await prisma.customer.delete({
+//       where: {
+//         id,
+//       },
+//     });
+
+//     logAction({
+//       req,
+//       action: "DELETE",
+//       module: "CUSTOMER",
+//       entityId: existingCustomer.id,
+//       entityName: existingCustomer.name,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Customer deleted successfully",
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+// module.exports = {
+//   createCustomer,
+//   getCustomers,
+//   getCustomerById,
+//   updateCustomer,
+//   deleteCustomer,
+//   previewCustomerImport,
+//   importCustomers,
+// };
+
+
+
+
 const prisma = require("../config/prisma");
 const { validateCustomer } = require("../validations/customerValidation");
 const { normalizeIndianPhone } = require("../utils/phoneUtils");
 const { logAction } = require("../services/auditLogService");
 const customerImportService = require("../services/customerImportService");
+const {
+  customerServiceInclude,
+  withServices,
+  resolveServiceIds,
+} = require("../utils/serviceHelper");
 
 const createCustomer = async (req, res) => {
   try {
@@ -16,7 +419,7 @@ const createCustomer = async (req, res) => {
       });
     }
 
-    const { name, phone, email, company, source, requirements, status } = req.body;
+    const { name, phone, email, company, source, requirements, status, serviceIds } = req.body;
 
     //console.log("req.user:", req.user);
 
@@ -31,6 +434,18 @@ const createCustomer = async (req, res) => {
 
     const { userId, companyId } = req.user;
 
+    // Services are OPTIONAL. Empty / missing = customer without services.
+    let validServiceIds = [];
+
+    try {
+      validServiceIds = await resolveServiceIds(companyId, serviceIds);
+    } catch (serviceError) {
+      return res.status(serviceError.statusCode || 400).json({
+        success: false,
+        message: serviceError.message,
+      });
+    }
+
     const customer = await prisma.customer.create({
       data: {
         name,
@@ -43,7 +458,16 @@ const createCustomer = async (req, res) => {
 
         userId,
         companyId,
+
+        ...(validServiceIds.length > 0
+          ? {
+              customerServices: {
+                create: validServiceIds.map((serviceId) => ({ serviceId })),
+              },
+            }
+          : {}),
       },
+      include: customerServiceInclude,
     });
 
     logAction({
@@ -57,7 +481,7 @@ const createCustomer = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Customer created successfully",
-      customer,
+      customer: withServices(customer),
     });
   } catch (error) {
     console.error(error);
@@ -131,7 +555,7 @@ const importCustomers = async (req, res) => {
 
 const getCustomers = async (req, res) => {
   try {
-    const { status, search } = req.query;
+    const { status, search, serviceId } = req.query;
 
     const where = {
       companyId: req.user.companyId
@@ -140,6 +564,13 @@ const getCustomers = async (req, res) => {
     // Filter by status
     if (status) {
       where.status = status;
+    }
+
+    // Filter by service ("NONE" = customers without any service)
+    if (serviceId === "NONE") {
+      where.customerServices = { none: {} };
+    } else if (serviceId) {
+      where.customerServices = { some: { serviceId: String(serviceId) } };
     }
 
     // Search by name, phone, or email
@@ -170,11 +601,12 @@ const getCustomers = async (req, res) => {
       orderBy: {
         createdAt: "desc",
       },
+      include: customerServiceInclude,
     });
 
     return res.status(200).json({
       success: true,
-      customers,
+      customers: customers.map(withServices),
     });
   } catch (error) {
     console.error(error);
@@ -194,7 +626,8 @@ const getCustomerById = async (req, res) => {
       where: {
         id,
         companyId: req.user.companyId
-      }
+      },
+      include: customerServiceInclude,
     });
 
     if (!customer) {
@@ -206,7 +639,7 @@ const getCustomerById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      customer,
+      customer: withServices(customer),
     });
   } catch (error) {
     console.error(error);
@@ -245,21 +678,48 @@ const updateCustomer = async (req, res) => {
       });
     }
 
-    const { name, phone, email, company, source, requirements, status } = req.body;
+    const { name, phone, email, company, source, requirements, status, serviceIds } = req.body;
+
+    const updateData = {
+      name,
+      phone,
+      email,
+      companyName: company,
+      source,
+      requirements,
+      status,
+    };
+
+    // Services are OPTIONAL. Only when `serviceIds` is sent as an array do we
+    // replace the customer's services (empty array = remove all services).
+    // If it is not sent, existing services stay exactly as they are.
+    if (Array.isArray(serviceIds)) {
+      let validServiceIds = [];
+
+      try {
+        validServiceIds = await resolveServiceIds(
+          req.user.companyId,
+          serviceIds
+        );
+      } catch (serviceError) {
+        return res.status(serviceError.statusCode || 400).json({
+          success: false,
+          message: serviceError.message,
+        });
+      }
+
+      updateData.customerServices = {
+        deleteMany: {},
+        create: validServiceIds.map((serviceId) => ({ serviceId })),
+      };
+    }
 
     const updatedCustomer = await prisma.customer.update({
       where: {
         id,
       },
-      data: {
-        name,
-        phone,
-        email,
-        companyName: company,
-        source,
-        requirements,
-        status,
-      },
+      data: updateData,
+      include: customerServiceInclude,
     });
 
     logAction({
@@ -287,7 +747,7 @@ const updateCustomer = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Customer updated successfully",
-      customer: updatedCustomer,
+      customer: withServices(updatedCustomer),
     });
   } catch (error) {
     console.error(error);
