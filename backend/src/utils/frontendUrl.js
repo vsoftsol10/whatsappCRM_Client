@@ -2,7 +2,7 @@
 require("dotenv").config();
 
 // Same fallback your emailService.js already uses
-const DEFAULT_FRONTEND_URL = "https://watsupcl.thevsoft.com";
+const DEFAULT_FRONTEND_URL = "https://crm.vatupcrm.in";
 
 /**
  * Returns the frontend base URL with no trailing slash.
