@@ -371,7 +371,7 @@ const app = express();
  
 // Use the configured CRM frontend origin(s), rather than reflecting any
 // requesting origin. FRONTEND_URL may contain comma-separated origins.
-const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com")
+const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://crm.vatupcrm.in" || "https://watsupcl.thevsoft.com")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
