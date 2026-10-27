@@ -617,7 +617,65 @@ const subscribePageToApp = async (pageId, pageToken) => {
     },
     timeout: REQUEST_TIMEOUT_MS,
   });
+
+  // ADDED (best effort, never throws, never changes the return value):
+  // 1) log what Meta now shows for this Page
+  // 2) also subscribe the linked Instagram account itself to the app's
+  //    "messages" webhook. The "Connect Instagram" button does this for its
+  //    own account; the Facebook route only subscribed the Page.
+  await subscribeLinkedInstagramBestEffort(pageId, pageToken);
+
   return res.data;
+};
+
+const subscribeLinkedInstagramBestEffort = async (pageId, pageToken) => {
+  // 1) DIAGNOSTIC: what is the Page subscribed to now?
+  try {
+    const check = await axios.get(`${GRAPH}/${pageId}/subscribed_apps`, {
+      params: { access_token: pageToken },
+      timeout: REQUEST_TIMEOUT_MS,
+    });
+    console.log("[FB DIAG] subscribed_apps for page", pageId, JSON.stringify(check.data));
+  } catch (e) {
+    console.log("[FB DIAG] subscribed_apps check failed:", extractError(e).message);
+  }
+
+  // 2) Subscribe the linked Instagram account (if there is one)
+  try {
+    const lookup = await axios.get(`${GRAPH}/${pageId}`, {
+      params: {
+        fields: "instagram_business_account{id,username}",
+        access_token: pageToken,
+      },
+      timeout: REQUEST_TIMEOUT_MS,
+    });
+    const igId = lookup.data?.instagram_business_account?.id;
+    if (!igId) {
+      console.log("[IG subscribe] no linked Instagram account on page", pageId, "- skipped");
+      return;
+    }
+
+    const sub = await axios.post(`${GRAPH}/${igId}/subscribed_apps`, null, {
+      params: {
+        subscribed_fields: "messages",
+        access_token: pageToken,
+      },
+      timeout: REQUEST_TIMEOUT_MS,
+    });
+    console.log("[IG subscribe] subscribed Instagram", igId, "->", JSON.stringify(sub.data));
+
+    try {
+      const igCheck = await axios.get(`${GRAPH}/${igId}/subscribed_apps`, {
+        params: { access_token: pageToken },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      console.log("[IG subscribe] subscribed_apps for Instagram", igId, JSON.stringify(igCheck.data));
+    } catch (e) {
+      console.log("[IG subscribe] read-back failed:", extractError(e).message);
+    }
+  } catch (e) {
+    console.log("[IG subscribe] failed (Page subscription is unaffected):", JSON.stringify(extractError(e)));
+  }
 };
 
 const unsubscribePageFromApp = async (pageId, pageToken) => {
