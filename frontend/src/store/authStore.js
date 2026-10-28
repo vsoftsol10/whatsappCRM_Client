@@ -1,3 +1,6 @@
+
+
+
 // import { create } from 'zustand';
 // import apiClient from '../api/apiClient';
 // import {
@@ -5,6 +8,7 @@
 //   resetPassword,
 //   changePassword,
 //   updateProfile,
+//   getMe,
 // } from "../api/authApi";
 
 // // ======================================================
@@ -392,6 +396,37 @@
 
 
 //   // ====================================================
+//   // REFRESH LOGGED-IN USER (e.g. company name, latest info)
+//   // Silent — used to top up data (like companyName) for
+//   // sessions that were logged in before it was added,
+//   // without forcing a re-login.
+//   // ====================================================
+
+//   fetchMe: async () => {
+//     if (!get().isAuthenticated) return;
+
+//     try {
+//       const data = await getMe();
+
+//       const updatedUser = {
+//         ...get().user,
+//         ...data,
+//       };
+
+//       localStorage.setItem(
+//         "user",
+//         JSON.stringify(updatedUser)
+//       );
+
+//       set({ user: updatedUser });
+//     } catch (error) {
+//       // Non-critical — keep whatever we already have in state.
+//       console.error("Failed to refresh user:", error);
+//     }
+//   },
+
+
+//   // ====================================================
 //   // UPDATE MY PROFILE
 //   // ====================================================
 
@@ -502,6 +537,8 @@
 // }));
 
 
+
+
 import { create } from 'zustand';
 import apiClient from '../api/apiClient';
 import {
@@ -539,10 +576,20 @@ const isTokenValid = (token) => {
 // INITIAL AUTH STATE
 // ======================================================
 
+// A broken value saved in the browser must never crash the app
+const safeParse = (value) => {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 const storedToken = localStorage.getItem("token");
 const storedUser = localStorage.getItem("user");
 
-const validToken = isTokenValid(storedToken);
+const validToken = isTokenValid(storedToken) && !!safeParse(storedUser);
 
 // If token is missing, expired, or invalid,
 // remove the old session immediately.
@@ -563,7 +610,7 @@ export const useAuthStore = create((set, get) => ({
 
   user:
     validToken && storedUser
-      ? JSON.parse(storedUser)
+      ? safeParse(storedUser)
       : null,
 
   token:
@@ -605,6 +652,11 @@ export const useAuthStore = create((set, get) => ({
         user,
         forcePasswordChange,
       } = response.data;
+
+      // The server must return a real login. Never save "undefined".
+      if (!token || !user) {
+        throw new Error("Server did not return a valid login response");
+      }
 
 
       // ------------------------------------------------
@@ -757,6 +809,8 @@ export const useAuthStore = create((set, get) => ({
 
       error: null,
     });
+    // Full reload clears every store, so the next company never sees old data
+    window.location.replace("/login");
   },
 
 
