@@ -284,6 +284,7 @@ const prisma = require("../config/prisma");
 const { encryptSecret, decryptSecret } = require("../utils/secretCrypto");
 const fb = require("../services/facebookService");
 const igLogin = require("../services/instagramService");
+const { facebookLinksInstagram } = require("../utils/socialFlags");
 
 // What the browser is allowed to see about a Page (never the token).
 const toPublicPage = (page) => ({
@@ -314,9 +315,19 @@ const getFacebookPages = async (req, res) => {
       orderBy: { connectedAt: "desc" },
     });
 
+    // Optional filter so the Facebook card and the Instagram card each
+    // list only their own connections. No ?type= -> everything (as before).
+    const type = String(req.query?.type || "").toLowerCase();
+    const visible =
+      type === "instagram"
+        ? pages.filter((p) => p.connectionType === "INSTAGRAM_LOGIN")
+        : type === "facebook"
+        ? pages.filter((p) => p.connectionType !== "INSTAGRAM_LOGIN")
+        : pages;
+
     return res.status(200).json({
       success: true,
-      pages: pages.map(toPublicPage),
+      pages: visible.map(toPublicPage),
     });
   } catch (error) {
     console.error("Get Facebook pages error:", error);
@@ -402,34 +413,42 @@ const connectFacebookPages = async (req, res) => {
         let instagramData = { instagramAccountId: null, instagramUsername: null };
         let instagramNote = null;
 
-        const { account: igAccount, error: igError } =
-          await fb.getLinkedInstagramAccount(pageId, pageToken);
+        // Facebook and Instagram are connected SEPARATELY now: the Facebook
+        // button only connects the Page. The Instagram account is connected
+        // with its own "Connect Instagram" button. Set
+        // FACEBOOK_LINK_INSTAGRAM=true to bring the old linking back.
+        // (When it is off, re-connecting a Page also clears an old Instagram
+        // link, so that account can be connected directly.)
+        if (facebookLinksInstagram()) {
+          const { account: igAccount, error: igError } =
+            await fb.getLinkedInstagramAccount(pageId, pageToken);
 
-        if (igAccount) {
-          // One Instagram account can only belong to one connected Page.
-          const clash = await prisma.facebookPage.findFirst({
-            where: { instagramAccountId: igAccount.id, NOT: { pageId } },
-            select: { id: true, companyId: true, connectionType: true },
-          });
+          if (igAccount) {
+            // One Instagram account can only belong to one connected Page.
+            const clash = await prisma.facebookPage.findFirst({
+              where: { instagramAccountId: igAccount.id, NOT: { pageId } },
+              select: { id: true, companyId: true, connectionType: true },
+            });
 
-          if (
-            clash &&
-            clash.companyId === companyId &&
-            clash.connectionType === "INSTAGRAM_LOGIN"
-          ) {
-            instagramNote =
-              "This Instagram account is already connected directly (without Facebook). Disconnect it in the Instagram section first if you want to connect it through this Page instead.";
-          } else if (clash) {
-            instagramNote =
-              "This Instagram account is already connected to another Page or CRM account, so Instagram was not enabled for this Page.";
-          } else {
-            instagramData = {
-              instagramAccountId: igAccount.id,
-              instagramUsername: igAccount.username,
-            };
+            if (
+              clash &&
+              clash.companyId === companyId &&
+              clash.connectionType === "INSTAGRAM_LOGIN"
+            ) {
+              instagramNote =
+                "This Instagram account is already connected directly (without Facebook). Disconnect it in the Instagram section first if you want to connect it through this Page instead.";
+            } else if (clash) {
+              instagramNote =
+                "This Instagram account is already connected to another Page or CRM account, so Instagram was not enabled for this Page.";
+            } else {
+              instagramData = {
+                instagramAccountId: igAccount.id,
+                instagramUsername: igAccount.username,
+              };
+            }
+          } else if (igError) {
+            instagramNote = `Instagram could not be checked: ${igError.message}`;
           }
-        } else if (igError) {
-          instagramNote = `Instagram could not be checked: ${igError.message}`;
         }
 
         const data = {
@@ -567,3 +586,4 @@ module.exports = {
   connectFacebookPages,
   disconnectFacebookPage,
 };
+ 

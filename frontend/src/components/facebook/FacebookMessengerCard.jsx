@@ -1,479 +1,17 @@
-// import { useEffect, useState, useCallback } from "react";
-// import { FaFacebookMessenger, FaInstagram } from "react-icons/fa";
-
-// import { loadFacebookSDK } from "../../utils/facebookSdk";
-// import {
-//   getFacebookPages,
-//   connectFacebookPages,
-//   disconnectFacebookPage,
-//   getInstagramAuthUrl,
-// } from "../../api/facebookApi";
-// import ConfirmModal from "../common/ConfirmModal";
-
-// // Configuration ID of the "Facebook Pages" login configuration
-// // (Meta Dashboard -> Facebook Login for Business -> Configurations).
-// const FACEBOOK_CONFIG_ID = import.meta.env.VITE_META_FACEBOOK_CONFIG_ID;
-
-// const getErrorMessage = (error, fallback) =>
-//   error?.response?.data?.message || error?.message || fallback;
-
-// function FacebookMessengerCard({ isAdmin = false }) {
-//   const [pages, setPages] = useState([]);
-//   const [loadingPages, setLoadingPages] = useState(true);
-//   const [sdkReady, setSdkReady] = useState(false);
-//   const [connecting, setConnecting] = useState(false);
-//   const [notice, setNotice] = useState(null); // { type: "success" | "error" | "info", text }
-//   const [skippedPages, setSkippedPages] = useState([]);
-//   const [instagramNotes, setInstagramNotes] = useState([]);
-//   const [pageToDisconnect, setPageToDisconnect] = useState(null);
-//   const [disconnecting, setDisconnecting] = useState(false);
-//   const [connectingInstagram, setConnectingInstagram] = useState(false);
-
-//   const fetchPages = useCallback(async () => {
-//     try {
-//       setLoadingPages(true);
-//       const data = await getFacebookPages();
-//       setPages(data?.pages || []);
-//     } catch (error) {
-//       console.error("Failed to fetch Facebook pages:", error);
-//       setPages([]);
-//     } finally {
-//       setLoadingPages(false);
-//     }
-//   }, []);
-
-//   useEffect(() => {
-//     fetchPages();
-
-//     loadFacebookSDK()
-//       .then(() => setSdkReady(true))
-//       .catch((error) => console.error("Facebook SDK error:", error));
-//   }, [fetchPages]);
-
-//   // Instagram sends the admin back here: /settings/security?instagram=connected|error|info
-//   useEffect(() => {
-//     const params = new URLSearchParams(window.location.search);
-//     const result = params.get("instagram");
-//     if (!result) return;
-
-//     if (result === "connected") {
-//       const username = params.get("username");
-//       setNotice({
-//         type: "success",
-//         text: username
-//           ? `Instagram @${username} connected successfully`
-//           : "Instagram connected successfully",
-//       });
-//       fetchPages();
-//     } else {
-//       setNotice({
-//         type: result === "info" ? "info" : "error",
-//         text:
-//           params.get("message") ||
-//           "Could not connect Instagram. Please try again.",
-//       });
-//     }
-
-//     // clean the address bar so a refresh does not repeat the message
-//     window.history.replaceState({}, "", window.location.pathname);
-//   }, [fetchPages]);
-
-//   const hasPages = pages.length > 0;
-//   const needsReconnect = pages.some((p) => p.status === "RECONNECT_NEEDED");
-
-//   // Send the Facebook login result (access token, or code) to our backend
-//   const finishConnect = async ({ accessToken, code }) => {
-//     try {
-//       const data = await connectFacebookPages({ accessToken, code });
-
-//       setNotice({
-//         type: "success",
-//         text: data?.message || "Facebook connected successfully",
-//       });
-//       setSkippedPages(data?.skipped || []);
-//       setInstagramNotes(
-//         (data?.pages || [])
-//           .filter((p) => p.instagramNote)
-//           .map((p) => `${p.pageName || p.pageId}: ${p.instagramNote}`)
-//       );
-
-//       await fetchPages();
-//     } catch (error) {
-//       console.error(
-//         "Facebook connect failed:",
-//         error?.response?.data || error?.message
-//       );
-//       setNotice({
-//         type: "error",
-//         text: getErrorMessage(
-//           error,
-//           "Failed to connect Facebook. Please try again."
-//         ),
-//       });
-//       setSkippedPages(error?.response?.data?.skipped || []);
-//     } finally {
-//       setConnecting(false);
-//     }
-//   };
-
-//   const handleConnect = () => {
-//     setNotice(null);
-//     setSkippedPages([]);
-//     setInstagramNotes([]);
-
-//     if (!FACEBOOK_CONFIG_ID) {
-//       console.error("Missing VITE_META_FACEBOOK_CONFIG_ID");
-//       setNotice({
-//         type: "error",
-//         text: "Facebook is not configured yet. Please contact support.",
-//       });
-//       return;
-//     }
-
-//     if (!window.FB) {
-//       setNotice({
-//         type: "error",
-//         text: "Facebook is still loading. Please try again in a moment.",
-//       });
-//       return;
-//     }
-
-//     setConnecting(true);
-
-//     // NOTE: FB.login needs a normal (non-async) callback.
-//     window.FB.login(
-//       (response) => {
-//         // A "User access token" configuration returns an access token
-//         // directly, so there is no code to exchange on the server.
-//         const accessToken = response?.authResponse?.accessToken;
-//         const code = response?.authResponse?.code;
-
-//         if (!accessToken && !code) {
-//           setConnecting(false);
-//           setNotice({
-//             type: "info",
-//             text: "Facebook login was cancelled. No changes were made.",
-//           });
-//           return;
-//         }
-
-//         finishConnect({ accessToken, code });
-//       },
-//       {
-//         config_id: FACEBOOK_CONFIG_ID,
-//       }
-//     );
-//   };
-
-//   // Instagram login WITHOUT Facebook: full-page redirect to Instagram, which
-//   // sends the admin back to this page when done.
-//   const handleConnectInstagram = async () => {
-//     setNotice(null);
-//     setSkippedPages([]);
-//     setInstagramNotes([]);
-
-//     try {
-//       setConnectingInstagram(true);
-//       const data = await getInstagramAuthUrl();
-//       if (!data?.url) throw new Error("No Instagram login URL returned");
-//       window.location.href = data.url;
-//     } catch (error) {
-//       setConnectingInstagram(false);
-//       setNotice({
-//         type: "error",
-//         text: getErrorMessage(
-//           error,
-//           "Could not start Instagram login. Please try again."
-//         ),
-//       });
-//     }
-//   };
-
-//   const handleDisconnect = async () => {
-//     if (!pageToDisconnect?.id) return;
-
-//     try {
-//       setDisconnecting(true);
-//       await disconnectFacebookPage(pageToDisconnect.id);
-//       setPageToDisconnect(null);
-//       setNotice({
-//         type: "success",
-//         text:
-//           pageToDisconnect.connectionType === "INSTAGRAM_LOGIN"
-//             ? "Instagram account disconnected."
-//             : "Facebook Page disconnected.",
-//       });
-//       await fetchPages();
-//     } catch (error) {
-//       setPageToDisconnect(null);
-//       setNotice({
-//         type: "error",
-//         text: getErrorMessage(
-//           error,
-//           "Failed to disconnect the Page. Please try again."
-//         ),
-//       });
-//     } finally {
-//       setDisconnecting(false);
-//     }
-//   };
-
-//   const noticeStyles = {
-//     success: "border-green-200 bg-green-50 text-green-700",
-//     error: "border-red-200 bg-red-50 text-red-700",
-//     info: "border-slate-200 bg-slate-50 text-slate-600",
-//   };
-
-//   return (
-//     <div data-tour="facebook-instagram-card" className="mt-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
-//       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-//         <div className="flex items-start gap-4">
-//           <div className="rounded-2xl bg-[#E7F0FF] p-4">
-//             <FaFacebookMessenger size={28} className="text-[#1877F2]" />
-//           </div>
-
-//           <div>
-//             <h2 className="text-xl font-bold text-slate-900">
-//               Facebook & Instagram
-//             </h2>
-
-//             <p className="mt-2 text-sm text-slate-500">
-//               {isAdmin
-//                 ? "Connect with Facebook to receive Messenger messages (and Instagram DMs if your Instagram is linked to the Page). No Facebook? Connect your Instagram professional account directly."
-//                 : "Facebook Pages connected to this CRM. Only an admin can connect or change them."}
-//             </p>
-
-//             <div className="mt-3 flex items-center gap-2">
-//               <span
-//                 className={`h-2.5 w-2.5 rounded-full ${
-//                   loadingPages
-//                     ? "bg-slate-300"
-//                     : needsReconnect
-//                     ? "bg-amber-400"
-//                     : hasPages
-//                     ? "bg-[#1877F2]"
-//                     : "bg-slate-400"
-//                 }`}
-//               />
-
-//               <span className="text-sm font-medium text-slate-500">
-//                 {loadingPages
-//                   ? "Checking..."
-//                   : needsReconnect
-//                   ? "Reconnect needed"
-//                   : hasPages
-//                   ? `Connected (${pages.length} Page${pages.length > 1 ? "s" : ""})`
-//                   : "Not Connected"}
-//               </span>
-//             </div>
-
-//             {!isAdmin && !loadingPages && !hasPages && (
-//               <p className="mt-2 text-sm text-slate-500">
-//                 No Facebook Page is connected yet. Please ask your admin to
-//                 connect one.
-//               </p>
-//             )}
-//           </div>
-//         </div>
-
-//         {/* Connect button: ADMIN only */}
-//         {isAdmin && (
-//           <div className="flex flex-col gap-3">
-//             <button
-//               type="button"
-//               onClick={handleConnect}
-//               disabled={connecting || !sdkReady}
-//               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1877F2] px-6 py-3 font-semibold text-white transition hover:bg-[#145DBF] disabled:cursor-not-allowed disabled:opacity-60"
-//             >
-//               <FaFacebookMessenger size={18} />
-//               {connecting
-//                 ? "Connecting..."
-//                 : needsReconnect
-//                 ? "Reconnect Facebook"
-//                 : hasPages
-//                 ? "Add / Update Pages"
-//                 : "Connect Facebook"}
-//             </button>
-
-//             <div className="flex items-center gap-3 text-xs text-slate-400">
-//               <span className="h-px flex-1 bg-slate-200" />
-//               or
-//               <span className="h-px flex-1 bg-slate-200" />
-//             </div>
-
-//             <button
-//               type="button"
-//               onClick={handleConnectInstagram}
-//               disabled={connectingInstagram}
-//               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] px-6 py-3 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-//             >
-//               <FaInstagram size={18} />
-//               {connectingInstagram
-//                 ? "Opening Instagram..."
-//                 : "Connect Instagram (no Facebook)"}
-//             </button>
-//             <p className="max-w-[260px] text-xs text-slate-400">
-//               Needs a Business or Creator Instagram account.
-//             </p>
-//           </div>
-//         )}
-//       </div>
-
-//       {/* Result message */}
-//       {notice && (
-//         <div
-//           className={`mt-5 rounded-xl border px-4 py-3 text-sm ${
-//             noticeStyles[notice.type] || noticeStyles.info
-//           }`}
-//         >
-//           {notice.text}
-//         </div>
-//       )}
-
-//       {/* Pages that could not be connected */}
-//       {skippedPages.length > 0 && (
-//         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-//           <p className="font-semibold">Some Pages could not be connected:</p>
-//           <ul className="mt-1 list-disc pl-5">
-//             {skippedPages.map((p) => (
-//               <li key={p.pageId}>
-//                 {p.pageName || p.pageId}: {p.reason}
-//               </li>
-//             ))}
-//           </ul>
-//         </div>
-//       )}
-
-//       {/* Instagram notes (for example an Instagram account already used elsewhere) */}
-//       {instagramNotes.length > 0 && (
-//         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-//           <p className="font-semibold">Instagram:</p>
-//           <ul className="mt-1 list-disc pl-5">
-//             {instagramNotes.map((note, i) => (
-//               <li key={i}>{note}</li>
-//             ))}
-//           </ul>
-//         </div>
-//       )}
-
-//       {/* Connected Pages */}
-//       {hasPages && (
-//         <div className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-200">
-//           {pages.map((page) => (
-//             <div
-//               key={page.id}
-//               className="flex items-center justify-between gap-4 px-4 py-3"
-//             >
-//               <div className="min-w-0">
-//                 <p className="truncate font-semibold text-slate-800">
-//                   {page.pageName ||
-//                     (page.connectionType === "INSTAGRAM_LOGIN"
-//                       ? "Instagram account"
-//                       : `Page ${page.pageId}`)}
-//                 </p>
-//                 <p
-//                   className={`text-xs font-medium ${
-//                     page.status === "RECONNECT_NEEDED"
-//                       ? "text-amber-600"
-//                       : "text-slate-500"
-//                   }`}
-//                 >
-//                   {page.status === "RECONNECT_NEEDED"
-//                     ? "Reconnect needed — access was removed or expired"
-//                     : "Connected"}
-//                 </p>
-
-//                 {page.connectionType === "INSTAGRAM_LOGIN" && (
-//                   <p className="text-xs text-slate-500">
-//                     Connected directly with Instagram (no Facebook)
-//                   </p>
-//                 )}
-
-//                 {page.hasInstagram ? (
-//                   <p className="text-xs font-medium text-pink-600">
-//                     Instagram:{" "}
-//                     {page.instagramUsername
-//                       ? `@${page.instagramUsername}`
-//                       : "linked"}
-//                   </p>
-//                 ) : (
-//                   <p className="text-xs text-slate-400">
-//                     Instagram: not linked. To receive Instagram DMs, link a
-//                     professional Instagram account to this Page, then click
-//                     "Add / Update Pages".
-//                   </p>
-//                 )}
-//               </div>
-
-//               {isAdmin && (
-//                 <div className="flex shrink-0 items-center gap-2">
-//                   {page.connectionType === "INSTAGRAM_LOGIN" &&
-//                     page.status === "RECONNECT_NEEDED" && (
-//                       <button
-//                         type="button"
-//                         onClick={handleConnectInstagram}
-//                         disabled={connectingInstagram}
-//                         className="rounded-xl bg-[#DD2A7B] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-//                       >
-//                         Reconnect
-//                       </button>
-//                     )}
-
-//                   <button
-//                     type="button"
-//                     onClick={() => setPageToDisconnect(page)}
-//                     className="rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-//                   >
-//                     Disconnect
-//                   </button>
-//                 </div>
-//               )}
-//             </div>
-//           ))}
-//         </div>
-//       )}
-
-//       <ConfirmModal
-//         isOpen={!!pageToDisconnect}
-//         title={
-//           pageToDisconnect?.connectionType === "INSTAGRAM_LOGIN"
-//             ? "Disconnect Instagram account?"
-//             : "Disconnect Facebook Page?"
-//         }
-//         message={
-//           pageToDisconnect?.connectionType === "INSTAGRAM_LOGIN"
-//             ? `You won't receive or send Instagram messages for "${
-//                 pageToDisconnect?.pageName || "this account"
-//               }" in the CRM until you reconnect. Existing chats are kept.`
-//             : `You won't receive or send Messenger messages for "${
-//                 pageToDisconnect?.pageName || "this Page"
-//               }" in the CRM until you reconnect. Existing chats are kept.`
-//         }
-//         confirmText={disconnecting ? "Disconnecting..." : "Disconnect"}
-//         cancelText="Cancel"
-//         variant="danger"
-//         onConfirm={handleDisconnect}
-//         onCancel={() => setPageToDisconnect(null)}
-//       />
-//     </div>
-//   );
-// }
-
-// export default FacebookMessengerCard;
-
-
-
-
+// Facebook Messenger card (Facebook ONLY).
+//
+// Instagram is connected separately in its own card (see
+// components/instagram/InstagramCard.jsx). Connecting a Facebook Page here no
+// longer links or subscribes any Instagram account.
 
 import { useEffect, useState, useCallback } from "react";
-import { FaFacebookMessenger, FaInstagram } from "react-icons/fa";
+import { FaFacebookMessenger } from "react-icons/fa";
 
 import { loadFacebookSDK } from "../../utils/facebookSdk";
 import {
   getFacebookPages,
   connectFacebookPages,
   disconnectFacebookPage,
-  getInstagramAuthUrl,
 } from "../../api/facebookApi";
 import ConfirmModal from "../common/ConfirmModal";
 
@@ -491,15 +29,14 @@ function FacebookMessengerCard({ isAdmin = false }) {
   const [connecting, setConnecting] = useState(false);
   const [notice, setNotice] = useState(null); // { type: "success" | "error" | "info", text }
   const [skippedPages, setSkippedPages] = useState([]);
-  const [instagramNotes, setInstagramNotes] = useState([]);
   const [pageToDisconnect, setPageToDisconnect] = useState(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [connectingInstagram, setConnectingInstagram] = useState(false);
 
   const fetchPages = useCallback(async () => {
     try {
       setLoadingPages(true);
-      const data = await getFacebookPages();
+      // Facebook Pages only (Instagram accounts are listed in the Instagram card)
+      const data = await getFacebookPages("facebook");
       setPages(data?.pages || []);
     } catch (error) {
       console.error("Failed to fetch Facebook pages:", error);
@@ -517,34 +54,6 @@ function FacebookMessengerCard({ isAdmin = false }) {
       .catch((error) => console.error("Facebook SDK error:", error));
   }, [fetchPages]);
 
-  // Instagram sends the admin back here: /settings/security?instagram=connected|error|info
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const result = params.get("instagram");
-    if (!result) return;
-
-    if (result === "connected") {
-      const username = params.get("username");
-      setNotice({
-        type: "success",
-        text: username
-          ? `Instagram @${username} connected successfully`
-          : "Instagram connected successfully",
-      });
-      fetchPages();
-    } else {
-      setNotice({
-        type: result === "info" ? "info" : "error",
-        text:
-          params.get("message") ||
-          "Could not connect Instagram. Please try again.",
-      });
-    }
-
-    // clean the address bar so a refresh does not repeat the message
-    window.history.replaceState({}, "", window.location.pathname);
-  }, [fetchPages]);
-
   const hasPages = pages.length > 0;
   const needsReconnect = pages.some((p) => p.status === "RECONNECT_NEEDED");
 
@@ -558,11 +67,6 @@ function FacebookMessengerCard({ isAdmin = false }) {
         text: data?.message || "Facebook connected successfully",
       });
       setSkippedPages(data?.skipped || []);
-      setInstagramNotes(
-        (data?.pages || [])
-          .filter((p) => p.instagramNote)
-          .map((p) => `${p.pageName || p.pageId}: ${p.instagramNote}`)
-      );
 
       await fetchPages();
     } catch (error) {
@@ -586,7 +90,6 @@ function FacebookMessengerCard({ isAdmin = false }) {
   const handleConnect = () => {
     setNotice(null);
     setSkippedPages([]);
-    setInstagramNotes([]);
 
     if (!FACEBOOK_CONFIG_ID) {
       console.error("Missing VITE_META_FACEBOOK_CONFIG_ID");
@@ -632,30 +135,6 @@ function FacebookMessengerCard({ isAdmin = false }) {
     );
   };
 
-  // Instagram login WITHOUT Facebook: full-page redirect to Instagram, which
-  // sends the admin back to this page when done.
-  const handleConnectInstagram = async () => {
-    setNotice(null);
-    setSkippedPages([]);
-    setInstagramNotes([]);
-
-    try {
-      setConnectingInstagram(true);
-      const data = await getInstagramAuthUrl();
-      if (!data?.url) throw new Error("No Instagram login URL returned");
-      window.location.href = data.url;
-    } catch (error) {
-      setConnectingInstagram(false);
-      setNotice({
-        type: "error",
-        text: getErrorMessage(
-          error,
-          "Could not start Instagram login. Please try again."
-        ),
-      });
-    }
-  };
-
   const handleDisconnect = async () => {
     if (!pageToDisconnect?.id) return;
 
@@ -665,10 +144,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
       setPageToDisconnect(null);
       setNotice({
         type: "success",
-        text:
-          pageToDisconnect.connectionType === "INSTAGRAM_LOGIN"
-            ? "Instagram account disconnected."
-            : "Facebook Page disconnected.",
+        text: "Facebook Page disconnected.",
       });
       await fetchPages();
     } catch (error) {
@@ -696,7 +172,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
       data-tour="facebook-instagram-card"
       className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
     >
-      {/* Header: icon + text on the left, actions on the right */}
+      {/* Header: icon + text on the left, action on the right */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-1 items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#E7F0FF]">
@@ -705,12 +181,12 @@ function FacebookMessengerCard({ isAdmin = false }) {
 
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-slate-900">
-              Facebook & Instagram
+              Facebook Messenger
             </h2>
 
             <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
               {isAdmin
-                ? "Connect with Facebook to receive Messenger messages (and Instagram DMs if your Instagram is linked to the Page). No Facebook? Connect your Instagram professional account directly."
+                ? "Connect your Facebook Page to receive and reply to Messenger messages. Instagram is connected separately in the Instagram section below."
                 : "Facebook Pages connected to this CRM. Only an admin can connect or change them."}
             </p>
 
@@ -754,7 +230,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
           </div>
         </div>
 
-        {/* Connect buttons: ADMIN only */}
+        {/* Connect button: ADMIN only */}
         {isAdmin && (
           <div className="flex w-full shrink-0 flex-col gap-3 lg:w-72">
             <button
@@ -772,28 +248,6 @@ function FacebookMessengerCard({ isAdmin = false }) {
                 ? "Add / Update Pages"
                 : "Connect Facebook"}
             </button>
-
-            <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" />
-              or
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleConnectInstagram}
-              disabled={connectingInstagram}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <FaInstagram size={16} />
-              {connectingInstagram
-                ? "Opening Instagram..."
-                : "Connect Instagram (no Facebook)"}
-            </button>
-
-            <p className="text-center text-xs text-slate-400">
-              Needs a Business or Creator Instagram account.
-            </p>
           </div>
         )}
       </div>
@@ -823,28 +277,15 @@ function FacebookMessengerCard({ isAdmin = false }) {
         </div>
       )}
 
-      {/* Instagram notes (for example an Instagram account already used elsewhere) */}
-      {instagramNotes.length > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <p className="font-semibold">Instagram:</p>
-          <ul className="mt-1 list-disc pl-5">
-            {instagramNotes.map((note, i) => (
-              <li key={i}>{note}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {/* Connected Pages */}
       {hasPages && (
         <div className="mt-6 border-t border-slate-100 pt-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Connected accounts
+            Connected Pages
           </p>
 
           <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
             {pages.map((page) => {
-              const isInstagramLogin = page.connectionType === "INSTAGRAM_LOGIN";
               const needsReconnectRow = page.status === "RECONNECT_NEEDED";
 
               return (
@@ -853,28 +294,17 @@ function FacebookMessengerCard({ isAdmin = false }) {
                   className="flex flex-col gap-3 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-start gap-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        isInstagramLogin ? "bg-pink-50" : "bg-[#E7F0FF]"
-                      }`}
-                    >
-                      {isInstagramLogin ? (
-                        <FaInstagram size={18} className="text-[#DD2A7B]" />
-                      ) : (
-                        <FaFacebookMessenger
-                          size={18}
-                          className="text-[#1877F2]"
-                        />
-                      )}
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E7F0FF]">
+                      <FaFacebookMessenger
+                        size={18}
+                        className="text-[#1877F2]"
+                      />
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate font-semibold text-slate-800">
-                          {page.pageName ||
-                            (isInstagramLogin
-                              ? "Instagram account"
-                              : `Page ${page.pageId}`)}
+                          {page.pageName || `Page ${page.pageId}`}
                         </p>
 
                         <span
@@ -890,24 +320,17 @@ function FacebookMessengerCard({ isAdmin = false }) {
                         </span>
                       </div>
 
-                      {isInstagramLogin && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Connected directly with Instagram (no Facebook)
-                        </p>
-                      )}
-
-                      {page.hasInstagram ? (
-                        <p className="mt-1 text-xs font-medium text-pink-600">
-                          Instagram:{" "}
+                      {/* Older connections only: an Instagram account was linked
+                          through this Page before the two were separated. */}
+                      {page.hasInstagram && (
+                        <p className="mt-1 max-w-xl text-xs leading-relaxed text-amber-700">
+                          An older Instagram link
                           {page.instagramUsername
-                            ? `@${page.instagramUsername}`
-                            : "linked"}
-                        </p>
-                      ) : (
-                        <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-400">
-                          Instagram: not linked. To receive Instagram DMs, link
-                          a professional Instagram account to this Page, then
-                          click "Add / Update Pages".
+                            ? ` (@${page.instagramUsername})`
+                            : ""}{" "}
+                          is still attached to this Page. Click “Add / Update
+                          Pages” to remove it, then connect Instagram in the
+                          Instagram section.
                         </p>
                       )}
                     </div>
@@ -915,17 +338,6 @@ function FacebookMessengerCard({ isAdmin = false }) {
 
                   {isAdmin && (
                     <div className="flex shrink-0 items-center gap-2 sm:justify-end">
-                      {isInstagramLogin && needsReconnectRow && (
-                        <button
-                          type="button"
-                          onClick={handleConnectInstagram}
-                          disabled={connectingInstagram}
-                          className="h-9 rounded-xl bg-[#DD2A7B] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-                        >
-                          Reconnect
-                        </button>
-                      )}
-
                       <button
                         type="button"
                         onClick={() => setPageToDisconnect(page)}
@@ -944,20 +356,10 @@ function FacebookMessengerCard({ isAdmin = false }) {
 
       <ConfirmModal
         isOpen={!!pageToDisconnect}
-        title={
-          pageToDisconnect?.connectionType === "INSTAGRAM_LOGIN"
-            ? "Disconnect Instagram account?"
-            : "Disconnect Facebook Page?"
-        }
-        message={
-          pageToDisconnect?.connectionType === "INSTAGRAM_LOGIN"
-            ? `You won't receive or send Instagram messages for "${
-                pageToDisconnect?.pageName || "this account"
-              }" in the CRM until you reconnect. Existing chats are kept.`
-            : `You won't receive or send Messenger messages for "${
-                pageToDisconnect?.pageName || "this Page"
-              }" in the CRM until you reconnect. Existing chats are kept.`
-        }
+        title="Disconnect Facebook Page?"
+        message={`You won't receive or send Messenger messages for "${
+          pageToDisconnect?.pageName || "this Page"
+        }" in the CRM until you reconnect. Existing chats are kept.`}
         confirmText={disconnecting ? "Disconnecting..." : "Disconnect"}
         cancelText="Cancel"
         variant="danger"

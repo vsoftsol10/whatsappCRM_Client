@@ -26,13 +26,19 @@
 //   return response.data;
 // };
 
+
 import apiClient from "./apiClient";
 
 const FACEBOOK_BASE_URL = "/api/facebook";
 
-// List this company's connected Facebook Pages
-export const getFacebookPages = async () => {
-  const response = await apiClient.get(`${FACEBOOK_BASE_URL}/pages`);
+// List this company's connected accounts.
+//   getFacebookPages("facebook")  -> Facebook Pages only
+//   getFacebookPages("instagram") -> directly connected Instagram accounts only
+//   getFacebookPages()            -> everything (as before)
+export const getFacebookPages = async (type) => {
+  const response = await apiClient.get(`${FACEBOOK_BASE_URL}/pages`, {
+    params: type ? { type } : undefined,
+  });
   return response.data;
 };
 

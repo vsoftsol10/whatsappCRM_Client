@@ -388,6 +388,9 @@
  
 
 
+
+
+
 // ============================================================
 // FACEBOOK / MESSENGER SERVICE
 // Thin wrapper around the Meta Graph API for Facebook Pages.
@@ -398,6 +401,7 @@
 // not returned when connecting through the Facebook button.
 // ============================================================
 const axios = require("axios");
+const { facebookLinksInstagram } = require("../utils/socialFlags");
 
 const GRAPH_API_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 const GRAPH = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -641,6 +645,14 @@ const subscribeLinkedInstagramBestEffort = async (pageId, pageToken) => {
   }
 
   // 2) Subscribe the linked Instagram account (if there is one)
+  //    Facebook and Instagram are connected separately now, so the Facebook
+  //    button leaves the Instagram account alone (the Instagram button does
+  //    its own subscription). Set FACEBOOK_LINK_INSTAGRAM=true to restore the
+  //    old behaviour.
+  if (!facebookLinksInstagram()) {
+    console.log("[IG subscribe] skipped - Instagram is connected separately");
+    return;
+  }
   try {
     const lookup = await axios.get(`${GRAPH}/${pageId}`, {
       params: {
