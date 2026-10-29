@@ -1,4 +1,3 @@
-
 // import React from "react";
 // import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -25,6 +24,7 @@
 // import CustomerProfile from "./pages/CustomerProfile";
 // import CampaignDetails from "./pages/CampaignDetails";
 // import Templates from "./pages/Templates";
+// import Services from "./pages/Services";
 
 // import AuditLogs from "./pages/settings/AuditLogs";
 // import AiAutoReply from "./pages/settings/AiAutoReply";
@@ -99,6 +99,8 @@
 
 //             <Route path="/templates" element={<Templates />} />
 
+//             <Route path="/services" element={<Services />} />
+
 //             <Route path="/tasks" element={<Tasks />} />
 
 //             <Route path="/tickets" element={<TicketsPage />} />
@@ -169,9 +171,8 @@
 
 
 
-
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom"; // CHANGED (added useSearchParams)
 
 import { useAuthStore } from "./store/authStore";
 
@@ -220,6 +221,58 @@ import Plans from "./pages/settings/Plans";
 // BACKUP
 import Backup from "./pages/Backup";
 
+
+// ======================================================
+// NEW: LOGIN ROUTE
+// ------------------------------------------------------
+// The employee e-mail links to /login?company=XXXX.
+// If another user (e.g. the company admin) is still logged
+// in on the SAME browser, the old code redirected straight
+// to the dashboard, so the new employee never saw the login
+// page.
+//
+// Now: when the page is opened with ?company=... and an old
+// session exists, the old session is cleared ONCE and the
+// page reloads, so the login form is shown.
+// Plain /login while logged in still goes to the dashboard.
+// ======================================================
+const LoginRoute = () => {
+  const { isAuthenticated } = useAuthStore();
+  const [searchParams] = useSearchParams();
+
+  const isInviteLink = !!searchParams.get("company");
+
+  // Decided only once, when this page is first opened.
+  // (After a successful login the URL still has ?company=...,
+  //  so without this the new user would be logged out again.)
+  const [mustResetSession] = React.useState(
+    () => isInviteLink && isAuthenticated
+  );
+
+  React.useEffect(() => {
+    if (mustResetSession) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      // Full reload clears every store, so the new user never
+      // sees the previous user's data. Same URL (keeps ?company=)
+      window.location.replace(
+        window.location.pathname + window.location.search
+      );
+    }
+  }, [mustResetSession]);
+
+  // Old session is being cleared - render nothing for a moment
+  if (mustResetSession) return null;
+
+  return !isAuthenticated ? (
+    <Login />
+  ) : (
+    <Navigate to="/dashboard" replace />
+  );
+};
+
+
 function App() {
   const { isAuthenticated } = useAuthStore();
 
@@ -229,7 +282,8 @@ function App() {
         {/* =====================================================
             LOGIN
         ====================================================== */}
-        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" replace />} />
+        {/* CHANGED: now uses LoginRoute */}
+        <Route path="/login" element={<LoginRoute />} />
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
@@ -338,4 +392,3 @@ function App() {
 }
 
 export default App;
-

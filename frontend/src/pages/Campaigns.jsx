@@ -1,3 +1,4 @@
+
 // import { useEffect, useMemo, useState } from "react";
 // import toast from "react-hot-toast";
 // import { Sparkles } from "lucide-react";
@@ -305,6 +306,11 @@
 //           setAiCampaign(null);
 //         }}
 //         aiCampaign={aiCampaign}
+//         onCreated={(campaign) => {
+//           // Straight after creation, open the Send Campaign modal
+//           setSelectedCampaign(campaign);
+//           setShowSendModal(true);
+//         }}
 //       />
 
 //       {/* ========================= */}
@@ -377,6 +383,7 @@ import toast from "react-hot-toast";
 import { Sparkles } from "lucide-react";
 
 import useCampaignStore from "../store/campaignStore";
+import { getCampaigns } from "../api/campaignApi"; // NEW (silent auto-refresh while sending)
 
 import CampaignStats from "../components/campaigns/CampaignStats";
 import CampaignFilters from "../components/campaigns/CampaignFilters";
@@ -421,6 +428,30 @@ export default function Campaigns() {
   useEffect(() => {
     fetchCampaigns();
   }, []);
+
+  // NEW: while any campaign is SENDING, refresh the list every 4 seconds
+  // (silently - no loading spinner) so sent / failed counts move live.
+  const hasSendingCampaign = campaigns.some(
+    (campaign) => campaign.status === "SENDING"
+  );
+
+  useEffect(() => {
+    if (!hasSendingCampaign) return;
+
+    const timer = setInterval(async () => {
+      try {
+        const response = await getCampaigns();
+
+        useCampaignStore.setState({
+          campaigns: response.data || [],
+        });
+      } catch (error) {
+        // ignore - the next tick will try again
+      }
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [hasSendingCampaign]);
 
   useEffect(() => {
     setCurrentPage(1);
