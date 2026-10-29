@@ -539,6 +539,8 @@
 
 
 
+
+
 import { create } from 'zustand';
 import apiClient from '../api/apiClient';
 import {
@@ -705,7 +707,9 @@ export const useAuthStore = create((set, get) => ({
 
       const message =
         error.response?.data?.message ||
-        'Login failed';
+        (error.response
+          ? 'Login failed'
+          : 'Cannot reach the server. Please wait a moment and try again.');
 
 
       set({
@@ -1090,4 +1094,5 @@ export const useAuthStore = create((set, get) => ({
       error: null,
     }),
 }));
+
 
