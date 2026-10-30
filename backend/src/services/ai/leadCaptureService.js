@@ -345,6 +345,7 @@
 
 //   // ---------- ask the AI ----------
 //   const answer = await completeOnce({
+//     companyId,
 //     systemPrompt: buildExtractionPrompt({
 //       companyName: conversation.company?.companyName,
 //       profile: settings.businessProfile,
@@ -445,9 +446,12 @@
 // };
 
 
+
+
 const prisma = require("../../config/prisma");
 const { completeOnce } = require("../aiService");
 const { readProfile } = require("./businessPrompt");
+const { pickNextEmployee, withCompanyLock } = require("./leadAssignment");
 const { notifyUser, NotificationType } = require("../notificationService");
 const { normalizeIndianPhone } = require("../../utils/phoneUtils");
 
@@ -835,38 +839,50 @@ const run = async (conversationId) => {
   // The check above ran before a slow AI call, so look again.
   if (await findRecentLead(companyId, leadPhone)) return "duplicate";
 
-  let assignee = null;
+  const createLead = async () => {
+    let assignee = null;
 
-  if (settings.leadAssigneeId) {
-    assignee = await prisma.user.findFirst({
-      where: {
-        id: settings.leadAssigneeId,
+    if (settings.leadAutoAssign) {
+      // Auto-assign: share new leads between all active employees
+      assignee = await pickNextEmployee(companyId);
+    } else if (settings.leadAssigneeId) {
+      assignee = await prisma.user.findFirst({
+        where: {
+          id: settings.leadAssigneeId,
+          companyId,
+          role: "USER",
+          status: "ACTIVE",
+        },
+        select: { id: true },
+      });
+    }
+
+    const lead = await prisma.lead.create({
+      data: {
         companyId,
-        role: "USER",
-        status: "ACTIVE",
+        name: result.name || `${PLACEHOLDER_NAME_PREFIX}${leadPhone}`,
+        phone: leadPhone,
+        source: LEAD_SOURCE,
+        requirements: result.requirement || null,
+        status: "NEW",
+        assignedToId: assignee ? assignee.id : null,
       },
-      select: { id: true },
     });
+
+    console.log("Lead capture: lead created:", lead.id);
+
+    await writeAuditLog({ companyId, lead });
+    await announceNewLead({ lead, assignee, companyId });
+
+    return "created";
+  };
+
+  // Auto-assign picks + creates one lead at a time per company
+  if (settings.leadAutoAssign) {
+    return withCompanyLock(companyId, createLead);
   }
 
-  const lead = await prisma.lead.create({
-    data: {
-      companyId,
-      name: result.name || `${PLACEHOLDER_NAME_PREFIX}${leadPhone}`,
-      phone: leadPhone,
-      source: LEAD_SOURCE,
-      requirements: result.requirement || null,
-      status: "NEW",
-      assignedToId: assignee ? assignee.id : null,
-    },
-  });
-
-  console.log("Lead capture: lead created:", lead.id);
-
-  await writeAuditLog({ companyId, lead });
-  await announceNewLead({ lead, assignee, companyId });
-
-  return "created";
+  return createLead();
 };
 
 const captureLeadFromChat = async (conversationId) => {

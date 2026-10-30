@@ -1544,6 +1544,10 @@ model AiSettings {
   leadCaptureEnabled Boolean @default(false)
   leadAssigneeId     String?
 
+  // true = new leads are shared between all active employees automatically
+  // (the one who got a lead longest ago gets the next one)
+  leadAutoAssign Boolean @default(false)
+
   // Last failure of the auto-reply pipeline, shown on the settings page
   lastError   String?
   lastErrorAt DateTime?

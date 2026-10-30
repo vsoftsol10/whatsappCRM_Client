@@ -264,6 +264,38 @@
 //     .trim()
 //     .slice(0, WHATSAPP_MAX_LENGTH);
 
+// // ============================================
+// // AI USAGE TRACKING (per company, for super admin)
+// // ============================================
+// // Writes one AiUsageLog row per successful AI call. Only counts are stored,
+// // never the message text. Fire-and-forget: a logging problem must never
+// // stop or delay a customer reply.
+// const logUsage = ({ companyId, type, channel, providerId, model, usage }) => {
+//   try {
+//     if (!companyId || !prisma.aiUsageLog) return;
+
+//     const inputTokens = Math.max(0, Number(usage?.inputTokens) || 0);
+//     const outputTokens = Math.max(0, Number(usage?.outputTokens) || 0);
+
+//     prisma.aiUsageLog
+//       .create({
+//         data: {
+//           companyId,
+//           type: type || "OTHER",
+//           channel: channel || "WhatsApp",
+//           provider: String(providerId || ""),
+//           model: String(model || ""),
+//           inputTokens,
+//           outputTokens,
+//           totalTokens: Number(usage?.totalTokens) || inputTokens + outputTokens,
+//         },
+//       })
+//       .catch((error) => console.error("AI usage log failed:", error.message));
+//   } catch (error) {
+//     console.error("AI usage log failed:", error.message);
+//   }
+// };
+
 // // Sends the conversation to the chosen provider and returns reply text.
 // // Throws on failure (callers turn it into a friendly message).
 // const callProvider = async ({
@@ -275,6 +307,8 @@
 //   messages,
 //   rawSystem = false,
 //   channel, // NEW (optional): "Instagram" | "Messenger"; empty = WhatsApp
+//   companyId, // for usage tracking
+//   usageType, // WHATSAPP_REPLY | SOCIAL_REPLY | LEAD_CAPTURE | TEST
 // }) => {
 //   const provider = getProvider(providerId);
 
@@ -287,6 +321,7 @@
 //   const system = rawSystem ? systemPrompt : `${systemPrompt}${rulesForChannel(channel)}`;
 
 //   let text;
+//   let usage = null;
 
 //   if (provider.type === "anthropic") {
 //     const response = await axios.post(
@@ -307,6 +342,11 @@
 //       .filter((block) => block.type === "text")
 //       .map((block) => block.text)
 //       .join("\n");
+
+//     usage = {
+//       inputTokens: response.data?.usage?.input_tokens,
+//       outputTokens: response.data?.usage?.output_tokens,
+//     };
 //   } else {
 //     const response = await axios.post(
 //       url,
@@ -327,7 +367,16 @@
 //     text = Array.isArray(content)
 //       ? content.map((part) => part.text || "").join("\n")
 //       : content;
+
+//     usage = {
+//       inputTokens: response.data?.usage?.prompt_tokens,
+//       outputTokens: response.data?.usage?.completion_tokens,
+//       totalTokens: response.data?.usage?.total_tokens,
+//     };
 //   }
+
+//   // Tokens were spent even if the reply turns out empty, so log first.
+//   logUsage({ companyId, type: usageType, channel, providerId, model, usage });
 
 //   const reply = cleanReplyText(text);
 
@@ -421,6 +470,8 @@
 //       systemPrompt,
 //       messages: history,
 //       channel: options.channel, // NEW: undefined for WhatsApp = unchanged
+//       companyId,
+//       usageType: options.channel ? "SOCIAL_REPLY" : "WHATSAPP_REPLY",
 //     });
 
 //     const { reply, handoff } = splitHandoff(raw);
@@ -469,6 +520,8 @@
 //       apiKey: platform.apiKey,
 //       systemPrompt,
 //       messages: [{ role: "user", content: sample }],
+//       companyId,
+//       usageType: "TEST",
 //     });
 
 //     const { reply, handoff } = splitHandoff(raw);
@@ -485,7 +538,7 @@
 // // For jobs that are not a WhatsApp reply, e.g. lead capture. Uses the same
 // // platform AI, but WITHOUT the WhatsApp reply rules or the hand-off marker.
 // // Throws on failure; the caller decides what to do.
-// const completeOnce = async ({ systemPrompt, messages }) => {
+// const completeOnce = async ({ systemPrompt, messages, companyId, channel }) => {
 //   const platform = getPlatformAi();
 
 //   if (!platform.available) throw new AiError(platform.error);
@@ -497,6 +550,9 @@
 //     systemPrompt,
 //     messages,
 //     rawSystem: true,
+//     companyId,
+//     channel,
+//     usageType: "LEAD_CAPTURE",
 //   });
 // };
 
@@ -510,8 +566,6 @@
 //   splitHandoff,
 //   completeOnce,
 // };
-
-
 
 
 
@@ -616,6 +670,7 @@ const serializeSettings = (settings) => ({
   historyLimit: settings.historyLimit,
   leadCaptureEnabled: Boolean(settings.leadCaptureEnabled),
   leadAssigneeId: settings.leadAssigneeId || null,
+  leadAutoAssign: Boolean(settings.leadAutoAssign),
   lastError: settings.lastError,
   lastErrorAt: settings.lastErrorAt,
   updatedAt: settings.updatedAt,
