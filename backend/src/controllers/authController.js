@@ -1,4 +1,3 @@
-
 // const prisma = require("../config/prisma");
 // const bcrypt = require("bcrypt");
 // const jwt = require("jsonwebtoken");
@@ -57,6 +56,9 @@
 
 // // ========================
 // // LOGIN USER
+// const FORGOT_PASSWORD_GENERIC_MESSAGE =
+//   "If an account exists for this email, a password reset link has been sent.";
+
 // // ========================
 // const loginUser = async (req, res) => {
 //   try {
@@ -74,7 +76,7 @@
 
 //     if (users.length === 0) {
 //       return res.status(400).json({
-//         message: "User not found",
+//         message: "Invalid email or password",
 //       });
 //     }
 
@@ -125,7 +127,7 @@
 
 //     if (!user) {
 //       return res.status(400).json({
-//         message: "Invalid password",
+//         message: "Invalid email or password",
 //       });
 //     }
 
@@ -509,10 +511,11 @@
 //       }))
 //     );
 
-//     // No account found
+//     // No account found - answer exactly like a success so attackers
+//     // cannot discover which emails are registered.
 //     if (users.length === 0) {
-//       return res.status(404).json({
-//         message: "User not found",
+//       return res.status(200).json({
+//         message: FORGOT_PASSWORD_GENERIC_MESSAGE,
 //       });
 //     }
 
@@ -551,7 +554,7 @@
 //     );
 
 //     return res.status(200).json({
-//       message: "Password reset email sent successfully",
+//       message: FORGOT_PASSWORD_GENERIC_MESSAGE,
 //     });
 
 //   } catch (error) {
@@ -625,6 +628,9 @@
 //   forgotPassword,
 //   resetPassword,
 // };
+
+
+
 
 
 const prisma = require("../config/prisma");
@@ -809,6 +815,7 @@ const loginUser = async (req, res) => {
           companyLogo: user.company?.logo,
           companyStatus: user.company?.status,
           expiryDate: user.company?.expiryDate,
+          tourSeenAt: user.tourSeenAt || null, // NEW
         },
       });
     }
@@ -841,6 +848,7 @@ const loginUser = async (req, res) => {
         companyLogo: user.company?.logo,
         companyStatus: user.company?.status,
         expiryDate: user.company?.expiryDate,
+        tourSeenAt: user.tourSeenAt || null, // NEW
       },
     });
   } catch (error) {
@@ -890,11 +898,45 @@ const getMe = async (req, res) => {
       companyLogo: user.company?.logo,
       companyStatus: user.company?.status,
       expiryDate: user.company?.expiryDate,
+      tourSeenAt: user.tourSeenAt || null, // NEW
     });
   } catch (error) {
     return res.status(500).json({
       message: error.message,
     });
+  }
+};
+
+// ========================
+// MARK PRODUCT TOUR (USER GUIDE) AS SEEN
+// ========================
+// Saved on the account, so the guide is shown only on the user's
+// first login - not again in every new browser.
+const markTourSeen = async (req, res) => {
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { tourSeenAt: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Already saved - keep the first date
+    if (existing.tourSeenAt) {
+      return res.status(200).json({ tourSeenAt: existing.tourSeenAt });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { tourSeenAt: new Date() },
+      select: { tourSeenAt: true },
+    });
+
+    return res.status(200).json({ tourSeenAt: updated.tourSeenAt });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -1252,6 +1294,7 @@ module.exports = {
   registerUser,
   loginUser,
   getMe,
+  markTourSeen, // NEW
   updateProfile,
   changePassword,
   forgotPassword,

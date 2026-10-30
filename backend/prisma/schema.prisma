@@ -529,6 +529,10 @@ model User {
 
   isFirstLogin Boolean @default(true)
 
+  // NEW: set when the user finishes / skips the product tour (user guide),
+  // so it is shown only once per account, not once per browser.
+  tourSeenAt DateTime?
+
   resetToken       String?
   resetTokenExpiry DateTime?
 
