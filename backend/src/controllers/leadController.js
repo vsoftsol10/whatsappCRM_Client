@@ -270,6 +270,34 @@
 //       }
 //     }
 
+//     // ================= PREVIOUS ASSIGNEE NOTIFICATION =================
+//     // When a lead is taken away from an employee (reassigned to someone
+//     // else, or unassigned), that previous employee is notified too.
+//     const previousAssigneeId = existingLead.assignedToId;
+//     const currentAssigneeId = updatedLead.assignedToId || null;
+
+//     if (
+//       previousAssigneeId &&
+//       previousAssigneeId !== currentAssigneeId &&
+//       previousAssigneeId !== req.user.userId
+//     ) {
+//       try {
+//         await notifyUser({
+//           userId: previousAssigneeId,
+//           title: "Lead Reassigned",
+//           message: updatedLead.assignedTo?.name
+//             ? `The lead "${updatedLead.name}" has been reassigned from you to ${updatedLead.assignedTo.name}.`
+//             : `The lead "${updatedLead.name}" has been unassigned from you.`,
+//           type: NotificationType.LEAD,
+//         });
+//       } catch (notificationError) {
+//         console.error(
+//           "Lead previous-assignee notification failed:",
+//           notificationError
+//         );
+//       }
+//     }
+
 //     logAction({
 //       req,
 //       action: "UPDATE",
@@ -560,6 +588,8 @@
 // };
 
 
+
+
 const prisma = require("../config/prisma");
 
 const {
@@ -795,11 +825,15 @@ const updateLead = async (req, res) => {
       },
       data: {
         name,
-        phone,
-        email,
+        // NEW: an empty phone / email / requirements is saved as null
+        // (not as an empty text), e.g. for Facebook / Instagram leads.
+        // Not sent at all (undefined) = left unchanged, as before.
+        phone: phone === undefined ? undefined : phone?.trim() || null,
+        email: email === undefined ? undefined : email?.trim() || null,
         companyName: company,
         source,
-        requirements,
+        requirements:
+          requirements === undefined ? undefined : requirements?.trim() || null,
         status: existingLead.isConverted
           ? existingLead.status
           : status,
@@ -1002,6 +1036,16 @@ const convertLeadToCustomer = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Lead already converted",
+      });
+    }
+
+    // NEW: a customer needs a phone number. Facebook / Instagram leads may
+    // not have one yet, so give a clear message instead of a server error.
+    if (!lead.phone || !lead.phone.trim()) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Add a phone number to this lead (Edit Lead) before converting it to a customer.",
       });
     }
 

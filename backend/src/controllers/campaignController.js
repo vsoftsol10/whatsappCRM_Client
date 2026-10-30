@@ -52,11 +52,20 @@
 // // Does NOT touch campaign.status or counts — the caller decides
 // // how to persist that, since a full send vs. a partial/targeted
 // // send need different bookkeeping (reset vs. increment).
+// // How many customers are sent to at the SAME time.
+// // Change with CAMPAIGN_CONCURRENCY in .env (default 10, allowed 1-30).
+// // Use a lower number (e.g. 5) if Meta shows rate-limit errors.
+// const CAMPAIGN_CONCURRENCY = Math.min(
+//   30,
+//   Math.max(1, parseInt(process.env.CAMPAIGN_CONCURRENCY, 10) || 10)
+// );
+
 // const sendToRecipients = async (
 //   campaign,
 //   recipientsToSend,
 //   whatsappAccount,
-//   companyId
+//   companyId,
+//   onProgress = null // NEW (optional): called after every batch with { sentCount, failedCount }
 // ) => {
 //   let sentCount = 0;
 //   let failedCount = 0;
@@ -72,7 +81,9 @@
 //     )
 //   );
 
-//   for (const recipient of recipientsToSend) {
+//   // The code inside is exactly the same as the old loop body.
+//   // It only moved into a function so several customers can run together.
+//   const processRecipient = async (recipient) => {
 //     const customer = recipient.customer;
 
 //     if (!customer || !customer.phone) {
@@ -83,7 +94,7 @@
 //         data: { status: "FAILED" },
 //       });
 
-//       continue;
+//       return; // (was "continue" in the old loop)
 //     }
 
 //     try {
@@ -202,6 +213,22 @@
 //         where: { id: recipient.id },
 //         data: { status: "FAILED" },
 //       });
+//     }
+//   };
+
+//   // Send in batches of CAMPAIGN_CONCURRENCY customers at the same time.
+//   // allSettled => one customer failing never stops the others.
+//   for (let i = 0; i < recipientsToSend.length; i += CAMPAIGN_CONCURRENCY) {
+//     const batch = recipientsToSend.slice(i, i + CAMPAIGN_CONCURRENCY);
+
+//     await Promise.allSettled(batch.map((recipient) => processRecipient(recipient)));
+
+//     if (typeof onProgress === "function") {
+//       try {
+//         await onProgress({ sentCount, failedCount });
+//       } catch (progressError) {
+//         console.error("Campaign progress update failed:", progressError.message);
+//       }
 //     }
 //   }
 
@@ -925,77 +952,101 @@
 //     // SEND
 //     // =====================================================
 
-//     const { sentCount, failedCount } = await sendToRecipients(
-//       campaign,
-//       targetRecipients,
-//       whatsappAccount,
-//       companyId
-//     );
-
-//     // =====================================================
-//     // FINAL CAMPAIGN STATUS / COUNTS
-//     // =====================================================
-
-//     // In case new customers were attached to the campaign above,
-//     // recount from the DB so totals stay accurate either way.
-//     const currentRecipientCount = await prisma.campaignRecipient.count({
-//       where: { campaignId: campaign.id },
-//     });
-
-//     const completedCampaign = await prisma.campaign.update({
-//       where: { id: campaign.id },
-//       data: isTargeted
-//         ? {
-//             // targeted: add this run's results on top of whatever was there
-//             sentCount: { increment: sentCount },
-//             failedCount: { increment: failedCount },
-//             totalRecipients: currentRecipientCount,
-//             audienceCount: currentRecipientCount,
-//             status: "COMPLETED",
-//             completedAt: new Date(),
-//           }
-//         : {
-//             // full send: this run's numbers are the whole campaign's numbers
-//             status: sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED",
-//             completedAt: new Date(),
-//             sentCount,
-//             failedCount,
-//             totalRecipients: campaign.recipients.length,
-//             audienceCount: campaign.recipients.length,
-//           },
-//     });
-
-//     logAction({
-//       req,
-//       action: "UPDATE",
-//       module: "CAMPAIGN",
-//       entityId: campaign.id,
-//       entityName: campaign.name,
-//       changes: {
-//         after: {
-//           status: completedCampaign.status,
-//           targeted: isTargeted,
-//           recipientsThisRun: targetRecipients.length,
-//           sentCount,
-//           failedCount,
-//         },
-//       },
-//     });
-
-//     return res.status(200).json({
+//     // Reply to the browser NOW. The sending continues in the background,
+//     // so a big campaign never times out and the screen is not stuck waiting.
+//     res.status(200).json({
 //       success: true,
-//       message:
-//         failedCount > 0 && sentCount === 0
-//           ? "Campaign sending failed."
-//           : "Campaign sent successfully.",
+//       message: `Campaign sending started for ${targetRecipients.length} customer(s). Progress will update shortly.`,
 //       data: {
-//         campaignId: completedCampaign.id,
-//         status: completedCampaign.status,
+//         campaignId: campaign.id,
+//         status: "SENDING",
 //         recipientsThisRun: targetRecipients.length,
-//         sentCount,
-//         failedCount,
 //       },
 //     });
+
+//     // ---------- BACKGROUND SENDING ----------
+//     (async () => {
+//       try {
+//         const { sentCount, failedCount } = await sendToRecipients(
+//           campaign,
+//           targetRecipients,
+//           whatsappAccount,
+//           companyId,
+//           // Live progress only for a full send (counters were reset to 0).
+//           // A targeted send adds its numbers at the end, as before.
+//           isTargeted
+//             ? null
+//             : async ({ sentCount: sent, failedCount: failed }) => {
+//                 await prisma.campaign.update({
+//                   where: { id: campaign.id },
+//                   data: { sentCount: sent, failedCount: failed },
+//                 });
+//               }
+//         );
+
+//         // =====================================================
+//         // FINAL CAMPAIGN STATUS / COUNTS
+//         // =====================================================
+
+//         // In case new customers were attached to the campaign above,
+//         // recount from the DB so totals stay accurate either way.
+//         const currentRecipientCount = await prisma.campaignRecipient.count({
+//           where: { campaignId: campaign.id },
+//         });
+
+//         const completedCampaign = await prisma.campaign.update({
+//           where: { id: campaign.id },
+//           data: isTargeted
+//             ? {
+//                 // targeted: add this run's results on top of whatever was there
+//                 sentCount: { increment: sentCount },
+//                 failedCount: { increment: failedCount },
+//                 totalRecipients: currentRecipientCount,
+//                 audienceCount: currentRecipientCount,
+//                 status: "COMPLETED",
+//                 completedAt: new Date(),
+//               }
+//             : {
+//                 // full send: this run's numbers are the whole campaign's numbers
+//                 status: sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED",
+//                 completedAt: new Date(),
+//                 sentCount,
+//                 failedCount,
+//                 totalRecipients: campaign.recipients.length,
+//                 audienceCount: campaign.recipients.length,
+//               },
+//         });
+
+//         logAction({
+//           req,
+//           action: "UPDATE",
+//           module: "CAMPAIGN",
+//           entityId: campaign.id,
+//           entityName: campaign.name,
+//           changes: {
+//             after: {
+//               status: completedCampaign.status,
+//               targeted: isTargeted,
+//               recipientsThisRun: targetRecipients.length,
+//               sentCount,
+//               failedCount,
+//             },
+//           },
+//         });
+//       } catch (backgroundError) {
+//         console.error("Background Send Campaign Error:", backgroundError);
+
+//         // Never leave the campaign stuck on SENDING
+//         await prisma.campaign
+//           .update({
+//             where: { id: campaign.id },
+//             data: { status: "FAILED", completedAt: new Date() },
+//           })
+//           .catch(() => {});
+//       }
+//     })();
+
+//     return;
 //   } catch (error) {
 //     console.error("Send Campaign Error:", error);
 
@@ -1092,57 +1143,74 @@
 //       },
 //     });
 
-//     const { sentCount, failedCount } = await sendToRecipients(
-//       campaign,
-//       campaign.recipients,
-//       whatsappAccount,
-//       companyId
-//     );
-
-//     const finalStatus = sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED";
-
-//     const completedCampaign = await prisma.campaign.update({
-//       where: { id: campaign.id },
-//       data: {
-//         status: finalStatus,
-//         completedAt: new Date(),
-//         sentCount,
-//         failedCount,
-//         totalRecipients: campaign.recipients.length,
-//         audienceCount: campaign.recipients.length,
-//       },
-//     });
-
-//     logAction({
-//       req,
-//       action: "UPDATE",
-//       module: "CAMPAIGN",
-//       entityId: campaign.id,
-//       entityName: campaign.name,
-//       changes: {
-//         after: {
-//           status: finalStatus,
-//           totalRecipients: campaign.recipients.length,
-//           sentCount,
-//           failedCount,
-//         },
-//       },
-//     });
-
-//     return res.status(200).json({
+//     // Reply now, keep sending in the background (same as sendCampaign)
+//     res.status(200).json({
 //       success: true,
-//       message:
-//         finalStatus === "COMPLETED"
-//           ? "Campaign resent successfully."
-//           : "Campaign resend failed.",
+//       message: `Campaign resend started for ${campaign.recipients.length} customer(s). Progress will update shortly.`,
 //       data: {
-//         campaignId: completedCampaign.id,
-//         status: completedCampaign.status,
+//         campaignId: campaign.id,
+//         status: "SENDING",
 //         totalRecipients: campaign.recipients.length,
-//         sentCount,
-//         failedCount,
 //       },
 //     });
+
+//     (async () => {
+//       try {
+//         const { sentCount, failedCount } = await sendToRecipients(
+//           campaign,
+//           campaign.recipients,
+//           whatsappAccount,
+//           companyId,
+//           async ({ sentCount: sent, failedCount: failed }) => {
+//             await prisma.campaign.update({
+//               where: { id: campaign.id },
+//               data: { sentCount: sent, failedCount: failed },
+//             });
+//           }
+//         );
+
+//         const finalStatus = sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED";
+
+//         await prisma.campaign.update({
+//           where: { id: campaign.id },
+//           data: {
+//             status: finalStatus,
+//             completedAt: new Date(),
+//             sentCount,
+//             failedCount,
+//             totalRecipients: campaign.recipients.length,
+//             audienceCount: campaign.recipients.length,
+//           },
+//         });
+
+//         logAction({
+//           req,
+//           action: "UPDATE",
+//           module: "CAMPAIGN",
+//           entityId: campaign.id,
+//           entityName: campaign.name,
+//           changes: {
+//             after: {
+//               status: finalStatus,
+//               totalRecipients: campaign.recipients.length,
+//               sentCount,
+//               failedCount,
+//             },
+//           },
+//         });
+//       } catch (backgroundError) {
+//         console.error("Background Resend Campaign Error:", backgroundError);
+
+//         await prisma.campaign
+//           .update({
+//             where: { id: campaign.id },
+//             data: { status: "FAILED", completedAt: new Date() },
+//           })
+//           .catch(() => {});
+//       }
+//     })();
+
+//     return;
 //   } catch (error) {
 //     console.error("Resend Campaign Error:", error);
 
@@ -1321,6 +1389,9 @@
  
 
 
+
+
+
 const prisma = require("../config/prisma");
 
 const {
@@ -1382,6 +1453,56 @@ const CAMPAIGN_CONCURRENCY = Math.min(
   Math.max(1, parseInt(process.env.CAMPAIGN_CONCURRENCY, 10) || 10)
 );
 
+// =====================================================
+// RETRY ON TEMPORARY META ERRORS
+// =====================================================
+// Rate-limit / "try again later" errors from Meta are retried up to
+// 3 times (waits about 2s, 4s, 8s). Permanent errors (wrong number,
+// template problem, etc.) are NOT retried. A timeout is NOT retried
+// either, because the message may already have reached the customer
+// and retrying could send it twice.
+const CAMPAIGN_RETRY_MAX = 3;
+const TEMPORARY_META_CODES = new Set([2, 4, 17, 32, 341, 613, 80007, 130429, 131016]);
+
+const isTemporaryMetaError = (error) => {
+  if (!error) return false;
+
+  // Network problem where the request never reached Meta
+  if (typeof error === "string") {
+    return /ECONNREFUSED|ENOTFOUND|EAI_AGAIN/i.test(error);
+  }
+
+  const metaError = error.error || error;
+
+  if (metaError.is_transient === true) return true;
+
+  return TEMPORARY_META_CODES.has(Number(metaError.code));
+};
+
+const sendWithRetry = async (sendFn) => {
+  let result = await sendFn();
+
+  for (
+    let attempt = 1;
+    attempt <= CAMPAIGN_RETRY_MAX &&
+    !result?.success &&
+    isTemporaryMetaError(result?.error);
+    attempt++
+  ) {
+    const waitMs = 2000 * 2 ** (attempt - 1) + Math.floor(Math.random() * 500);
+
+    console.log(
+      `Meta temporary error - retry ${attempt}/${CAMPAIGN_RETRY_MAX} in ${waitMs}ms`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+    result = await sendFn();
+  }
+
+  return result;
+};
+
 const sendToRecipients = async (
   campaign,
   recipientsToSend,
@@ -1403,20 +1524,16 @@ const sendToRecipients = async (
     )
   );
 
-  // The code inside is exactly the same as the old loop body.
-  // It only moved into a function so several customers can run together.
+  // Sends to ONE customer (conversation + Meta call) and returns what
+  // happened. The database saving for the whole batch is done together
+  // afterwards in flushBatch (far fewer database calls).
   const processRecipient = async (recipient) => {
     const customer = recipient.customer;
 
     if (!customer || !customer.phone) {
       failedCount++;
 
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: "FAILED" },
-      });
-
-      return; // (was "continue" in the old loop)
+      return { recipient, ok: false };
     }
 
     try {
@@ -1449,27 +1566,29 @@ const sendToRecipients = async (
       );
 
       if (campaign.imageUrl) {
-        result = await sendCampaignImageTemplate(
-          customer.phone,
-          campaign.template.name,
-          campaign.imageUrl,
-          templateParams,
-          campaign.template.language || "en_US",
-          whatsappAccount,
-          buttonComponents // 👈 NEW
+        result = await sendWithRetry(() =>
+          sendCampaignImageTemplate(
+            customer.phone,
+            campaign.template.name,
+            campaign.imageUrl,
+            templateParams,
+            campaign.template.language || "en_US",
+            whatsappAccount,
+            buttonComponents // 👈 NEW
+          )
         );
       } else {
-        result = await sendTemplateMessage(
-          customer.phone,
-          campaign.template.name,
-          templateParams,
-          whatsappAccount,
-          campaign.template.language || "en_US",
-          buttonComponents // 👈 NEW
+        result = await sendWithRetry(() =>
+          sendTemplateMessage(
+            customer.phone,
+            campaign.template.name,
+            templateParams,
+            whatsappAccount,
+            campaign.template.language || "en_US",
+            buttonComponents // 👈 NEW
+          )
         );
       }
-
-      console.log("WhatsApp Result:", result);
 
       // =====================================================
       // SUCCESS
@@ -1480,14 +1599,6 @@ const sendToRecipients = async (
 
         sentCount++;
 
-        await prisma.campaignRecipient.update({
-          where: { id: recipient.id },
-          data: {
-            status: "SENT",
-            sentAt: new Date(),
-          },
-        });
-
         // Show the template body with {{1}}, {{2}} etc. actually
         // filled in with templateParams — the same values just sent
         // to Meta — instead of the raw messageContent field.
@@ -1496,45 +1607,142 @@ const sendToRecipients = async (
           templateParams
         );
 
-        await prisma.message.create({
-          data: {
-            conversationId: conversation.id,
-            sender: "AGENT",
-            content: sentContent,
-            imageUrl: campaign.imageUrl,
-            messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
-            status: "SENT",
-            metaMessageId,
-            // 👈 NEW: keep the template's buttons so the chat can show them
-            buttons:
-              Array.isArray(campaign.template.buttons) &&
-              campaign.template.buttons.length > 0
-                ? campaign.template.buttons
-                : undefined,
-          },
-        });
-
-        await prisma.conversation.update({
-          where: { id: conversation.id },
-          data: { lastMessage: sentContent },
-        });
-      } else {
-        failedCount++;
-
-        await prisma.campaignRecipient.update({
-          where: { id: recipient.id },
-          data: { status: "FAILED" },
-        });
+        return {
+          recipient,
+          ok: true,
+          conversationId: conversation.id,
+          metaMessageId,
+          sentContent,
+        };
       }
+
+      // Failed: log it (successful sends are no longer logged one by one)
+      console.log(`WhatsApp send failed for ${customer.phone}:`, result?.error);
+
+      failedCount++;
+
+      return { recipient, ok: false };
     } catch (error) {
       console.error(`Campaign send failed for ${customer.phone}:`, error);
 
       failedCount++;
 
-      await prisma.campaignRecipient.update({
-        where: { id: recipient.id },
-        data: { status: "FAILED" },
-      });
+      return { recipient, ok: false };
+    }
+  };
+
+  // Template buttons are saved with every sent message so the chat can show them
+  const messageButtons =
+    Array.isArray(campaign.template.buttons) &&
+    campaign.template.buttons.length > 0
+      ? campaign.template.buttons
+      : undefined;
+
+  // =====================================================
+  // SAVE A WHOLE BATCH TOGETHER
+  // =====================================================
+  // Before: 3 database calls per customer (recipient status, message,
+  // conversation). Now: one transaction per batch of customers.
+  // If the batch save ever fails, it falls back to saving one by one
+  // exactly like the old code did.
+  const flushBatch = async (outcomes) => {
+    const sentOutcomes = outcomes.filter((o) => o.ok);
+    const failedOutcomes = outcomes.filter((o) => !o.ok);
+
+    try {
+      const writes = [];
+
+      if (sentOutcomes.length > 0) {
+        writes.push(
+          prisma.campaignRecipient.updateMany({
+            where: { id: { in: sentOutcomes.map((o) => o.recipient.id) } },
+            data: { status: "SENT", sentAt: new Date() },
+          })
+        );
+
+        writes.push(
+          prisma.message.createMany({
+            data: sentOutcomes.map((o) => ({
+              conversationId: o.conversationId,
+              sender: "AGENT",
+              content: o.sentContent,
+              imageUrl: campaign.imageUrl,
+              messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+              status: "SENT",
+              metaMessageId: o.metaMessageId,
+              buttons: messageButtons,
+            })),
+          })
+        );
+
+        // lastMessage is different for every customer (their name is in it)
+        sentOutcomes.forEach((o) => {
+          writes.push(
+            prisma.conversation.update({
+              where: { id: o.conversationId },
+              data: { lastMessage: o.sentContent },
+            })
+          );
+        });
+      }
+
+      if (failedOutcomes.length > 0) {
+        writes.push(
+          prisma.campaignRecipient.updateMany({
+            where: { id: { in: failedOutcomes.map((o) => o.recipient.id) } },
+            data: { status: "FAILED" },
+          })
+        );
+      }
+
+      if (writes.length > 0) {
+        await prisma.$transaction(writes);
+      }
+    } catch (batchError) {
+      console.error(
+        "Batch save failed, saving one by one:",
+        batchError.message
+      );
+
+      for (const o of sentOutcomes) {
+        try {
+          await prisma.campaignRecipient.update({
+            where: { id: o.recipient.id },
+            data: { status: "SENT", sentAt: new Date() },
+          });
+
+          await prisma.message.create({
+            data: {
+              conversationId: o.conversationId,
+              sender: "AGENT",
+              content: o.sentContent,
+              imageUrl: campaign.imageUrl,
+              messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+              status: "SENT",
+              metaMessageId: o.metaMessageId,
+              buttons: messageButtons,
+            },
+          });
+
+          await prisma.conversation.update({
+            where: { id: o.conversationId },
+            data: { lastMessage: o.sentContent },
+          });
+        } catch (singleError) {
+          console.error("Save failed for one customer:", singleError.message);
+        }
+      }
+
+      for (const o of failedOutcomes) {
+        try {
+          await prisma.campaignRecipient.update({
+            where: { id: o.recipient.id },
+            data: { status: "FAILED" },
+          });
+        } catch (singleError) {
+          console.error("Save failed for one customer:", singleError.message);
+        }
+      }
     }
   };
 
@@ -1543,7 +1751,19 @@ const sendToRecipients = async (
   for (let i = 0; i < recipientsToSend.length; i += CAMPAIGN_CONCURRENCY) {
     const batch = recipientsToSend.slice(i, i + CAMPAIGN_CONCURRENCY);
 
-    await Promise.allSettled(batch.map((recipient) => processRecipient(recipient)));
+    const settled = await Promise.allSettled(
+      batch.map((recipient) => processRecipient(recipient))
+    );
+
+    const outcomes = settled.map((item, index) => {
+      if (item.status === "fulfilled") return item.value;
+
+      // Should not happen (processRecipient catches its own errors)
+      failedCount++;
+      return { recipient: batch[index], ok: false };
+    });
+
+    await flushBatch(outcomes);
 
     if (typeof onProgress === "function") {
       try {

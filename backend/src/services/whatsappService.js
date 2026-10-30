@@ -1,3 +1,4 @@
+
 // const axios = require("axios");
 
 // const GRAPH_API_VERSION = "v23.0";
@@ -178,7 +179,8 @@
 //   templateName,
 //   params = [],
 //   whatsappAccount,
-//   languageCode = "en_US"
+//   languageCode = "en_US",
+//   buttonComponents = [] // 👈 NEW (optional): extra button parameters
 // ) => {
 
 //   if (!to || typeof to !== "string" || !to.trim()) {
@@ -207,12 +209,16 @@
 //         template: {
 //           name: templateName,
 //           language: { code: languageCode || "en_US" },
-//           components: params.length > 0 ? [
-//             {
-//               type: "body",
-//               parameters: params.map(p => ({ type: "text", text: sanitizeTemplateParam(p) }))
-//             }
-//           ] : []
+//           components: [
+//             ...(params.length > 0 ? [
+//               {
+//                 type: "body",
+//                 parameters: params.map(p => ({ type: "text", text: sanitizeTemplateParam(p) }))
+//               }
+//             ] : []),
+//             // 👈 NEW: only filled for templates with a copy-code button
+//             ...buttonComponents,
+//           ]
 //         },
 //       },
 //       {
@@ -234,7 +240,7 @@
 // // SEND CAMPAIGN IMAGE TEMPLATE
 // // ============================================
 // // 👈 CHANGED: now takes whatsappAccount instead of process.env.WHATSAPP_PHONE_NUMBER_ID
-// const sendCampaignImageTemplate = async (to, templateName, imageUrl, params = [], languageCode = "en_US", whatsappAccount) => {
+// const sendCampaignImageTemplate = async (to, templateName, imageUrl, params = [], languageCode = "en_US", whatsappAccount, buttonComponents = []) => {
 
 //   if (!to || typeof to !== "string" || !to.trim()) {
 //     return {
@@ -288,6 +294,8 @@
 //                 text: sanitizeTemplateParam(p),
 //               })),
 //             },
+//             // 👈 NEW: only filled for templates with a copy-code button
+//             ...buttonComponents,
 //           ],
 //         },
 //       },
@@ -478,9 +486,19 @@
 // };
 
 
+
 const axios = require("axios");
+const https = require("https"); // NEW
 
 const GRAPH_API_VERSION = "v23.0";
+
+// NEW: reuse the connection to Meta between campaign messages
+// (faster than opening a new connection for every message).
+const metaHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
+
+// NEW: stop waiting for Meta after 30 seconds (axios has no limit by default,
+// so one stuck request could block a whole campaign batch).
+const META_CAMPAIGN_TIMEOUT_MS = 30000;
 
 // ============================================
 // SEND TEXT MESSAGE
@@ -701,6 +719,8 @@ const sendTemplateMessage = async (
         },
       },
       {
+        timeout: META_CAMPAIGN_TIMEOUT_MS, // NEW
+        httpsAgent: metaHttpsAgent, // NEW
         headers: {
           // 👈 CHANGED
           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
@@ -779,6 +799,8 @@ const sendCampaignImageTemplate = async (to, templateName, imageUrl, params = []
         },
       },
       {
+        timeout: META_CAMPAIGN_TIMEOUT_MS, // NEW
+        httpsAgent: metaHttpsAgent, // NEW
         headers: {
           // 👈 CHANGED
           Authorization: `Bearer ${process.env.META_SYSTEM_USER_TOKEN}`,
