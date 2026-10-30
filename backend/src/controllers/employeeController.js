@@ -1,10 +1,514 @@
 
 
+// const prisma = require("../config/prisma");
+// const bcrypt = require("bcryptjs");
+// const generatePassword = require("../utils/generatePassword");
+// const sendEmployeeCredentials = require("../services/emailService");
+// const { logAction } = require("../services/auditLogService");
+
+// // CREATE EMPLOYEE
+// // CREATE EMPLOYEE
+// const createEmployee = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       email,
+//       phone,
+//       department,
+//       designation,
+//       address,
+//       role,
+//       status,
+//     } = req.body;
+
+//     // ==========================================
+//     // CHECK DUPLICATE EMAIL
+//     // ==========================================
+
+//     const existingUser = await prisma.user.findFirst({
+//       where: {
+//         companyId: req.user.companyId,
+//         email: email.trim().toLowerCase(),
+//       },
+//     });
+
+//     if (existingUser) {
+//       return res.status(409).json({
+//         success: false,
+//         message: "Employee with this email already exists",
+//       });
+//     }
+
+//     // ==========================================
+//     // GENERATE PASSWORD
+//     // ==========================================
+
+//     const tempPassword = generatePassword();
+
+//     console.log("=================================");
+//     console.log("EMPLOYEE EMAIL:", email);
+//     console.log("TEMP PASSWORD:", tempPassword);
+//     console.log("=================================");
+
+//     // Get company information
+//     const company = await prisma.company.findUnique({
+//       where: {
+//         id: req.user.companyId,
+//       },
+//       select: {
+//         id: true,
+//         companyId: true,
+//         companyName: true,
+//       },
+//     });
+
+//     if (!company) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Company not found",
+//       });
+//     }
+
+//     console.log("COMPANY:", company);
+
+//     const hashedPassword = await bcrypt.hash(
+//       tempPassword,
+//       10
+//     );
+
+//     // ==========================================
+//     // CREATE EMPLOYEE
+//     // ==========================================
+
+//     const employee = await prisma.user.create({
+//       data: {
+//         name: name.trim(),
+//         email: email.trim().toLowerCase(),
+//         password: hashedPassword,
+
+//         // Employee must change temporary password after first login
+//         isFirstLogin: true,
+
+//         role: "USER",
+//         status: status || "ACTIVE",
+//         phone,
+//         department,
+//         designation,
+//         address,
+//         companyId: req.user.companyId,
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         phone: true,
+//         department: true,
+//         designation: true,
+//         address: true,
+//         role: true,
+//         status: true,
+//       },
+//     });
+
+//     console.log(
+//       "Employee created successfully:",
+//       employee.id
+//     );
+
+//     // ==========================================
+//     // SEND EMAIL
+//     // ==========================================
+
+//     let emailSent = false;
+
+//     try {
+//       await sendEmployeeCredentials(
+//         employee.name,
+//         employee.email,
+//         tempPassword,
+//         company.companyId
+//       );
+
+//       emailSent = true;
+
+//       console.log(
+//         "Employee credentials email sent successfully"
+//       );
+
+//     } catch (emailError) {
+
+//       console.error(
+//         "Employee created, but email sending failed:",
+//         emailError
+//       );
+
+//       // IMPORTANT:
+//       // Do NOT return 500 here.
+//       // Employee has already been created.
+//       emailSent = false;
+//     }
+
+//     // ==========================================
+//     // SUCCESS RESPONSE
+//     // ==========================================
+
+//     logAction({
+//       req,
+//       action: "CREATE",
+//       module: "EMPLOYEE",
+//       entityId: employee.id,
+//       entityName: employee.name,
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+
+//       message: emailSent
+//         ? "Employee created successfully"
+//         : "Employee created successfully, but email could not be sent",
+
+//       employee,
+
+//       emailSent,
+//     });
+
+//   } catch (error) {
+
+//     console.error(
+//       "Create Employee Error:",
+//       error
+//     );
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create employee",
+//     });
+//   }
+// };
+
+// // GET ALL EMPLOYEES
+// const getEmployees = async (req, res) => {
+//   try {
+//     const employees = await prisma.user.findMany({
+//       where: {
+//         role: "USER",
+//         status: "ACTIVE",
+//         companyId: req.user.companyId
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         phone: true,
+//         department: true,
+//         designation: true,
+//         address: true,
+//         role: true,
+//         status: true,
+//       },
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       employees,
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+// // GET EMPLOYEE BY ID
+// // GET EMPLOYEE BY ID
+// const getEmployeeById = async (req, res) => {
+//   try {
+//     const employee = await prisma.user.findFirst({
+//       where: {
+//         id: req.params.id,
+//         companyId: req.user.companyId,
+//         role: "USER",
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         phone: true,
+//         department: true,
+//         designation: true,
+//         address: true,
+//         role: true,
+//         status: true,
+//       },
+//     });
+
+//     if (!employee) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Employee not found",
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       employee,
+//     });
+//   } catch (error) {
+//     console.error("Get Employee By ID Error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+
+// // UPDATE EMPLOYEE
+// const updateEmployee = async (req, res) => {
+//   try {
+
+//     const {
+//       name,
+//       email,
+//       phone,
+//       department,
+//       designation,
+//       address,
+//       role,
+//       status,
+//     } = req.body;
+
+
+
+//     // Check employee belongs to logged-in company
+//     const existingEmployee = await prisma.user.findFirst({
+//       where: {
+//         id: req.params.id,
+//         companyId: req.user.companyId,
+//         role: "USER",
+//       }
+//     });
+
+
+//     if (!existingEmployee) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Employee not found"
+//       });
+//     }
+
+//     // Check whether another employee already uses this email
+//     const duplicateEmail = await prisma.user.findFirst({
+//       where: {
+//         companyId: req.user.companyId,
+//         email,
+//         NOT: {
+//           id: req.params.id,
+//         },
+//       },
+//     });
+
+//     if (duplicateEmail) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Email already exists",
+//       });
+//     }
+
+
+//     // Update employee
+//     const employee = await prisma.user.update({
+
+//       where: {
+//         id: req.params.id
+//       },
+
+//       data: {
+//         name,
+//         email,
+//         phone,
+//         department,
+//         designation,
+//         address,
+//         role,
+//         status,
+//       },
+
+//       select: {
+//         id: true,
+//         name: true,
+//         email: true,
+//         phone: true,
+//         department: true,
+//         designation: true,
+//         address: true,
+//         role: true,
+//         status: true,
+//       }
+
+//     });
+
+
+//     logAction({
+//       req,
+//       action: "UPDATE",
+//       module: "EMPLOYEE",
+//       entityId: employee.id,
+//       entityName: employee.name,
+//       changes: {
+//         before: {
+//           name: existingEmployee.name,
+//           email: existingEmployee.email,
+//           role: existingEmployee.role,
+//           status: existingEmployee.status,
+//         },
+//         after: {
+//           name: employee.name,
+//           email: employee.email,
+//           role: employee.role,
+//           status: employee.status,
+//         },
+//       },
+//     });
+
+//     return res.status(200).json({
+
+//       success: true,
+//       message: "Employee updated successfully",
+//       employee
+
+//     });
+
+
+//   } catch (error) {
+
+//     console.error("Update Employee Error:", error);
+
+//     return res.status(500).json({
+
+//       success: false,
+//       message: "Internal Server Error"
+
+//     });
+
+//   }
+
+// };
+
+// // DELETE EMPLOYEE
+// const deleteEmployee = async (req, res) => {
+//   try {
+//     const employeeId = req.params.id;
+
+//     const employee = await prisma.user.findFirst({
+//       where: {
+//         id: employeeId,
+//         companyId: req.user.companyId,
+//         role: "USER",
+//       },
+//     });
+
+//     if (!employee) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Employee not found",
+//       });
+//     }
+
+//     // Check assigned tasks
+//     const taskCount = await prisma.task.count({
+//       where: {
+//         assignedToId: employeeId,
+//       },
+//     });
+
+//     if (taskCount > 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Cannot delete employee. ${taskCount} task(s) are still assigned.`,
+//       });
+//     }
+
+//     // Check assigned deals
+//     const dealCount = await prisma.deal.count({
+//       where: {
+//         assignedToId: employeeId,
+//       },
+//     });
+
+//     if (dealCount > 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Cannot delete employee. ${dealCount} deal(s) are still assigned.`,
+//       });
+//     }
+
+//     await prisma.user.delete({
+//       where: {
+//         id: employeeId,
+//       },
+//     });
+
+//     logAction({
+//       req,
+//       action: "DELETE",
+//       module: "EMPLOYEE",
+//       entityId: employee.id,
+//       entityName: employee.name,
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Employee deleted successfully",
+//     });
+//   } catch (error) {
+//     console.error(error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//     });
+//   }
+// };
+
+// module.exports = {
+//   createEmployee,
+//   getEmployees,
+//   getEmployeeById,
+//   updateEmployee,
+//   deleteEmployee,
+// };
+
+
 const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const generatePassword = require("../utils/generatePassword");
 const sendEmployeeCredentials = require("../services/emailService");
 const { logAction } = require("../services/auditLogService");
+
+// ==========================================
+// ROLE HELPERS
+// ==========================================
+
+// Only "ADMIN" or "USER" are valid. Anything else becomes "USER".
+const normalizeRole = (role) =>
+  String(role || "").trim().toUpperCase() === "ADMIN" ? "ADMIN" : "USER";
+
+// The company owner = the first admin created for the company.
+// The owner is never listed / edited / deleted from Manage Employees.
+const getCompanyOwnerId = async (companyId) => {
+  const owner = await prisma.user.findFirst({
+    where: { companyId, role: "ADMIN" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+
+  return owner ? owner.id : null;
+};
 
 // CREATE EMPLOYEE
 // CREATE EMPLOYEE
@@ -20,6 +524,20 @@ const createEmployee = async (req, res) => {
       role,
       status,
     } = req.body;
+
+    // ==========================================
+    // ROLE (USER or ADMIN)
+    // ==========================================
+
+    const newRole = normalizeRole(role);
+
+    // Only an admin can create another admin
+    if (newRole === "ADMIN" && req.user.role !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Only an admin can create another admin",
+      });
+    }
 
     // ==========================================
     // CHECK DUPLICATE EMAIL
@@ -89,7 +607,7 @@ const createEmployee = async (req, res) => {
         // Employee must change temporary password after first login
         isFirstLogin: true,
 
-        role: "USER",
+        role: newRole,
         status: status || "ACTIVE",
         phone,
         department,
@@ -189,12 +707,27 @@ const createEmployee = async (req, res) => {
 // GET ALL EMPLOYEES
 const getEmployees = async (req, res) => {
   try {
+    // Default (task / deal / ticket / lead dropdowns): active USER employees only.
+    const where = {
+      role: "USER",
+      status: "ACTIVE",
+      companyId: req.user.companyId,
+    };
+
+    // Manage Employees page: ?includeAdmins=true also returns admins that
+    // were created as employees (never the company owner).
+    if (req.query.includeAdmins === "true" && req.user.role === "ADMIN") {
+      const ownerId = await getCompanyOwnerId(req.user.companyId);
+
+      where.role = { in: ["USER", "ADMIN"] };
+
+      if (ownerId) {
+        where.id = { not: ownerId };
+      }
+    }
+
     const employees = await prisma.user.findMany({
-      where: {
-        role: "USER",
-        status: "ACTIVE",
-        companyId: req.user.companyId
-      },
+      where,
       select: {
         id: true,
         name: true,
@@ -226,11 +759,14 @@ const getEmployees = async (req, res) => {
 // GET EMPLOYEE BY ID
 const getEmployeeById = async (req, res) => {
   try {
+    const ownerId = await getCompanyOwnerId(req.user.companyId);
+
     const employee = await prisma.user.findFirst({
       where: {
         id: req.params.id,
         companyId: req.user.companyId,
-        role: "USER",
+        role: { in: ["USER", "ADMIN"] },
+        ...(ownerId ? { NOT: { id: ownerId } } : {}),
       },
       select: {
         id: true,
@@ -285,11 +821,15 @@ const updateEmployee = async (req, res) => {
 
 
     // Check employee belongs to logged-in company
+    // (USER employees and admins created as employees - never the company owner)
+    const ownerId = await getCompanyOwnerId(req.user.companyId);
+
     const existingEmployee = await prisma.user.findFirst({
       where: {
         id: req.params.id,
         companyId: req.user.companyId,
-        role: "USER",
+        role: { in: ["USER", "ADMIN"] },
+        ...(ownerId ? { NOT: { id: ownerId } } : {}),
       }
     });
 
@@ -298,6 +838,35 @@ const updateEmployee = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Employee not found"
+      });
+    }
+
+    // Role handling: keep the current role unless a valid role is sent
+    const updatedRole =
+      role === undefined || role === null || role === ""
+        ? existingEmployee.role
+        : normalizeRole(role);
+
+    // Only an admin can edit an admin or give someone admin access
+    if (
+      (existingEmployee.role === "ADMIN" || updatedRole === "ADMIN") &&
+      req.user.role !== "ADMIN"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Only an admin can manage admin accounts",
+      });
+    }
+
+    // Admin cannot remove their own admin access / deactivate themselves
+    if (
+      existingEmployee.id === req.user.userId &&
+      (updatedRole !== existingEmployee.role ||
+        (status && status !== existingEmployee.status))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot change your own role or status",
       });
     }
 
@@ -334,7 +903,7 @@ const updateEmployee = async (req, res) => {
         department,
         designation,
         address,
-        role,
+        role: updatedRole,
         status,
       },
 
@@ -404,11 +973,14 @@ const deleteEmployee = async (req, res) => {
   try {
     const employeeId = req.params.id;
 
+    const ownerId = await getCompanyOwnerId(req.user.companyId);
+
     const employee = await prisma.user.findFirst({
       where: {
         id: employeeId,
         companyId: req.user.companyId,
-        role: "USER",
+        role: { in: ["USER", "ADMIN"] },
+        ...(ownerId ? { NOT: { id: ownerId } } : {}),
       },
     });
 
@@ -416,6 +988,21 @@ const deleteEmployee = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Employee not found",
+      });
+    }
+
+    // Only an admin can delete an admin; nobody can delete their own account here
+    if (employee.role === "ADMIN" && req.user.role !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Only an admin can delete an admin account",
+      });
+    }
+
+    if (employee.id === req.user.userId) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own account",
       });
     }
 

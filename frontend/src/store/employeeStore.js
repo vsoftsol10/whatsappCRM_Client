@@ -1,3 +1,4 @@
+
 // import { create } from "zustand";
 // import { getEmployees } from "../api/employeeApi";
 
@@ -17,7 +18,7 @@
 //       console.log("Employees API Response:", response);
 
 //       set({
-//         employees: response.employees,
+//         employees: Array.isArray(response?.employees) ? response.employees : [],
 //         loading: false,
 //       });
 //     } catch (error) {
@@ -34,6 +35,8 @@
 
 // export default useEmployeeStore;
 
+
+
 import { create } from "zustand";
 import { getEmployees } from "../api/employeeApi";
 
@@ -42,14 +45,17 @@ const useEmployeeStore = create((set) => ({
   loading: false,
   error: null,
 
-  fetchEmployees: async () => {
+  // options (optional): { includeAdmins: true } -> used by Manage Employees page
+  fetchEmployees: async (options) => {
     try {
       set({
         loading: true,
         error: null,
       });
 
-      const response = await getEmployees();
+      const response = await getEmployees(
+        options && options.includeAdmins ? { includeAdmins: true } : undefined
+      );
       console.log("Employees API Response:", response);
 
       set({

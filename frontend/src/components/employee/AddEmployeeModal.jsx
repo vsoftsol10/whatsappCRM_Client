@@ -79,8 +79,8 @@
 //             newErrors.department = "Department is required";
 //         }
 
-//         // Designation
-//         if (!formData.designation) {
+//         // Designation (typed manually)
+//         if (!formData.designation.trim()) {
 //             newErrors.designation = "Designation is required";
 //         }
 
@@ -335,59 +335,25 @@
 //                                 )}
 //                             </div>
 
-//                             {/* Designation */}
+//                             {/* Designation (manual entry) */}
 //                             <div>
 //                                 <label className="mb-2 block font-semibold text-black">
 //                                     Designation{" "}
 //                                     <span className="text-red-500">*</span>
 //                                 </label>
 
-//                                 <select
+//                                 <input
+//                                     type="text"
 //                                     name="designation"
 //                                     value={formData.designation}
 //                                     onChange={handleChange}
+//                                     placeholder="Designation (e.g. Sales Executive)"
 //                                     className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
 //                                         errors.designation
 //                                             ? "border-red-500"
 //                                             : "border-gray-300 focus:border-[#25D366]"
 //                                     }`}
-//                                 >
-//                                     <option value="">
-//                                         Select Designation
-//                                     </option>
-
-//                                     <option value="Sales Agent">
-//                                         Sales Agent
-//                                     </option>
-
-//                                     <option value="Support Agent">
-//                                         Support Agent
-//                                     </option>
-
-//                                     <option value="Technical">
-//                                         Technical
-//                                     </option>
-
-//                                     <option value="Marketing">
-//                                         Marketing
-//                                     </option>
-
-//                                     <option value="Manager">
-//                                         Manager
-//                                     </option>
-
-//                                     <option value="HR">
-//                                         HR
-//                                     </option>
-
-//                                     <option value="Finance">
-//                                         Finance
-//                                     </option>
-
-//                                     <option value="Other">
-//                                         Other
-//                                     </option>
-//                                 </select>
+//                                 />
 
 //                                 {errors.designation && (
 //                                     <p className="mt-1 text-sm text-red-500">
@@ -499,6 +465,8 @@
 // export default AddEmployeeModal;
 
 
+
+
 import { useState } from "react";
 import { FiArrowLeft } from "react-icons/fi";
 import { createEmployee } from "../../api/employeeApi";
@@ -580,7 +548,7 @@ function AddEmployeeModal({ onClose, onSuccess }) {
             newErrors.department = "Department is required";
         }
 
-        // Designation (typed manually)
+        // Designation (selected from dropdown)
         if (!formData.designation.trim()) {
             newErrors.designation = "Designation is required";
         }
@@ -836,25 +804,59 @@ function AddEmployeeModal({ onClose, onSuccess }) {
                                 )}
                             </div>
 
-                            {/* Designation (manual entry) */}
+                            {/* Designation (dropdown) */}
                             <div>
                                 <label className="mb-2 block font-semibold text-black">
                                     Designation{" "}
                                     <span className="text-red-500">*</span>
                                 </label>
 
-                                <input
-                                    type="text"
+                                <select
                                     name="designation"
                                     value={formData.designation}
                                     onChange={handleChange}
-                                    placeholder="Designation (e.g. Sales Executive)"
                                     className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
                                         errors.designation
                                             ? "border-red-500"
                                             : "border-gray-300 focus:border-[#25D366]"
                                     }`}
-                                />
+                                >
+                                    <option value="">
+                                        Select Designation
+                                    </option>
+
+                                    <option value="Sales Agent">
+                                        Sales Agent
+                                    </option>
+
+                                    <option value="Support Agent">
+                                        Support Agent
+                                    </option>
+
+                                    <option value="Technical">
+                                        Technical
+                                    </option>
+
+                                    <option value="Marketing">
+                                        Marketing
+                                    </option>
+
+                                    <option value="Manager">
+                                        Manager
+                                    </option>
+
+                                    <option value="HR">
+                                        HR
+                                    </option>
+
+                                    <option value="Finance">
+                                        Finance
+                                    </option>
+
+                                    <option value="Other">
+                                        Other
+                                    </option>
+                                </select>
 
                                 {errors.designation && (
                                     <p className="mt-1 text-sm text-red-500">
