@@ -274,6 +274,9 @@
 
 
 
+
+
+
 const prisma = require("../config/prisma");
 
 const {
@@ -282,7 +285,10 @@ const {
   getPlatformAi,
   testAutoReply,
 } = require("../services/aiService");
-const { sanitizeProfile } = require("../services/ai/businessPrompt");
+const {
+  sanitizeProfile,
+  sanitizeContactRequest,
+} = require("../services/ai/businessPrompt");
 
 const MAX_PROMPT_LENGTH = 4000;
 
@@ -360,7 +366,8 @@ const getAiSettings = async (req, res) => {
 // Body (all optional): isEnabled, businessProfile, systemPrompt (extra
 // instructions, may be empty), historyLimit, leadCaptureEnabled,
 // leadAssigneeId (employee id or null), leadAutoAssign (true = share new
-// leads between all active employees automatically)
+// leads between all active employees automatically), contactRequest
+// ({ enabled, name, phone, email, other, wording })
 // The AI provider, model and key are platform-wide (server .env) and
 // cannot be changed from here.
 const updateAiSettings = async (req, res) => {
@@ -455,6 +462,17 @@ const updateAiSettings = async (req, res) => {
       }
     }
 
+    // ---------- ask for contact details ----------
+    if (body.contactRequest !== undefined) {
+      const { contactRequest, error } = sanitizeContactRequest(
+        body.contactRequest
+      );
+
+      if (error) return badRequest(res, error);
+
+      data.contactRequest = contactRequest;
+    }
+
     // ---------- can it actually run? ----------
     const willBeEnabled = data.isEnabled ?? existing.isEnabled;
 
@@ -527,8 +545,25 @@ const testAiSettings = async (req, res) => {
       businessProfile = profile;
     }
 
+    let contactRequest;
+
+    if (body.contactRequest !== undefined) {
+      const sanitized = sanitizeContactRequest(body.contactRequest);
+
+      if (sanitized.error) return badRequest(res, sanitized.error);
+
+      contactRequest = sanitized.contactRequest;
+    }
+
+    // Which chat the test pretends to be: WhatsApp (default), Instagram or Messenger
+    const channel = ["Instagram", "Messenger"].includes(body.channel)
+      ? body.channel
+      : undefined;
+
     const result = await testAutoReply(companyId, {
       businessProfile,
+      contactRequest,
+      channel,
       systemPrompt:
         typeof body.systemPrompt === "string" ? body.systemPrompt : undefined,
       message: typeof body.message === "string" ? body.message : undefined,

@@ -574,7 +574,11 @@ const axios = require("axios");
 const prisma = require("../config/prisma");
 
 const { getProvider } = require("./ai/providers");
-const { buildSystemPrompt, readProfile } = require("./ai/businessPrompt");
+const {
+  buildSystemPrompt,
+  readProfile,
+  readContactRequest,
+} = require("./ai/businessPrompt");
 const { assertSafeHttpsUrl, safeHttpsAgent } = require("../utils/safeUrl");
 
 // Reasoning models can be slow, so give providers plenty of time.
@@ -671,6 +675,7 @@ const serializeSettings = (settings) => ({
   leadCaptureEnabled: Boolean(settings.leadCaptureEnabled),
   leadAssigneeId: settings.leadAssigneeId || null,
   leadAutoAssign: Boolean(settings.leadAutoAssign),
+  contactRequest: readContactRequest(settings.contactRequest),
   lastError: settings.lastError,
   lastErrorAt: settings.lastErrorAt,
   updatedAt: settings.updatedAt,
@@ -698,6 +703,11 @@ const composeSystemPrompt = async (companyId, settings, overrides = {}) => {
       overrides.systemPrompt !== undefined
         ? overrides.systemPrompt
         : settings.systemPrompt,
+    contactRequest:
+      overrides.contactRequest !== undefined
+        ? overrides.contactRequest
+        : settings.contactRequest,
+    channel: overrides.channel,
   });
 };
 
@@ -1034,7 +1044,9 @@ const getAutoReply = async (conversationId, options = {}) => {
       return { success: false, error: "Latest message is not from the customer" };
     }
 
-    const systemPrompt = await composeSystemPrompt(companyId, settings);
+    const systemPrompt = await composeSystemPrompt(companyId, settings, {
+      channel: options.channel, // undefined for WhatsApp
+    });
 
     const raw = await callProvider({
       providerId: platform.providerId,
@@ -1082,6 +1094,8 @@ const testAutoReply = async (companyId, overrides = {}) => {
     const systemPrompt = await composeSystemPrompt(companyId, settings, {
       businessProfile: overrides.businessProfile,
       systemPrompt: overrides.systemPrompt,
+      contactRequest: overrides.contactRequest,
+      channel: overrides.channel,
     });
     const sample = (overrides.message || "").trim() || "Hi, I need some help.";
 

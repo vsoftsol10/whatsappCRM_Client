@@ -804,7 +804,6 @@
 
 
 
-
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import {
@@ -815,6 +814,7 @@ import {
   Clock,
   FileText,
   LoaderCircle,
+  Phone,
   RotateCcw,
   Save,
   Send,
@@ -852,11 +852,21 @@ const EMPTY_PROFILE = {
   tone: "FRIENDLY",
 };
 
+const EMPTY_CONTACT = {
+  enabled: false,
+  name: false,
+  phone: false,
+  email: false,
+  other: "",
+  wording: "",
+};
+
 const EMPTY_FORM = {
   isEnabled: false,
   leadCaptureEnabled: false,
   leadAssigneeId: "",
   leadAutoAssign: false,
+  contactRequest: EMPTY_CONTACT,
   businessProfile: EMPTY_PROFILE,
   systemPrompt: "",
   historyLimit: 10,
@@ -867,6 +877,7 @@ const toForm = (settings) => ({
   leadCaptureEnabled: Boolean(settings.leadCaptureEnabled),
   leadAssigneeId: settings.leadAssigneeId || "",
   leadAutoAssign: Boolean(settings.leadAutoAssign),
+  contactRequest: { ...EMPTY_CONTACT, ...(settings.contactRequest || {}) },
   businessProfile: { ...EMPTY_PROFILE, ...(settings.businessProfile || {}) },
   systemPrompt: settings.systemPrompt || "",
   historyLimit: settings.historyLimit || 10,
@@ -988,6 +999,7 @@ export default function AiAutoReply() {
   const [testMessage, setTestMessage] = useState(
     "Hi, what are your working hours?"
   );
+  const [testChannel, setTestChannel] = useState("WhatsApp");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testError, setTestError] = useState("");
@@ -1034,6 +1046,25 @@ export default function AiAutoReply() {
       businessProfile: { ...prev.businessProfile, ...patch },
     }));
 
+  const updateContact = (patch) =>
+    setForm((prev) => ({
+      ...prev,
+      contactRequest: { ...prev.contactRequest, ...patch },
+    }));
+
+  // Turning the switch on starts with name + mobile number ticked
+  const toggleContactRequest = (value) => {
+    const current = form.contactRequest;
+    const nothingPicked =
+      !current.name && !current.phone && !current.email && !current.other;
+
+    updateContact(
+      value && nothingPicked
+        ? { enabled: true, name: true, phone: true }
+        : { enabled: value }
+    );
+  };
+
   // ---------- actions ----------
   const handleDiscard = () => {
     if (!saved) return;
@@ -1043,6 +1074,17 @@ export default function AiAutoReply() {
   const validate = () => {
     if (form.systemPrompt.length > MAX_PROMPT_LENGTH)
       return `Extra instructions must be ${MAX_PROMPT_LENGTH} characters or fewer`;
+
+    const contact = form.contactRequest;
+
+    if (
+      contact.enabled &&
+      !contact.name &&
+      !contact.phone &&
+      !contact.email &&
+      !contact.other.trim()
+    )
+      return "Pick at least one detail for the AI to ask for";
 
     if (form.isEnabled && !aiAvailable)
       return "AI auto-reply is not available right now. Please contact support.";
@@ -1066,6 +1108,7 @@ export default function AiAutoReply() {
         leadCaptureEnabled: form.leadCaptureEnabled,
         leadAssigneeId: form.leadAssigneeId || null,
         leadAutoAssign: form.leadAutoAssign,
+        contactRequest: form.contactRequest,
         businessProfile: form.businessProfile,
         systemPrompt: form.systemPrompt,
         historyLimit: Number(form.historyLimit),
@@ -1091,6 +1134,8 @@ export default function AiAutoReply() {
 
       const data = await testAiSettings({
         message: testMessage,
+        channel: testChannel,
+        contactRequest: form.contactRequest,
         businessProfile: form.businessProfile,
         systemPrompt: form.systemPrompt,
       });
@@ -1414,6 +1459,91 @@ export default function AiAutoReply() {
               </ul>
             </div>
           </Card>
+
+          {/* ---------- ASK FOR CONTACT DETAILS ---------- */}
+          <Card
+            icon={Phone}
+            title="Ask for contact details"
+            subtitle="When a customer shows interest, the AI answers first, then politely asks once for the details you pick, so your team can contact them."
+            action={
+              <Toggle
+                checked={form.contactRequest.enabled}
+                onChange={toggleContactRequest}
+                label="Ask customers for contact details"
+              />
+            }
+          >
+            <div className="space-y-5">
+              <Field label="What should the AI ask for?">
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  {[
+                    { key: "name", label: "Name" },
+                    { key: "phone", label: "Mobile number" },
+                    { key: "email", label: "Email" },
+                  ].map((item) => (
+                    <label
+                      key={item.key}
+                      className="flex items-center gap-2 text-sm text-slate-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.contactRequest[item.key]}
+                        onChange={(e) =>
+                          updateContact({ [item.key]: e.target.checked })
+                        }
+                        disabled={!form.contactRequest.enabled}
+                        className="h-4 w-4 accent-[#25D366] disabled:cursor-not-allowed"
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+
+              <Field
+                label="Something else (optional)"
+                hint="For example: college name and course interested in, or your preferred call time."
+              >
+                <input
+                  type="text"
+                  value={form.contactRequest.other}
+                  onChange={(e) => updateContact({ other: e.target.value })}
+                  maxLength={200}
+                  disabled={!form.contactRequest.enabled}
+                  placeholder="College name and course interested in"
+                  className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-60`}
+                />
+              </Field>
+
+              <Field
+                label="How should it ask? (optional)"
+                hint="Leave empty and the AI uses its own polite wording. If you write a line, the AI follows it and adapts it to the chat."
+              >
+                <textarea
+                  rows={2}
+                  value={form.contactRequest.wording}
+                  onChange={(e) => updateContact({ wording: e.target.value })}
+                  maxLength={300}
+                  disabled={!form.contactRequest.enabled}
+                  placeholder="Sure, I can help with that! May I have your name and mobile number so our team can call you with the details?"
+                  className={`${inputClass} resize-none disabled:cursor-not-allowed disabled:opacity-60`}
+                />
+              </Field>
+
+              <ul className="space-y-1.5 text-xs text-slate-500">
+                <li>The AI asks only once and never pressures the customer.</li>
+                <li>
+                  On WhatsApp the AI already knows the customer&apos;s number,
+                  so it will not ask for it there. It is asked on Instagram and
+                  Facebook.
+                </li>
+                <li>
+                  Use &ldquo;Test your setup&rdquo; on the right to see how it
+                  behaves before you save.
+                </li>
+              </ul>
+            </div>
+          </Card>
         </div>
 
         {/* ============ RIGHT: STATUS + TEST ============ */}
@@ -1485,6 +1615,18 @@ export default function AiAutoReply() {
                   maxLength={500}
                   className={inputClass}
                 />
+              </Field>
+
+              <Field label="Test as">
+                <select
+                  value={testChannel}
+                  onChange={(e) => setTestChannel(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="WhatsApp">WhatsApp chat</option>
+                  <option value="Instagram">Instagram chat</option>
+                  <option value="Messenger">Facebook Messenger chat</option>
+                </select>
               </Field>
 
               <button
@@ -1619,4 +1761,6 @@ export default function AiAutoReply() {
     </div>
   );
 }
+
+
 
