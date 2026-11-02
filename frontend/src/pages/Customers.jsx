@@ -1,3 +1,4 @@
+
 // import { useEffect, useState, useMemo, useRef } from "react";
 // import { useNavigate } from "react-router-dom";
 // import {
@@ -21,6 +22,7 @@
 // import CustomerStatCard from "../components/customers/CustomerStatCard";
 // import ConfirmModal from "../components/common/ConfirmModal";
 // import ViewCustomerModal from "../components/customers/ViewCustomerModal";
+// import { getServices } from "../api/serviceApi";
 
 // function Customers() {
 //   const customers =
@@ -34,6 +36,10 @@
 
 //   const [searchTerm, setSearchTerm] = useState("");
 //   const [statusFilter, setStatusFilter] = useState("ALL");
+
+//   // Service filter: "ALL" | "NONE" (no service) | a service id
+//   const [serviceFilter, setServiceFilter] = useState("ALL");
+//   const [serviceOptions, setServiceOptions] = useState([]);
 
 //   // Currently opened customer menu
 //   const [openMenu, setOpenMenu] = useState(null);
@@ -158,7 +164,8 @@
 //           statusFilter === "ALL"
 //             ? ""
 //             : statusFilter,
-//           searchTerm
+//           searchTerm,
+//           serviceFilter === "ALL" ? "" : serviceFilter
 //         );
 
 //         setCustomers(
@@ -181,7 +188,25 @@
 //     setCustomers,
 //     statusFilter,
 //     searchTerm,
+//     serviceFilter,
 //   ]);
+
+//   // =========================
+//   // LOAD SERVICES (for the filter dropdown)
+//   // =========================
+
+//   useEffect(() => {
+//     const loadServices = async () => {
+//       try {
+//         const data = await getServices();
+//         setServiceOptions(data.services || []);
+//       } catch (error) {
+//         console.error("Failed to fetch services:", error);
+//       }
+//     };
+
+//     loadServices();
+//   }, []);
 
 //   // =========================
 //   // RESET PAGE
@@ -189,7 +214,7 @@
 
 //   useEffect(() => {
 //     setCurrentPage(1);
-//   }, [searchTerm, statusFilter]);
+//   }, [searchTerm, statusFilter, serviceFilter]);
 
 //   // =========================
 //   // CUSTOMER STATS
@@ -719,6 +744,25 @@
 //         {/* Filter Chips */}
 
 //         <div className="flex flex-wrap gap-2 sm:gap-3">
+//           {/* Service filter (only shown when the company has services) */}
+//           {serviceOptions.length > 0 && (
+//             <select
+//               value={serviceFilter}
+//               onChange={(e) => setServiceFilter(e.target.value)}
+//               className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#25D366]"
+//             >
+//               <option value="ALL">All Services</option>
+
+//               {serviceOptions.map((service) => (
+//                 <option key={service.id} value={service.id}>
+//                   {service.name}
+//                 </option>
+//               ))}
+
+//               <option value="NONE">No Service</option>
+//             </select>
+//           )}
+
 
 //           {[
 //             {
@@ -766,7 +810,7 @@
 
 //         <div className="crm-table-scroll overflow-visible">
 
-//           <table className="w-full min-w-[900px]">
+//           <table className="w-full min-w-[1000px]">
 
 //             <thead className="bg-[#25D366] text-black">
 
@@ -782,6 +826,10 @@
 
 //                 <th className="crm-th">
 //                   Company
+//                 </th>
+
+//                 <th className="crm-th">
+//                   Services
 //                 </th>
 
 //                 <th className="crm-th">
@@ -833,6 +881,24 @@
 //                       </td>
 
 //                       <td className="crm-td">
+//                         {customer.services &&
+//                         customer.services.length > 0 ? (
+//                           <div className="flex flex-wrap gap-1">
+//                             {customer.services.map((service) => (
+//                               <span
+//                                 key={service.id}
+//                                 className="rounded-full bg-[#DCF8C6] px-2.5 py-0.5 text-xs font-semibold text-[#128C7E]"
+//                               >
+//                                 {service.name}
+//                               </span>
+//                             ))}
+//                           </div>
+//                         ) : (
+//                           "-"
+//                         )}
+//                       </td>
+
+//                       <td className="crm-td">
 
 //                         <span
 //                           className={`crm-badge ${customer.status ===
@@ -881,7 +947,7 @@
 //                 <tr>
 
 //                   <td
-//                     colSpan="5"
+//                     colSpan="6"
 //                     className="p-8 text-center text-gray-500"
 //                   >
 //                     No customers found
@@ -1686,7 +1752,6 @@
 
 
 
-
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -1695,6 +1760,7 @@ import {
   FileSpreadsheet,
   X,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -1704,6 +1770,7 @@ import useCustomerStore from "../store/customerStore";
 import {
   getCustomers,
   deleteCustomer,
+  bulkDeleteCustomers,
   previewCustomerImport,
   importCustomers,
 } from "../api/customerApi";
@@ -1745,6 +1812,13 @@ function Customers() {
   const [allCustomers, setAllCustomers] = useState([]);
 
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+
+  // Bulk selection / bulk delete
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] =
+    useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] =
+    useState(false);
 
   const ROWS_PER_PAGE = 10;
 
@@ -1902,6 +1976,14 @@ function Customers() {
 
   useEffect(() => {
     setCurrentPage(1);
+  }, [searchTerm, statusFilter, serviceFilter]);
+
+  // =========================
+  // CLEAR SELECTION WHEN FILTERS CHANGE
+  // =========================
+
+  useEffect(() => {
+    setSelectedIds([]);
   }, [searchTerm, statusFilter, serviceFilter]);
 
   // =========================
@@ -2124,6 +2206,150 @@ function Customers() {
         error?.response?.data?.message ||
         "Failed to delete customer"
       );
+    }
+  };
+
+  // =========================
+  // BULK SELECTION
+  // =========================
+
+  // Only keep ids that are still in the current (filtered) list
+  const validSelectedIds = useMemo(() => {
+    const visible = new Set(
+      customers.map((customer) => customer.id)
+    );
+
+    return selectedIds.filter((id) => visible.has(id));
+  }, [selectedIds, customers]);
+
+  const selectedSet = new Set(validSelectedIds);
+
+  const pageIds = paginatedCustomers.map(
+    (customer) => customer.id
+  );
+
+  const allPageSelected =
+    pageIds.length > 0 &&
+    pageIds.every((id) => selectedSet.has(id));
+
+  const somePageSelected = pageIds.some((id) =>
+    selectedSet.has(id)
+  );
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectPage = () => {
+    setSelectedIds((prev) => {
+      if (allPageSelected) {
+        return prev.filter((id) => !pageIds.includes(id));
+      }
+
+      return [...new Set([...prev, ...pageIds])];
+    });
+  };
+
+  const handleSelectAllFiltered = () => {
+    setSelectedIds(customers.map((customer) => customer.id));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const confirmBulkDelete = async () => {
+    const ids = [...validSelectedIds];
+
+    setShowBulkDeleteModal(false);
+
+    if (ids.length === 0) return;
+
+    setIsBulkDeleting(true);
+
+    try {
+      const result = await bulkDeleteCustomers(ids);
+
+      const deletedIds = Array.isArray(result?.deletedIds)
+        ? result.deletedIds
+        : [];
+
+      const deletedSet = new Set(deletedIds);
+
+      if (deletedIds.length > 0) {
+        setCustomers(
+          customers.filter(
+            (customer) => !deletedSet.has(customer.id)
+          )
+        );
+
+        setAllCustomers((prev) =>
+          prev.filter(
+            (customer) => !deletedSet.has(customer.id)
+          )
+        );
+
+        toast.success(
+          result?.message ||
+          `${deletedIds.length} customers deleted successfully`
+        );
+
+        // Do not stay on a page that no longer exists
+        const newTotalPages = Math.max(
+          1,
+          Math.ceil(
+            (customers.length - deletedIds.length) /
+            ROWS_PER_PAGE
+          )
+        );
+
+        if (currentPage > newTotalPages) {
+          setCurrentPage(newTotalPages);
+        }
+      }
+
+      // Customers that could not be deleted (tickets / deals)
+      const skipped = Array.isArray(result?.skipped)
+        ? result.skipped
+        : [];
+
+      if (skipped.length > 0) {
+        const names = skipped
+          .slice(0, 3)
+          .map((item) => item.name)
+          .join(", ");
+
+        toast.error(
+          `${skipped.length} customer${
+            skipped.length === 1 ? "" : "s"
+          } not deleted (${names}${
+            skipped.length > 3 ? ", ..." : ""
+          }). ${skipped[0].reason}`,
+          { duration: 7000 }
+        );
+      } else if (deletedIds.length === 0) {
+        toast.error("No customers were deleted");
+      }
+
+      setSelectedIds([]);
+    } catch (error) {
+      console.error(error);
+
+      // 403 is already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        return;
+      }
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to delete customers"
+      );
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -2492,6 +2718,69 @@ function Customers() {
 
       </div>
 
+      {/* ================= BULK SELECT BAR ================= */}
+
+      {customers.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+
+          <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={allPageSelected}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate =
+                    somePageSelected && !allPageSelected;
+                }
+              }}
+              onChange={handleToggleSelectPage}
+              className="h-4 w-4 cursor-pointer accent-[#25D366]"
+            />
+
+            {validSelectedIds.length > 0
+              ? `${validSelectedIds.length} selected`
+              : "Select all on this page"}
+          </label>
+
+          {validSelectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+
+              {validSelectedIds.length < customers.length && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllFiltered}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#25D366] hover:bg-[#DCF8C6]"
+                >
+                  Select all {customers.length}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-gray-100"
+              >
+                Clear
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(true)}
+                disabled={isBulkDeleting}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {isBulkDeleting
+                  ? "Deleting..."
+                  : "Delete Selected"}
+              </button>
+
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* ================= TABLE ================= */}
 
       <div className="crm-table-shell overflow-visible">
@@ -2503,6 +2792,22 @@ function Customers() {
             <thead className="bg-[#25D366] text-black">
 
               <tr>
+
+                <th className="crm-th w-12">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all customers on this page"
+                    checked={allPageSelected}
+                    ref={(el) => {
+                      if (el) {
+                        el.indeterminate =
+                          somePageSelected && !allPageSelected;
+                      }
+                    }}
+                    onChange={handleToggleSelectPage}
+                    className="h-4 w-4 cursor-pointer accent-black"
+                  />
+                </th>
 
                 <th className="crm-th">
                   Name
@@ -2552,8 +2857,29 @@ function Customers() {
                           }
                         )
                       }
-                      className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50"
+                      className={`cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 ${
+                        selectedSet.has(customer.id)
+                          ? "bg-[#F0FBE8]"
+                          : ""
+                      }`}
                     >
+
+                      {/* ================= SELECT ================= */}
+
+                      <td
+                        className="crm-td w-12"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${customer.name}`}
+                          checked={selectedSet.has(customer.id)}
+                          onChange={() =>
+                            handleToggleSelect(customer.id)
+                          }
+                          className="h-4 w-4 cursor-pointer accent-[#25D366]"
+                        />
+                      </td>
 
                       <td className="crm-td font-medium">
                         {customer.name}
@@ -2635,7 +2961,7 @@ function Customers() {
                 <tr>
 
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="p-8 text-center text-gray-500"
                   >
                     No customers found
@@ -2789,6 +3115,19 @@ function Customers() {
         onCancel={() =>
           setDeleteTargetId(null)
         }
+      />
+
+      {/* ================= BULK DELETE MODAL ================= */}
+
+      <ConfirmModal
+        isOpen={showBulkDeleteModal}
+        title="Delete Selected Customers"
+        message={`Are you sure you want to delete ${validSelectedIds.length} selected customer${validSelectedIds.length === 1 ? "" : "s"}? Their conversations and messages will also be deleted. This cannot be undone.`}
+        confirmText={`Delete ${validSelectedIds.length}`}
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setShowBulkDeleteModal(false)}
       />
 
       {/* ================= VIEW ================= */}

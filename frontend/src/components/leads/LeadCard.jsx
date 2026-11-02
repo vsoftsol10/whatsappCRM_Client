@@ -1,3 +1,4 @@
+
 // import { 
 //   MoreVertical, 
 //   Eye,
@@ -195,6 +196,10 @@
 //                     <p className="text-sm text-gray-700 break-all">
 //                       ✉️ {lead.email || "N/A"}
 //                     </p>
+
+//                     <p className="text-sm text-gray-700">
+//                       👤 {lead.assignedTo?.name || "Unassigned"}
+//                     </p>
 //                   </div>
 
 //                   {/* Requirements */}
@@ -212,14 +217,20 @@
 
 //                   {/* Footer */}
 //                   <div className="flex justify-between items-center mt-auto">
-//                     <span
-//                       className={`px-3 py-1 rounded-full text-xs font-semibold ${
-//                         statusStyles[lead.status] ||
-//                         "bg-gray-100 text-gray-700"
-//                       }`}
-//                     >
-//                       {lead.status}
-//                     </span>
+//                     {lead.isConverted ? (
+//                       <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#DCF8C6] text-[#128C7E]">
+//                         Converted
+//                       </span>
+//                     ) : (
+//                       <span
+//                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
+//                           statusStyles[lead.status] ||
+//                           "bg-gray-100 text-gray-700"
+//                         }`}
+//                       >
+//                         {lead.status}
+//                       </span>
+//                     )}
 
 //                     <span className="text-xs text-gray-400">
 //                       Lead
@@ -228,6 +239,8 @@
 //                 </div>
 //         );
 //       }
+
+
 
 import { 
   MoreVertical, 
@@ -250,6 +263,10 @@ export default function LeadCard({
   onDelete,
   onStatusChange,
   onConvert,
+  // Optional multi-select (bulk delete). If not passed, the card
+  // looks and behaves exactly as before.
+  selected = false,
+  onToggleSelect,
  }) {
 
   const statusStyles = {
@@ -284,12 +301,25 @@ export default function LeadCard({
 }, []);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition min-h-[260px]">
+    <div
+      className={`bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition min-h-[260px] ${
+        selected ? "ring-2 ring-[#25D366]" : ""
+      }`}
+    >
       
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-lg font-bold text-gray-900">
+          <h3 className="flex items-center gap-3 text-lg font-bold text-gray-900">
+            {typeof onToggleSelect === "function" && (
+              <input
+                type="checkbox"
+                aria-label={`Select ${lead.name}`}
+                checked={selected}
+                onChange={() => onToggleSelect(lead.id)}
+                className="h-4 w-4 shrink-0 cursor-pointer accent-[#25D366]"
+              />
+            )}
             {lead.name}
           </h3>
 

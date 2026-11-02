@@ -3,11 +3,14 @@
 // export const getCustomers = async (
 //   status = "",
 //   search = "",
+//   serviceId = "",
 // ) => {
 //   const response = await apiClient.get("/api/customers", {
 //     params: {
 //       status,
 //       search,
+//       // optional: a service id, or "NONE" for customers without a service
+//       serviceId,
 //     },
 //   });
 
@@ -138,6 +141,19 @@ export const updateCustomer = async (
 export const deleteCustomer = async (id) => {
   const response = await apiClient.delete(
     `/api/customers/${id}`
+  );
+
+  return response.data;
+};
+
+/**
+ * Delete many customers at once
+ * ids = array of customer ids
+ */
+export const bulkDeleteCustomers = async (ids) => {
+  const response = await apiClient.post(
+    "/api/customers/bulk-delete",
+    { ids }
   );
 
   return response.data;

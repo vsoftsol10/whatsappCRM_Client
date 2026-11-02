@@ -25,7 +25,7 @@
 //       const response = await getLeads();
 
 //       set({
-//         leads: response.data,
+//         leads: Array.isArray(response?.data) ? response.data : [],
 //         isLoading: false,
 //       });
 //     } catch (error) {
@@ -209,6 +209,7 @@ import {
   updateLeadStatus,
   convertLeadToCustomer,
   deleteLead,
+  bulkDeleteLeads,
 } from "../api/leadApi";
 
 const useLeadStore = create((set) => ({
@@ -389,6 +390,33 @@ const useLeadStore = create((set) => ({
     }
   },
 
+  // ================= BULK DELETE LEADS =================
+  removeLeads: async (ids) => {
+    try {
+      const response = await bulkDeleteLeads(ids);
+
+      const deletedIds = Array.isArray(response?.deletedIds)
+        ? response.deletedIds
+        : [];
+
+      set((state) => ({
+        leads: state.leads.filter(
+          (lead) => !deletedIds.includes(lead.id)
+        ),
+      }));
+
+      return response;
+    } catch (error) {
+      set({
+        error:
+          error.response?.data?.message ||
+          "Failed to delete leads",
+      });
+
+      throw error;
+    }
+  },
+
   // ================= CLEAR ERROR =================
   clearError: () => {
     set({
@@ -398,4 +426,5 @@ const useLeadStore = create((set) => ({
 }));
 
 export default useLeadStore;
+
 

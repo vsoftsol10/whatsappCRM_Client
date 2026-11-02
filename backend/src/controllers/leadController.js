@@ -1,4 +1,3 @@
-
 // const prisma = require("../config/prisma");
 
 // const {
@@ -234,11 +233,15 @@
 //       },
 //       data: {
 //         name,
-//         phone,
-//         email,
+//         // NEW: an empty phone / email / requirements is saved as null
+//         // (not as an empty text), e.g. for Facebook / Instagram leads.
+//         // Not sent at all (undefined) = left unchanged, as before.
+//         phone: phone === undefined ? undefined : phone?.trim() || null,
+//         email: email === undefined ? undefined : email?.trim() || null,
 //         companyName: company,
 //         source,
-//         requirements,
+//         requirements:
+//           requirements === undefined ? undefined : requirements?.trim() || null,
 //         status: existingLead.isConverted
 //           ? existingLead.status
 //           : status,
@@ -441,6 +444,16 @@
 //       return res.status(400).json({
 //         success: false,
 //         message: "Lead already converted",
+//       });
+//     }
+
+//     // NEW: a customer needs a phone number. Facebook / Instagram leads may
+//     // not have one yet, so give a clear message instead of a server error.
+//     if (!lead.phone || !lead.phone.trim()) {
+//       return res.status(400).json({
+//         success: false,
+//         message:
+//           "Add a phone number to this lead (Edit Lead) before converting it to a customer.",
 //       });
 //     }
 
@@ -1183,6 +1196,110 @@ const deleteLead = async (req, res) => {
   }
 };
 
+// ================= BULK DELETE LEADS =================
+// Admin: any lead of the company.
+// Employee: only the leads assigned to them (the same leads they can see).
+const BULK_DELETE_MAX = 500;
+
+const bulkDeleteLeads = async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one lead.",
+      });
+    }
+
+    const uniqueIds = [
+      ...new Set(
+        ids
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      ),
+    ];
+
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one lead.",
+      });
+    }
+
+    if (uniqueIds.length > BULK_DELETE_MAX) {
+      return res.status(400).json({
+        success: false,
+        message: `You can delete at most ${BULK_DELETE_MAX} leads at a time.`,
+      });
+    }
+
+    const where = {
+      id: { in: uniqueIds },
+      companyId: req.user.companyId,
+    };
+
+    if (req.user.role !== "ADMIN") {
+      where.assignedToId = req.user.userId;
+    }
+
+    const leads = await prisma.lead.findMany({
+      where,
+      select: { id: true, name: true },
+    });
+
+    if (leads.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Leads not found",
+      });
+    }
+
+    const deletableIds = leads.map((lead) => lead.id);
+
+    // Work notes are removed automatically (onDelete: Cascade)
+    await prisma.lead.deleteMany({
+      where: {
+        id: { in: deletableIds },
+        companyId: req.user.companyId,
+      },
+    });
+
+    leads.forEach((lead) => {
+      logAction({
+        req,
+        action: "DELETE",
+        module: "LEAD",
+        entityId: lead.id,
+        entityName: lead.name,
+      });
+    });
+
+    const skippedCount = uniqueIds.length - leads.length;
+
+    return res.status(200).json({
+      success: true,
+      message:
+        skippedCount > 0
+          ? `${leads.length} deleted, ${skippedCount} skipped`
+          : `${leads.length} lead${
+              leads.length === 1 ? "" : "s"
+            } deleted successfully`,
+      deletedCount: leads.length,
+      deletedIds: deletableIds,
+      skippedCount,
+    });
+  } catch (error) {
+    console.error("Bulk Delete Leads Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete leads",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createLead,
   getLeads,
@@ -1190,4 +1307,5 @@ module.exports = {
   updateLeadStatus,
   convertLeadToCustomer,
   deleteLead,
+  bulkDeleteLeads,
 };

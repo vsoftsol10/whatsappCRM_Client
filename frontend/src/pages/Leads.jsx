@@ -1,3 +1,4 @@
+
 // import { useEffect, useMemo, useState } from "react";
 // import { LayoutGrid, PanelsTopLeft } from "lucide-react";
 
@@ -92,7 +93,10 @@
 //   const [currentPage, setCurrentPage] =
 //     useState(1);
 
-//   const itemsPerPage = 10;
+//   // Grid view: 12 per page, because 12 divides evenly into the 3-column
+//   // (xl), 2-column (md) and 1-column layouts, so the last row is never
+//   // left with a single stray card. List/table view keeps 10 per page.
+//   const itemsPerPage = viewMode === "grid" ? 12 : 10;
 
 //   useEffect(() => {
 //     fetchLeads();
@@ -443,7 +447,7 @@
 
 
 import { useEffect, useMemo, useState } from "react";
-import { LayoutGrid, PanelsTopLeft } from "lucide-react";
+import { LayoutGrid, PanelsTopLeft, Trash2 } from "lucide-react";
 
 import useLeadStore from "../store/leadStore";
 import useEmployeeStore from "../store/employeeStore";
@@ -500,6 +504,7 @@ export default function Lead() {
     isLoading,
     fetchLeads,
     removeLead,
+    removeLeads,
     changeLeadStatus,
     convertLead,
   } = useLeadStore();
@@ -533,6 +538,13 @@ export default function Lead() {
   const [deleteTargetId, setDeleteTargetId] =
     useState(null);
 
+  // Bulk selection / bulk delete
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] =
+    useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] =
+    useState(false);
+
   const [currentPage, setCurrentPage] =
     useState(1);
 
@@ -557,6 +569,11 @@ export default function Lead() {
     selectedStatus,
     viewMode,
   ]);
+
+  // Selection only makes sense for the list the user is looking at
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [searchTerm, selectedStatus]);
 
   // =========================
   // LEAD STATS
@@ -633,6 +650,113 @@ export default function Lead() {
       startIndex + itemsPerPage
     );
 
+
+  // =========================
+  // BULK SELECTION
+  // =========================
+
+  // Only keep ids that are still in the current (filtered) list
+  const validSelectedIds = useMemo(() => {
+    const visible = new Set(
+      filteredLeads.map((lead) => lead.id)
+    );
+
+    return selectedIds.filter((id) => visible.has(id));
+  }, [selectedIds, filteredLeads]);
+
+  const selectedSet = new Set(validSelectedIds);
+
+  const pageIds = paginatedLeads.map((lead) => lead.id);
+
+  const allPageSelected =
+    pageIds.length > 0 &&
+    pageIds.every((id) => selectedSet.has(id));
+
+  const somePageSelected = pageIds.some((id) =>
+    selectedSet.has(id)
+  );
+
+  const handleToggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectPage = () => {
+    setSelectedIds((prev) => {
+      if (allPageSelected) {
+        return prev.filter((id) => !pageIds.includes(id));
+      }
+
+      return [...new Set([...prev, ...pageIds])];
+    });
+  };
+
+  const handleSelectAllFiltered = () => {
+    setSelectedIds(filteredLeads.map((lead) => lead.id));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const confirmBulkDelete = async () => {
+    const ids = [...validSelectedIds];
+
+    setShowBulkDeleteModal(false);
+
+    if (ids.length === 0) return;
+
+    setIsBulkDeleting(true);
+
+    try {
+      const response = await removeLeads(ids);
+
+      const deletedCount = response?.deletedCount || 0;
+
+      if (deletedCount > 0) {
+        toast.success(
+          response?.message ||
+          `${deletedCount} leads deleted successfully`
+        );
+      } else {
+        toast.error("No leads were deleted");
+      }
+
+      setSelectedIds([]);
+
+      // Make sure we are not left on an empty page
+      const remainingItems =
+        filteredLeads.length - deletedCount;
+
+      const newTotalPages = Math.ceil(
+        remainingItems / itemsPerPage
+      );
+
+      if (
+        currentPage > newTotalPages &&
+        newTotalPages > 0
+      ) {
+        setCurrentPage(newTotalPages);
+      }
+    } catch (error) {
+      console.error(error);
+
+      // 403 is already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        return;
+      }
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to delete leads"
+      );
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   // =========================
   // HANDLERS
@@ -784,6 +908,69 @@ export default function Lead() {
         setSelectedStatus={setSelectedStatus}
       />
 
+      {/* ================= BULK SELECT BAR ================= */}
+
+      {!isLoading && filteredLeads.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+
+          <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={allPageSelected}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate =
+                    somePageSelected && !allPageSelected;
+                }
+              }}
+              onChange={handleToggleSelectPage}
+              className="h-4 w-4 cursor-pointer accent-[#25D366]"
+            />
+
+            {validSelectedIds.length > 0
+              ? `${validSelectedIds.length} selected`
+              : "Select all on this page"}
+          </label>
+
+          {validSelectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+
+              {validSelectedIds.length < filteredLeads.length && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllFiltered}
+                  className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#25D366] hover:bg-[#DCF8C6]"
+                >
+                  Select all {filteredLeads.length}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-gray-100"
+              >
+                Clear
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteModal(true)}
+                disabled={isBulkDeleting}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {isBulkDeleting
+                  ? "Deleting..."
+                  : "Delete Selected"}
+              </button>
+
+            </div>
+          )}
+
+        </div>
+      )}
+
       {/* ================= CONTENT ================= */}
 
       {isLoading ? (
@@ -815,6 +1002,8 @@ export default function Lead() {
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}
               onConvert={handleConvert}
+              selected={selectedSet.has(lead.id)}
+              onToggleSelect={handleToggleSelect}
             />
           ))}
 
@@ -829,6 +1018,9 @@ export default function Lead() {
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
           onConvert={handleConvert}
+          selectedIds={validSelectedIds}
+          onToggleSelect={handleToggleSelect}
+          onToggleSelectPage={handleToggleSelectPage}
         />
 
       )}
@@ -879,6 +1071,19 @@ export default function Lead() {
         variant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTargetId(null)}
+      />
+
+      {/* ================= BULK DELETE CONFIRM MODAL ================= */}
+
+      <ConfirmModal
+        isOpen={showBulkDeleteModal}
+        title="Delete Selected Leads"
+        message={`Are you sure you want to delete ${validSelectedIds.length} selected lead${validSelectedIds.length === 1 ? "" : "s"}? This cannot be undone.`}
+        confirmText={`Delete ${validSelectedIds.length}`}
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setShowBulkDeleteModal(false)}
       />
 
     </div>

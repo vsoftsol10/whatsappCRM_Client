@@ -4,6 +4,11 @@
 // const { normalizeIndianPhone } = require("../utils/phoneUtils");
 // const { logAction } = require("../services/auditLogService");
 // const customerImportService = require("../services/customerImportService");
+// const {
+//   customerServiceInclude,
+//   withServices,
+//   resolveServiceIds,
+// } = require("../utils/serviceHelper");
 
 // const createCustomer = async (req, res) => {
 //   try {
@@ -16,7 +21,7 @@
 //       });
 //     }
 
-//     const { name, phone, email, company, source, requirements, status } = req.body;
+//     const { name, phone, email, company, source, requirements, status, serviceIds } = req.body;
 
 //     //console.log("req.user:", req.user);
 
@@ -31,6 +36,18 @@
 
 //     const { userId, companyId } = req.user;
 
+//     // Services are OPTIONAL. Empty / missing = customer without services.
+//     let validServiceIds = [];
+
+//     try {
+//       validServiceIds = await resolveServiceIds(companyId, serviceIds);
+//     } catch (serviceError) {
+//       return res.status(serviceError.statusCode || 400).json({
+//         success: false,
+//         message: serviceError.message,
+//       });
+//     }
+
 //     const customer = await prisma.customer.create({
 //       data: {
 //         name,
@@ -43,7 +60,16 @@
 
 //         userId,
 //         companyId,
+
+//         ...(validServiceIds.length > 0
+//           ? {
+//               customerServices: {
+//                 create: validServiceIds.map((serviceId) => ({ serviceId })),
+//               },
+//             }
+//           : {}),
 //       },
+//       include: customerServiceInclude,
 //     });
 
 //     logAction({
@@ -57,7 +83,7 @@
 //     res.status(201).json({
 //       success: true,
 //       message: "Customer created successfully",
-//       customer,
+//       customer: withServices(customer),
 //     });
 //   } catch (error) {
 //     console.error(error);
@@ -131,7 +157,7 @@
 
 // const getCustomers = async (req, res) => {
 //   try {
-//     const { status, search } = req.query;
+//     const { status, search, serviceId } = req.query;
 
 //     const where = {
 //       companyId: req.user.companyId
@@ -140,6 +166,13 @@
 //     // Filter by status
 //     if (status) {
 //       where.status = status;
+//     }
+
+//     // Filter by service ("NONE" = customers without any service)
+//     if (serviceId === "NONE") {
+//       where.customerServices = { none: {} };
+//     } else if (serviceId) {
+//       where.customerServices = { some: { serviceId: String(serviceId) } };
 //     }
 
 //     // Search by name, phone, or email
@@ -170,11 +203,12 @@
 //       orderBy: {
 //         createdAt: "desc",
 //       },
+//       include: customerServiceInclude,
 //     });
 
 //     return res.status(200).json({
 //       success: true,
-//       customers,
+//       customers: customers.map(withServices),
 //     });
 //   } catch (error) {
 //     console.error(error);
@@ -194,7 +228,8 @@
 //       where: {
 //         id,
 //         companyId: req.user.companyId
-//       }
+//       },
+//       include: customerServiceInclude,
 //     });
 
 //     if (!customer) {
@@ -206,7 +241,7 @@
 
 //     return res.status(200).json({
 //       success: true,
-//       customer,
+//       customer: withServices(customer),
 //     });
 //   } catch (error) {
 //     console.error(error);
@@ -245,21 +280,48 @@
 //       });
 //     }
 
-//     const { name, phone, email, company, source, requirements, status } = req.body;
+//     const { name, phone, email, company, source, requirements, status, serviceIds } = req.body;
+
+//     const updateData = {
+//       name,
+//       phone,
+//       email,
+//       companyName: company,
+//       source,
+//       requirements,
+//       status,
+//     };
+
+//     // Services are OPTIONAL. Only when `serviceIds` is sent as an array do we
+//     // replace the customer's services (empty array = remove all services).
+//     // If it is not sent, existing services stay exactly as they are.
+//     if (Array.isArray(serviceIds)) {
+//       let validServiceIds = [];
+
+//       try {
+//         validServiceIds = await resolveServiceIds(
+//           req.user.companyId,
+//           serviceIds
+//         );
+//       } catch (serviceError) {
+//         return res.status(serviceError.statusCode || 400).json({
+//           success: false,
+//           message: serviceError.message,
+//         });
+//       }
+
+//       updateData.customerServices = {
+//         deleteMany: {},
+//         create: validServiceIds.map((serviceId) => ({ serviceId })),
+//       };
+//     }
 
 //     const updatedCustomer = await prisma.customer.update({
 //       where: {
 //         id,
 //       },
-//       data: {
-//         name,
-//         phone,
-//         email,
-//         companyName: company,
-//         source,
-//         requirements,
-//         status,
-//       },
+//       data: updateData,
+//       include: customerServiceInclude,
 //     });
 
 //     logAction({
@@ -287,7 +349,7 @@
 //     return res.status(200).json({
 //       success: true,
 //       message: "Customer updated successfully",
-//       customer: updatedCustomer,
+//       customer: withServices(updatedCustomer),
 //     });
 //   } catch (error) {
 //     console.error(error);
@@ -844,12 +906,179 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
+// ======================================================
+// BULK DELETE CUSTOMERS
+// Same rules as deleteCustomer, applied to many customers:
+//  - only customers of the logged-in company
+//  - customers with tickets (or deals) are skipped, not deleted
+//  - conversation + messages are removed together with the customer
+// ======================================================
+const BULK_DELETE_MAX = 500;
+
+const bulkDeleteCustomers = async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one customer.",
+      });
+    }
+
+    const uniqueIds = [
+      ...new Set(
+        ids.filter((id) => typeof id === "string" && id.trim())
+      ),
+    ];
+
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select at least one customer.",
+      });
+    }
+
+    if (uniqueIds.length > BULK_DELETE_MAX) {
+      return res.status(400).json({
+        success: false,
+        message: `You can delete at most ${BULK_DELETE_MAX} customers at a time.`,
+      });
+    }
+
+    // Only customers that belong to this company
+    const customers = await prisma.customer.findMany({
+      where: {
+        id: { in: uniqueIds },
+        companyId: req.user.companyId,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (customers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Customers not found",
+      });
+    }
+
+    const foundIds = customers.map((customer) => customer.id);
+
+    // Customers that still have tickets cannot be deleted
+    const tickets = await prisma.ticket.findMany({
+      where: { customerId: { in: foundIds } },
+      select: { customerId: true },
+      distinct: ["customerId"],
+    });
+
+    // Customers that still have deals cannot be deleted either
+    // (the database does not allow it)
+    const deals = await prisma.deal.findMany({
+      where: { customerId: { in: foundIds } },
+      select: { customerId: true },
+      distinct: ["customerId"],
+    });
+
+    const blockedByTickets = new Set(
+      tickets.map((row) => row.customerId)
+    );
+    const blockedByDeals = new Set(
+      deals.map((row) => row.customerId)
+    );
+
+    const deletable = [];
+    const skipped = [];
+
+    for (const customer of customers) {
+      if (blockedByTickets.has(customer.id)) {
+        skipped.push({
+          id: customer.id,
+          name: customer.name,
+          reason: "Has tickets. Delete the tickets first.",
+        });
+      } else if (blockedByDeals.has(customer.id)) {
+        skipped.push({
+          id: customer.id,
+          name: customer.name,
+          reason: "Has deals. Delete the deals first.",
+        });
+      } else {
+        deletable.push(customer);
+      }
+    }
+
+    if (deletable.length > 0) {
+      const deletableIds = deletable.map((customer) => customer.id);
+
+      await prisma.$transaction([
+        // Messages first, then conversations, then customers
+        prisma.message.deleteMany({
+          where: {
+            conversation: {
+              customerId: { in: deletableIds },
+            },
+          },
+        }),
+        prisma.conversation.deleteMany({
+          where: { customerId: { in: deletableIds } },
+        }),
+        prisma.customer.deleteMany({
+          where: {
+            id: { in: deletableIds },
+            companyId: req.user.companyId,
+          },
+        }),
+      ]);
+
+      deletable.forEach((customer) => {
+        logAction({
+          req,
+          action: "DELETE",
+          module: "CUSTOMER",
+          entityId: customer.id,
+          entityName: customer.name,
+        });
+      });
+    }
+
+    const deletedCount = deletable.length;
+
+    let message;
+
+    if (deletedCount > 0 && skipped.length === 0) {
+      message = `${deletedCount} customer${
+        deletedCount === 1 ? "" : "s"
+      } deleted successfully`;
+    } else if (deletedCount > 0) {
+      message = `${deletedCount} deleted, ${skipped.length} skipped`;
+    } else {
+      message = "No customers were deleted";
+    }
+
+    return res.status(200).json({
+      success: deletedCount > 0,
+      message,
+      deletedCount,
+      deletedIds: deletable.map((customer) => customer.id),
+      skipped,
+    });
+  } catch (error) {
+    console.error("Bulk delete customers error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
   createCustomer,
   getCustomers,
   getCustomerById,
   updateCustomer,
   deleteCustomer,
+  bulkDeleteCustomers,
   previewCustomerImport,
   importCustomers,
 };
