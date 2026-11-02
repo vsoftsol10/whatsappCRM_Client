@@ -1,9 +1,9 @@
-
 // import { useEffect, useMemo, useState } from "react";
 // import toast from "react-hot-toast";
 // import { Sparkles } from "lucide-react";
 
 // import useCampaignStore from "../store/campaignStore";
+// import { getCampaigns } from "../api/campaignApi"; // NEW (silent auto-refresh while sending)
 
 // import CampaignStats from "../components/campaigns/CampaignStats";
 // import CampaignFilters from "../components/campaigns/CampaignFilters";
@@ -48,6 +48,30 @@
 //   useEffect(() => {
 //     fetchCampaigns();
 //   }, []);
+
+//   // NEW: while any campaign is SENDING, refresh the list every 4 seconds
+//   // (silently - no loading spinner) so sent / failed counts move live.
+//   const hasSendingCampaign = campaigns.some(
+//     (campaign) => campaign.status === "SENDING"
+//   );
+
+//   useEffect(() => {
+//     if (!hasSendingCampaign) return;
+
+//     const timer = setInterval(async () => {
+//       try {
+//         const response = await getCampaigns();
+
+//         useCampaignStore.setState({
+//           campaigns: response.data || [],
+//         });
+//       } catch (error) {
+//         // ignore - the next tick will try again
+//       }
+//     }, 4000);
+
+//     return () => clearInterval(timer);
+//   }, [hasSendingCampaign]);
 
 //   useEffect(() => {
 //     setCurrentPage(1);
@@ -423,7 +447,7 @@ export default function Campaigns() {
 
   const [currentPage, setCurrentPage] = useState(1);
 
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchCampaigns();
@@ -681,6 +705,7 @@ export default function Campaigns() {
             totalItems={filteredCampaigns.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
           />
         )}
 

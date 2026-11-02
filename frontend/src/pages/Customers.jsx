@@ -1752,6 +1752,7 @@
 
 
 
+
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -1776,6 +1777,7 @@ import {
 } from "../api/customerApi";
 import CustomerStatCard from "../components/customers/CustomerStatCard";
 import ConfirmModal from "../components/common/ConfirmModal";
+import Pagination from "../components/common/Pagination";
 import ViewCustomerModal from "../components/customers/ViewCustomerModal";
 import { getServices } from "../api/serviceApi";
 
@@ -1820,7 +1822,9 @@ function Customers() {
   const [isBulkDeleting, setIsBulkDeleting] =
     useState(false);
 
-  const ROWS_PER_PAGE = 10;
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const ROWS_PER_PAGE = rowsPerPage;
 
   // Ref for currently opened menu
   const menuRef = useRef(null);
@@ -2025,7 +2029,7 @@ function Customers() {
         start,
         start + ROWS_PER_PAGE
       );
-    }, [customers, currentPage]);
+    }, [customers, currentPage, ROWS_PER_PAGE]);
 
   // =========================
   // OPEN ACTION MENU
@@ -3032,75 +3036,16 @@ function Customers() {
 
       {/* ================= PAGINATION ================= */}
 
-      <div className="mt-6 flex flex-col items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm sm:flex-row sm:px-6">
-
-        <p className="text-center text-sm text-gray-600 sm:text-left">
-          Page {currentPage} of{" "}
-          {totalPages}
-        </p>
-
-        <div className="flex max-w-full flex-wrap justify-center gap-2">
-
-          <button
-            onClick={() =>
-              setCurrentPage((prev) =>
-                Math.max(
-                  prev - 1,
-                  1
-                )
-              )
-            }
-            disabled={
-              currentPage === 1
-            }
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:bg-gray-100"
-          >
-            Previous
-          </button>
-
-          {Array.from(
-            { length: totalPages },
-            (_, index) => (
-
-              <button
-                key={index}
-                onClick={() =>
-                  setCurrentPage(
-                    index + 1
-                  )
-                }
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${currentPage ===
-                  index + 1
-                  ? "bg-[#25D366] text-black"
-                  : "border border-gray-300 bg-white hover:bg-gray-100"
-                  }`}
-              >
-                {index + 1}
-              </button>
-
-            )
-          )}
-
-          <button
-            onClick={() =>
-              setCurrentPage((prev) =>
-                Math.min(
-                  prev + 1,
-                  totalPages
-                )
-              )
-            }
-            disabled={
-              currentPage === totalPages
-            }
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 hover:bg-gray-100"
-          >
-            Next
-          </button>
-
-        </div>
-
-      </div>
+      {customers.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={customers.length}
+          itemsPerPage={ROWS_PER_PAGE}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setRowsPerPage(size); setCurrentPage(1); }}
+        />
+      )}
 
       {/* ================= DELETE MODAL ================= */}
 

@@ -446,6 +446,7 @@
 
 
 
+
 import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, PanelsTopLeft, Trash2 } from "lucide-react";
 
@@ -551,7 +552,17 @@ export default function Lead() {
   // Grid view: 12 per page, because 12 divides evenly into the 3-column
   // (xl), 2-column (md) and 1-column layouts, so the last row is never
   // left with a single stray card. List/table view keeps 10 per page.
-  const itemsPerPage = viewMode === "grid" ? 12 : 10;
+  // The user can pick another size from the "Page size" dropdown;
+  // it resets to the default whenever the view (grid/table) changes.
+  const [pageSizeOverride, setPageSizeOverride] =
+    useState(null);
+
+  const itemsPerPage =
+    pageSizeOverride ?? (viewMode === "grid" ? 12 : 10);
+
+  useEffect(() => {
+    setPageSizeOverride(null);
+  }, [viewMode]);
 
   useEffect(() => {
     fetchLeads();
@@ -1032,6 +1043,12 @@ export default function Lead() {
           totalItems={filteredLeads.length}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSizeOverride(size); setCurrentPage(1); }}
+          pageSizeOptions={
+            viewMode === "grid"
+              ? [12, 24, 48, 96]
+              : [10, 20, 50, 100]
+          }
         />
       )}
 
@@ -1089,3 +1106,4 @@ export default function Lead() {
     </div>
   );
 }
+

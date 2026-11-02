@@ -147,8 +147,8 @@
 
 //       {/* FILTERS */}
 //       <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
-//         <div className="flex flex-wrap items-end gap-3">
-//           <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+//         <div className="flex flex-wrap items-center gap-3">
+//           <div className="flex h-10 shrink-0 items-center gap-2 text-sm font-medium text-slate-500">
 //             <Filter className="h-4 w-4" />
 //             Filters
 //           </div>
@@ -158,7 +158,7 @@
 //             onChange={(e) =>
 //               setFilters((prev) => ({ ...prev, module: e.target.value }))
 //             }
-//             className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
+//             className="h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
 //           >
 //             <option value="">All Modules</option>
 //             {MODULE_OPTIONS.map((m) => (
@@ -173,7 +173,7 @@
 //             onChange={(e) =>
 //               setFilters((prev) => ({ ...prev, action: e.target.value }))
 //             }
-//             className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
+//             className="h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
 //           >
 //             <option value="">All Actions</option>
 //             {ACTION_OPTIONS.map((a) => (
@@ -183,14 +183,14 @@
 //             ))}
 //           </select>
 
-//           <div className="flex items-center gap-2">
+//           <div className="flex h-10 items-center gap-2">
 //             <input
 //               type="date"
 //               value={filters.startDate}
 //               onChange={(e) =>
 //                 setFilters((prev) => ({ ...prev, startDate: e.target.value }))
 //               }
-//               className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
+//               className="h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
 //             />
 
 //             <span className="text-sm text-slate-400">to</span>
@@ -201,14 +201,14 @@
 //               onChange={(e) =>
 //                 setFilters((prev) => ({ ...prev, endDate: e.target.value }))
 //               }
-//               className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
+//               className="h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-[#25D366] focus:outline-none"
 //             />
 //           </div>
 
 //           {hasActiveFilters && (
 //             <button
 //               onClick={clearFilters}
-//               className="flex items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
+//               className="flex h-10 items-center gap-1 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100"
 //             >
 //               <X className="h-4 w-4" />
 //               Clear
@@ -401,24 +401,27 @@
 //                 </div>
 //               )}
 //             </div>
-//           </div>
+//           </div>3
+          
 //         </div>
 //       )}
 //     </div>
 //   );
 // }
 
+
+
+
 import { useEffect, useState, useCallback } from "react";
 import {
   History,
-  ChevronLeft,
-  ChevronRight,
   X,
   Filter,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 import { getAuditLogs } from "../../api/auditLogApi";
+import Pagination from "../../components/common/Pagination";
 
 const MODULE_OPTIONS = [
   "CUSTOMER",
@@ -471,13 +474,13 @@ export default function AuditLogs() {
   // LOAD AUDIT LOGS
   // =====================================================
 
-  const loadLogs = useCallback(async (page = 1) => {
+  const loadLogs = useCallback(async (page = 1, limitOverride) => {
     try {
       setLoading(true);
 
       const params = {
         page,
-        limit: pagination.limit,
+        limit: limitOverride || pagination.limit,
       };
 
       if (filters.module) params.module = filters.module;
@@ -709,32 +712,22 @@ export default function AuditLogs() {
 
         {/* PAGINATION */}
         {!loading && logs.length > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-            <span className="text-xs text-slate-500">
-              Page {pagination.page} of {pagination.totalPages} ·{" "}
-              {pagination.total} total entries
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                disabled={pagination.page <= 1}
-                onClick={() => loadLogs(pagination.page - 1)}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Prev
-              </button>
-
-              <button
-                disabled={pagination.page >= pagination.totalPages}
-                onClick={() => loadLogs(pagination.page + 1)}
-                className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 disabled:opacity-40"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          <Pagination
+            variant="inline"
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            pageSizeOptions={[10, 25, 50, 100]}
+            onPageChange={(page) => loadLogs(page)}
+            onPageSizeChange={(size) => {
+              setPagination((prev) => ({
+                ...prev,
+                limit: size,
+              }));
+              loadLogs(1, size);
+            }}
+          />
         )}
       </div>
 

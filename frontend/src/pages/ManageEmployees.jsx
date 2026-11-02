@@ -1,5 +1,3 @@
-
-
 // import React, {
 //   useEffect,
 //   useMemo,
@@ -52,8 +50,12 @@
 //   const {
 //     employees,
 //     loading,
-//     fetchEmployees,
+//     fetchEmployees: fetchEmployeesBase,
 //   } = useEmployeeStore();
+
+//   // Manage Employees also lists admins that were created as employees
+//   const fetchEmployees = () =>
+//     fetchEmployeesBase({ includeAdmins: true });
 
 //   useEffect(() => {
 //     fetchEmployees();
@@ -303,8 +305,6 @@
 
 
 
-
-
 import React, {
   useEffect,
   useMemo,
@@ -352,7 +352,7 @@ const ManageEmployees = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] =
     useState(false);
 
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const {
     employees,
@@ -574,6 +574,7 @@ const ManageEmployees = () => {
             totalItems={filteredEmployees.length}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
           />
         </>
       )}
