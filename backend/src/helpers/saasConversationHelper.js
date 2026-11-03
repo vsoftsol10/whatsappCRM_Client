@@ -1,6 +1,40 @@
 // const prisma = require("../config/prisma");
 
-// const getOrCreateSaaSConversation = async (
+// // ------------------------------------------------------
+// // Tiny in-process lock, keyed by company + phone.
+// //
+// // Two WhatsApp messages from the same NEW number can arrive within
+// // milliseconds. Without a lock both would find "no conversation" and
+// // both would create one. This makes the second wait for the first.
+// // (Works for a single server process. If you run several instances,
+// // also add the partial unique index described in the notes.)
+// // ------------------------------------------------------
+// const locks = new Map();
+
+// const withLock = async (key, fn) => {
+//   const previous = locks.get(key) || Promise.resolve();
+
+//   let release;
+//   const current = new Promise((resolve) => {
+//     release = resolve;
+//   });
+
+//   const chain = previous.then(() => current);
+//   locks.set(key, chain);
+
+//   await previous;
+
+//   try {
+//     return await fn();
+//   } finally {
+//     release();
+//     if (locks.get(key) === chain) {
+//       locks.delete(key);
+//     }
+//   }
+// };
+
+// const findOrCreateConversation = async (
 //   companyId,
 //   whatsappAccountId,
 //   phone
@@ -17,8 +51,6 @@
 //     throw new Error("Customer phone number is required");
 //   }
 
-//   // Make sure the WhatsApp account belongs
-//   // to this company.
 //   const whatsappAccount = await prisma.whatsAppAccount.findFirst({
 //     where: {
 //       id: whatsappAccountId,
@@ -33,7 +65,6 @@
 //     );
 //   }
 
-//   // Find customer ONLY inside this company.
 //   const customer = await prisma.customer.findFirst({
 //     where: {
 //       companyId,
@@ -41,7 +72,6 @@
 //     },
 //   });
 
-//   // Existing customer
 //   if (customer) {
 //     let conversation = await prisma.conversation.findUnique({
 //       where: {
@@ -53,14 +83,12 @@
 //     });
 
 //     if (conversation) {
-//       // Make sure conversation belongs to this company.
 //       if (conversation.companyId !== companyId) {
 //         throw new Error(
 //           "Conversation belongs to another company"
 //         );
 //       }
 
-//       // Associate WhatsApp account if not already set.
 //       if (conversation.whatsappAccountId !== whatsappAccountId) {
 //         conversation = await prisma.conversation.update({
 //           where: {
@@ -76,6 +104,35 @@
 //       }
 
 //       return conversation;
+//     }
+
+//     // NEW: this number chatted with us BEFORE it was saved as a customer,
+//     // so a phone-only conversation may already exist. Link it to the
+//     // customer instead of starting a second chat (keeps the history).
+//     const phoneOnly = await prisma.conversation.findFirst({
+//       where: {
+//         companyId,
+//         phone,
+//         customerId: null,
+//       },
+//       orderBy: {
+//         createdAt: "asc",
+//       },
+//     });
+
+//     if (phoneOnly) {
+//       return prisma.conversation.update({
+//         where: {
+//           id: phoneOnly.id,
+//         },
+//         data: {
+//           customerId: customer.id,
+//           whatsappAccountId,
+//         },
+//         include: {
+//           customer: true,
+//         },
+//       });
 //     }
 
 //     conversation = await prisma.conversation.create({
@@ -96,7 +153,41 @@
 //     return conversation;
 //   }
 
-//   // No customer yet
+//   // NEW: unknown number. Reuse the existing phone-only conversation
+//   // (oldest one wins, in case duplicates already exist in the database)
+//   // instead of creating a brand new chat for every message.
+//   const existing = await prisma.conversation.findFirst({
+//     where: {
+//       companyId,
+//       phone,
+//       customerId: null,
+//     },
+//     orderBy: {
+//       createdAt: "asc",
+//     },
+//     include: {
+//       customer: true,
+//     },
+//   });
+
+//   if (existing) {
+//     if (existing.whatsappAccountId !== whatsappAccountId) {
+//       return prisma.conversation.update({
+//         where: {
+//           id: existing.id,
+//         },
+//         data: {
+//           whatsappAccountId,
+//         },
+//         include: {
+//           customer: true,
+//         },
+//       });
+//     }
+
+//     return existing;
+//   }
+
 //   return prisma.conversation.create({
 //     data: {
 //       companyId,
@@ -113,13 +204,26 @@
 //   });
 // };
 
+// // Same name and arguments as before, so no caller needs to change.
+// const getOrCreateSaaSConversation = (
+//   companyId,
+//   whatsappAccountId,
+//   phone
+// ) =>
+//   withLock(`${companyId}:${phone}`, () =>
+//     findOrCreateConversation(companyId, whatsappAccountId, phone)
+//   );
+
 // module.exports = {
 //   getOrCreateSaaSConversation,
 // };
 
 
 
+
+
 const prisma = require("../config/prisma");
+const { getDefaultBotEnabled } = require("../utils/botDefault");
 
 // ------------------------------------------------------
 // Tiny in-process lock, keyed by company + phone.
@@ -265,6 +369,8 @@ const findOrCreateConversation = async (
         status: "OPEN",
         channel: "WHATSAPP",
         unreadCount: 0,
+        // Bot starts ON/OFF following Settings > AI Auto-Reply
+        botEnabled: await getDefaultBotEnabled(companyId),
       },
       include: {
         customer: true,
@@ -318,6 +424,8 @@ const findOrCreateConversation = async (
       status: "OPEN",
       channel: "WHATSAPP",
       unreadCount: 0,
+      // Bot starts ON/OFF following Settings > AI Auto-Reply
+      botEnabled: await getDefaultBotEnabled(companyId),
     },
     include: {
       customer: true,
