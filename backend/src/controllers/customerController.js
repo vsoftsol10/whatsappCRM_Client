@@ -459,6 +459,7 @@
 
 
 
+
 const prisma = require("../config/prisma");
 const { validateCustomer } = require("../validations/customerValidation");
 const { normalizeIndianPhone } = require("../utils/phoneUtils");
@@ -913,7 +914,21 @@ const deleteCustomer = async (req, res) => {
 //  - customers with tickets (or deals) are skipped, not deleted
 //  - conversation + messages are removed together with the customer
 // ======================================================
-const BULK_DELETE_MAX = 500;
+// There is NO limit on how many customers can be deleted at once.
+// Internally the work is done in batches of 500 so that very large
+// deletes never hit database limits (too many query parameters,
+// transaction time-outs). The user never sees or notices the batches.
+const BULK_DELETE_BATCH_SIZE = 500;
+
+const splitIntoBatches = (items, size) => {
+  const batches = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    batches.push(items.slice(index, index + size));
+  }
+
+  return batches;
+};
 
 const bulkDeleteCustomers = async (req, res) => {
   try {
@@ -939,21 +954,25 @@ const bulkDeleteCustomers = async (req, res) => {
       });
     }
 
-    if (uniqueIds.length > BULK_DELETE_MAX) {
-      return res.status(400).json({
-        success: false,
-        message: `You can delete at most ${BULK_DELETE_MAX} customers at a time.`,
-      });
-    }
+    const idBatches = splitIntoBatches(
+      uniqueIds,
+      BULK_DELETE_BATCH_SIZE
+    );
 
     // Only customers that belong to this company
-    const customers = await prisma.customer.findMany({
-      where: {
-        id: { in: uniqueIds },
-        companyId: req.user.companyId,
-      },
-      select: { id: true, name: true },
-    });
+    const customers = [];
+
+    for (const batch of idBatches) {
+      const found = await prisma.customer.findMany({
+        where: {
+          id: { in: batch },
+          companyId: req.user.companyId,
+        },
+        select: { id: true, name: true },
+      });
+
+      customers.push(...found);
+    }
 
     if (customers.length === 0) {
       return res.status(404).json({
@@ -962,83 +981,96 @@ const bulkDeleteCustomers = async (req, res) => {
       });
     }
 
-    const foundIds = customers.map((customer) => customer.id);
-
-    // Customers that still have tickets cannot be deleted
-    const tickets = await prisma.ticket.findMany({
-      where: { customerId: { in: foundIds } },
-      select: { customerId: true },
-      distinct: ["customerId"],
-    });
-
-    // Customers that still have deals cannot be deleted either
-    // (the database does not allow it)
-    const deals = await prisma.deal.findMany({
-      where: { customerId: { in: foundIds } },
-      select: { customerId: true },
-      distinct: ["customerId"],
-    });
-
-    const blockedByTickets = new Set(
-      tickets.map((row) => row.customerId)
-    );
-    const blockedByDeals = new Set(
-      deals.map((row) => row.customerId)
+    const foundBatches = splitIntoBatches(
+      customers,
+      BULK_DELETE_BATCH_SIZE
     );
 
     const deletable = [];
     const skipped = [];
 
-    for (const customer of customers) {
-      if (blockedByTickets.has(customer.id)) {
-        skipped.push({
-          id: customer.id,
-          name: customer.name,
-          reason: "Has tickets. Delete the tickets first.",
-        });
-      } else if (blockedByDeals.has(customer.id)) {
-        skipped.push({
-          id: customer.id,
-          name: customer.name,
-          reason: "Has deals. Delete the deals first.",
-        });
-      } else {
-        deletable.push(customer);
-      }
-    }
+    for (const batch of foundBatches) {
+      const batchIds = batch.map((customer) => customer.id);
 
-    if (deletable.length > 0) {
-      const deletableIds = deletable.map((customer) => customer.id);
-
-      await prisma.$transaction([
-        // Messages first, then conversations, then customers
-        prisma.message.deleteMany({
-          where: {
-            conversation: {
-              customerId: { in: deletableIds },
-            },
-          },
-        }),
-        prisma.conversation.deleteMany({
-          where: { customerId: { in: deletableIds } },
-        }),
-        prisma.customer.deleteMany({
-          where: {
-            id: { in: deletableIds },
-            companyId: req.user.companyId,
-          },
-        }),
-      ]);
-
-      deletable.forEach((customer) => {
-        logAction({
-          req,
-          action: "DELETE",
-          module: "CUSTOMER",
-          entityId: customer.id,
-          entityName: customer.name,
-        });
+      // Customers that still have tickets cannot be deleted
+      const tickets = await prisma.ticket.findMany({
+        where: { customerId: { in: batchIds } },
+        select: { customerId: true },
+        distinct: ["customerId"],
       });
+
+      // Customers that still have deals cannot be deleted either
+      // (the database does not allow it)
+      const deals = await prisma.deal.findMany({
+        where: { customerId: { in: batchIds } },
+        select: { customerId: true },
+        distinct: ["customerId"],
+      });
+
+      const blockedByTickets = new Set(
+        tickets.map((row) => row.customerId)
+      );
+      const blockedByDeals = new Set(
+        deals.map((row) => row.customerId)
+      );
+
+      const batchDeletable = [];
+
+      for (const customer of batch) {
+        if (blockedByTickets.has(customer.id)) {
+          skipped.push({
+            id: customer.id,
+            name: customer.name,
+            reason: "Has tickets. Delete the tickets first.",
+          });
+        } else if (blockedByDeals.has(customer.id)) {
+          skipped.push({
+            id: customer.id,
+            name: customer.name,
+            reason: "Has deals. Delete the deals first.",
+          });
+        } else {
+          batchDeletable.push(customer);
+        }
+      }
+
+      if (batchDeletable.length > 0) {
+        const deletableIds = batchDeletable.map(
+          (customer) => customer.id
+        );
+
+        await prisma.$transaction([
+          // Messages first, then conversations, then customers
+          prisma.message.deleteMany({
+            where: {
+              conversation: {
+                customerId: { in: deletableIds },
+              },
+            },
+          }),
+          prisma.conversation.deleteMany({
+            where: { customerId: { in: deletableIds } },
+          }),
+          prisma.customer.deleteMany({
+            where: {
+              id: { in: deletableIds },
+              companyId: req.user.companyId,
+            },
+          }),
+        ]);
+
+        batchDeletable.forEach((customer) => {
+          logAction({
+            req,
+            action: "DELETE",
+            module: "CUSTOMER",
+            entityId: customer.id,
+            entityName: customer.name,
+          });
+        });
+
+        deletable.push(...batchDeletable);
+      }
     }
 
     const deletedCount = deletable.length;
