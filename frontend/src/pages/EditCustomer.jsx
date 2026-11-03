@@ -7,6 +7,7 @@
 // } from "../api/customerApi";
 
 // import toast from "react-hot-toast";
+// import ServiceMultiSelect from "../components/services/ServiceMultiSelect";
 
 // function EditCustomer({
 //   customerId,
@@ -23,6 +24,7 @@
 //     source: "",
 //     requirements: "",
 //     status: "ACTIVE",
+//     serviceIds: [], // optional
 //   });
 
 //   const [errors, setErrors] = useState({});
@@ -55,6 +57,7 @@
 //           source: data.customer.source || "",
 //           requirements: data.customer.requirements || "",
 //           status: data.customer.status || "ACTIVE",
+//           serviceIds: (data.customer.services || []).map((s) => s.id),
 //         });
 //       } catch (error) {
 //         console.error(
@@ -411,6 +414,15 @@
 //             />
 //           </div>
 
+//           {/* Services (optional) */}
+//           <ServiceMultiSelect
+//             value={formData.serviceIds}
+//             onChange={(ids) =>
+//               setFormData((prev) => ({ ...prev, serviceIds: ids }))
+//             }
+//             disabled={loading}
+//           />
+
 //           {/* Status */}
 //           <div>
 //             <label className="block mb-2 font-semibold text-black">
@@ -604,11 +616,7 @@ function EditCustomer({
         "Enter a valid email address";
     }
 
-    // Company
-    if (!formData.company.trim()) {
-      newErrors.company =
-        "Company name is required";
-    }
+    // Company - optional
 
     // Status
     if (!formData.status) {
@@ -844,8 +852,7 @@ function EditCustomer({
           {/* Company */}
           <div>
             <label className="block mb-2 font-semibold text-black">
-              Company{" "}
-              <span className="text-red-500">*</span>
+              Company
             </label>
 
             <input

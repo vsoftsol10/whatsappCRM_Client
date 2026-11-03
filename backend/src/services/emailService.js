@@ -1,4 +1,9 @@
+
 // const axios = require("axios");
+// const { buildFrontendUrl } = require("../utils/frontendUrl");
+
+// // Change the brand name here and it updates every employee-credentials email
+// const BRAND_NAME = "Vatup CRM";
 
 // const sendEmployeeCredentials = async (
 //   name,
@@ -6,14 +11,17 @@
 //   tempPassword,
 //   companyId
 // ) => {
-//   const loginUrl =
-//   `${process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com"}/login?company=${companyId}`;
+//   const loginPath = companyId
+//     ? `/login?company=${encodeURIComponent(companyId)}`
+//     : "/login";
+//   const loginUrl = buildFrontendUrl(loginPath);
+
 //   await axios.post(
 //     "https://api.brevo.com/v3/smtp/email",
 //     {
 //       sender: {
-//         name: "WhatsApp CRM",
-//         email: process.env.EMAIL_USER,
+//         name: BRAND_NAME,
+//         email: process.env.EMAIL_USER, // must be a verified sender in Brevo
 //       },
 
 //       to: [
@@ -23,12 +31,12 @@
 //         },
 //       ],
 
-//       subject: "Welcome to WhatsApp CRM",
+//       subject: `Welcome to ${BRAND_NAME}`,
 
 //       textContent: `
 // Hello ${name},
 
-// Your WhatsApp CRM account has been created successfully.
+// Your ${BRAND_NAME} account has been created successfully.
 
 // Login Details
 // -------------
@@ -42,7 +50,7 @@
 // Please change your password after your first login.
 
 // Regards,
-// WhatsApp CRM Team
+// ${BRAND_NAME} Team
 //       `,
 //     },
 
@@ -60,13 +68,24 @@
 // module.exports = sendEmployeeCredentials;
 
 
-
+// backend/src/services/emailService.js
+//
+// Sends the "Welcome - here are your login details" email to a new
+// employee. Same function name, same arguments and same Brevo call as
+// before; only the email DESIGN changed (see emailTemplates.js).
 
 const axios = require("axios");
 const { buildFrontendUrl } = require("../utils/frontendUrl");
-
-// Change the brand name here and it updates every employee-credentials email
-const BRAND_NAME = "Vatup CRM";
+const {
+  BRAND_NAME,
+  esc,
+  layout,
+  paragraph,
+  smallText,
+  detailsBox,
+  button,
+  fallbackLink,
+} = require("./emailTemplates");
 
 const sendEmployeeCredentials = async (
   name,
@@ -78,6 +97,27 @@ const sendEmployeeCredentials = async (
     ? `/login?company=${encodeURIComponent(companyId)}`
     : "/login";
   const loginUrl = buildFrontendUrl(loginPath);
+
+  const htmlContent = layout({
+    preheader: `Your ${BRAND_NAME} account is ready. Here are your login details.`,
+    title: `Welcome to ${BRAND_NAME}`,
+    bodyHtml: `
+      ${paragraph(`Hello ${esc(name)},`)}
+      ${paragraph(
+        "Your account has been created. You can sign in with the details below."
+      )}
+
+      ${detailsBox([
+        { label: "Email", value: email },
+        { label: "Temporary password", value: tempPassword, mono: true },
+      ])}
+
+      ${button("Log in", loginUrl)}
+
+      ${smallText("Please change your password after your first login.")}
+      ${fallbackLink(loginUrl)}
+    `,
+  });
 
   await axios.post(
     "https://api.brevo.com/v3/smtp/email",
@@ -96,6 +136,9 @@ const sendEmployeeCredentials = async (
 
       subject: `Welcome to ${BRAND_NAME}`,
 
+      htmlContent,
+
+      // Plain-text version for email apps that don't show HTML
       textContent: `
 Hello ${name},
 

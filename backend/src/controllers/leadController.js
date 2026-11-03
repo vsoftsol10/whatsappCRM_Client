@@ -603,6 +603,8 @@
 
 
 
+
+
 const prisma = require("../config/prisma");
 
 const {
@@ -1199,7 +1201,21 @@ const deleteLead = async (req, res) => {
 // ================= BULK DELETE LEADS =================
 // Admin: any lead of the company.
 // Employee: only the leads assigned to them (the same leads they can see).
-const BULK_DELETE_MAX = 500;
+// There is NO limit on how many leads can be deleted at once.
+// Internally the work is done in batches of 500 so that very large
+// deletes never hit database limits (too many query parameters,
+// time-outs). The user never sees or notices the batches.
+const BULK_DELETE_BATCH_SIZE = 500;
+
+const splitLeadIdsIntoBatches = (items, size) => {
+  const batches = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    batches.push(items.slice(index, index + size));
+  }
+
+  return batches;
+};
 
 const bulkDeleteLeads = async (req, res) => {
   try {
@@ -1227,26 +1243,31 @@ const bulkDeleteLeads = async (req, res) => {
       });
     }
 
-    if (uniqueIds.length > BULK_DELETE_MAX) {
-      return res.status(400).json({
-        success: false,
-        message: `You can delete at most ${BULK_DELETE_MAX} leads at a time.`,
+    const idBatches = splitLeadIdsIntoBatches(
+      uniqueIds,
+      BULK_DELETE_BATCH_SIZE
+    );
+
+    // Find every lead this user is allowed to delete
+    const leads = [];
+
+    for (const batch of idBatches) {
+      const where = {
+        id: { in: batch },
+        companyId: req.user.companyId,
+      };
+
+      if (req.user.role !== "ADMIN") {
+        where.assignedToId = req.user.userId;
+      }
+
+      const found = await prisma.lead.findMany({
+        where,
+        select: { id: true, name: true },
       });
+
+      leads.push(...found);
     }
-
-    const where = {
-      id: { in: uniqueIds },
-      companyId: req.user.companyId,
-    };
-
-    if (req.user.role !== "ADMIN") {
-      where.assignedToId = req.user.userId;
-    }
-
-    const leads = await prisma.lead.findMany({
-      where,
-      select: { id: true, name: true },
-    });
 
     if (leads.length === 0) {
       return res.status(404).json({
@@ -1258,12 +1279,17 @@ const bulkDeleteLeads = async (req, res) => {
     const deletableIds = leads.map((lead) => lead.id);
 
     // Work notes are removed automatically (onDelete: Cascade)
-    await prisma.lead.deleteMany({
-      where: {
-        id: { in: deletableIds },
-        companyId: req.user.companyId,
-      },
-    });
+    for (const batch of splitLeadIdsIntoBatches(
+      deletableIds,
+      BULK_DELETE_BATCH_SIZE
+    )) {
+      await prisma.lead.deleteMany({
+        where: {
+          id: { in: batch },
+          companyId: req.user.companyId,
+        },
+      });
+    }
 
     leads.forEach((lead) => {
       logAction({
