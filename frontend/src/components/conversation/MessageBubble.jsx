@@ -3,13 +3,9 @@ import {
   FaCheck,
   FaCheckDouble,
   FaEllipsisV,
-  FaPen,
-  FaTrash,
   FaRegCopy,
   FaFileAlt,
 } from "react-icons/fa";
-import useMessageStore from "../../store/messageStore";
-import ConfirmModal from "../common/ConfirmModal";
 import LinkifiedText from "./LinkifiedText";
 // 👈 NEW: shows the template buttons (call / website / quick reply / copy code)
 import { TemplateButtonsPreview } from "../templates/TemplateButtonsEditor";
@@ -19,19 +15,14 @@ function MessageBubble({ message }) {
 
   // NEW: messages sent from OUR side (a human agent, a campaign, or the AI bot)
   // show on the RIGHT. Only CUSTOMER messages show on the LEFT.
-  // isSender (AGENT only) is still used for the edit/delete menu, so the
-  // bot's messages cannot be edited or deleted by mistake.
+  // isSender (AGENT only) is used for the three-dot menu (Copy).
+  // Edit / Delete were removed: WhatsApp cannot edit or delete a message
+  // that was already sent, so the customer would still see the original.
   const isOutgoing = ["AGENT", "BOT"].includes(message.sender?.toUpperCase());
 
   const [showMenu, setShowMenu] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(message.content || "");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const menuRef = useRef(null);
-
-  const updateMessage = useMessageStore((state) => state.updateMessage);
-  const removeMessage = useMessageStore((state) => state.removeMessage);
 
   // Close menu on outside click
   useEffect(() => {
@@ -64,39 +55,6 @@ function MessageBubble({ message }) {
     setShowMenu(false);
   };
 
-  const handleEditStart = () => {
-    setEditText(message.content || "");
-    setIsEditing(true);
-    setShowMenu(false);
-  };
-
-  const handleEditCancel = () => {
-    setEditText(message.content || "");
-    setIsEditing(false);
-  };
-
-  const handleEditSave = () => {
-    const trimmed = editText.trim();
-
-    if (!trimmed || trimmed === message.content) {
-      setIsEditing(false);
-      return;
-    }
-
-    updateMessage(message.id, trimmed);
-    setIsEditing(false);
-  };
-
-  const handleDelete = () => {
-    setShowMenu(false);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteMessage = () => {
-    setShowDeleteConfirm(false);
-    removeMessage(message.id);
-  };
-
   return (
     <>
     <div
@@ -112,7 +70,7 @@ function MessageBubble({ message }) {
         }`}
       >
         {/* Three-dot menu — only on your own (AGENT) messages */}
-        {isSender && !isEditing && (
+        {isSender && (
           <div
             ref={menuRef}
             className="absolute right-1 top-1 z-10"
@@ -125,31 +83,13 @@ function MessageBubble({ message }) {
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-7 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-7 w-32 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
                 <button
                   onClick={handleCopy}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
                 >
                   <FaRegCopy size={12} />
                   Copy
-                </button>
-
-                {message.content && (
-                  <button
-                    onClick={handleEditStart}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <FaPen size={12} />
-                    Edit
-                  </button>
-                )}
-
-                <button
-                  onClick={handleDelete}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
-                >
-                  <FaTrash size={12} />
-                  Delete
                 </button>
               </div>
             )}
@@ -194,40 +134,12 @@ function MessageBubble({ message }) {
 
         {/* Message + Time */}
         <div className="px-4 py-2">
-          {isEditing ? (
-            <div className="min-w-[200px]">
-              <textarea
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                className="w-full resize-none rounded-md border border-gray-300 bg-white p-2 text-sm text-gray-800 outline-none focus:border-[#25D366]"
-                rows={3}
-                autoFocus
-              />
-
-              <div className="mt-1 flex justify-end gap-3 text-xs">
-                <button
-                  onClick={handleEditCancel}
-                  className="text-gray-500 hover:underline"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  onClick={handleEditSave}
-                  className="font-medium text-[#128C7E] hover:underline"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          ) : (
-            message.content &&
+          {message.content &&
             !(message.imageUrl && message.messageType === "DOCUMENT") && (
               <p className="break-words text-sm leading-relaxed whitespace-pre-wrap">
                 <LinkifiedText text={message.content} linkClassName="text-blue-600" />
               </p>
-            )
-          )}
+            )}
 
           {/* 👈 NEW: template buttons (only on template / campaign messages) */}
           <TemplateButtonsPreview buttons={message.buttons} />
@@ -237,7 +149,7 @@ function MessageBubble({ message }) {
               isOutgoing ? "text-[#6B7280]" : "text-gray-500"
             }`}
           >
-            {message.isEdited && !isEditing && (
+            {message.isEdited && (
               <span className="italic">Edited</span>
             )}
 
@@ -253,17 +165,6 @@ function MessageBubble({ message }) {
         </div>
       </div>
     </div>
-
-    <ConfirmModal
-      isOpen={showDeleteConfirm}
-      title="Delete Message"
-      message="Delete this message? This cannot be undone."
-      confirmText="Delete"
-      cancelText="Cancel"
-      variant="danger"
-      onConfirm={confirmDeleteMessage}
-      onCancel={() => setShowDeleteConfirm(false)}
-    />
     </>
   );
 }

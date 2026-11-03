@@ -197,7 +197,7 @@
 // export default ChatHeader;
 
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   FaEllipsisV,
   FaArrowLeft,
@@ -209,6 +209,51 @@ import { Bot } from "lucide-react";
 import useConversationStore from "../../store/conversationStore";
 import useMessageStore from "../../store/messageStore";
 import ConfirmModal from "../common/ConfirmModal";
+
+// ------------------------------------------------------------
+// WhatsApp does NOT share customer presence (online / last seen)
+// with businesses, so "Online" can never be known. Instead we show
+// how recently the customer last messaged us (live, from the chat).
+// ------------------------------------------------------------
+const ACTIVE_NOW_MS = 5 * 60 * 1000;
+const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const formatTime = (d) =>
+  d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+const getCustomerActivity = (lastAt, now) => {
+  if (!lastAt) {
+    return { label: "No messages from customer yet", active: false, windowClosed: false };
+  }
+
+  const diff = Math.max(0, now - lastAt);
+  const windowClosed = diff > REPLY_WINDOW_MS;
+  const date = new Date(lastAt);
+
+  if (diff < ACTIVE_NOW_MS) {
+    return { label: "Active now", active: true, windowClosed };
+  }
+
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) {
+    return { label: `Active ${mins} min ago`, active: false, windowClosed };
+  }
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfYesterday = startOfToday.getTime() - 24 * 60 * 60 * 1000;
+
+  let label;
+  if (lastAt >= startOfToday.getTime()) {
+    label = `Last message today at ${formatTime(date)}`;
+  } else if (lastAt >= startOfYesterday) {
+    label = `Last message yesterday at ${formatTime(date)}`;
+  } else {
+    label = `Last message ${date.toLocaleDateString()} ${formatTime(date)}`;
+  }
+
+  return { label, active: false, windowClosed };
+};
 
 function ChatHeader({
   selectedConversation,
@@ -225,6 +270,34 @@ function ChatHeader({
   const toggleBot = useConversationStore((state) => state.toggleBot);
   const clearMessages = useMessageStore((state) => state.clearMessages);
   const [botLoading, setBotLoading] = useState(false);
+
+  // Live data: messages of the open chat (updated by the socket)
+  const messages = useMessageStore((state) => state.messages);
+  const messagesConversationId = useMessageStore(
+    (state) => state.messagesConversationId
+  );
+
+  // Re-render every 30s so "Active 3 min ago" keeps moving
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const lastCustomerMessageAt = useMemo(() => {
+    if (!selectedConversation) return null;
+    if (messagesConversationId !== selectedConversation.id) return null;
+
+    let latest = null;
+    for (const m of messages) {
+      if (String(m.sender || "").toUpperCase() !== "CUSTOMER") continue;
+      const t = new Date(m.createdAt).getTime();
+      if (!Number.isNaN(t) && (latest === null || t > latest)) latest = t;
+    }
+    return latest;
+  }, [messages, messagesConversationId, selectedConversation?.id]);
+
+  const activity = getCustomerActivity(lastCustomerMessageAt, now);
 
   // Close menu on outside click
   useEffect(() => {
@@ -294,7 +367,7 @@ function ChatHeader({
             )?.charAt(0)}
           </div>
 
-          {selectedConversation.isOnline && (
+          {activity.active && selectedConversation.status !== "CLOSED" && (
             <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-[#25D366]"></span>
           )}
         </div>
@@ -311,8 +384,20 @@ function ChatHeader({
               Closed
             </p>
           ) : (
-            <p className="text-sm font-medium text-[#25D366]">
-              Online
+            <p
+              className={`truncate text-sm font-medium ${
+                activity.active ? "text-[#25D366]" : "text-gray-500"
+              }`}
+            >
+              {activity.label}
+              {activity.windowClosed && (
+                <span
+                  className="ml-2 text-xs font-normal text-amber-600"
+                  title="WhatsApp allows free-form replies only within 24 hours of the customer's last message. Use a template."
+                >
+                  · 24h window closed
+                </span>
+              )}
             </p>
           )}
         </div>
