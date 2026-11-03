@@ -1,7 +1,9 @@
+
 // import { useState } from "react";
 // import { X } from "lucide-react";
 // import { createCustomer } from "../api/customerApi";
 // import toast from "react-hot-toast";
+// import ServiceMultiSelect from "../components/services/ServiceMultiSelect";
 
 // function AddCustomer({ onClose, onSuccess }) {
 //   const [formData, setFormData] = useState({
@@ -12,6 +14,7 @@
 //     source: "",
 //     requirements: "",
 //     status: "ACTIVE",
+//     serviceIds: [], // optional
 //   });
 
 //   const [errors, setErrors] = useState({});
@@ -320,6 +323,15 @@
 //             />
 //           </div>
 
+//           {/* Services (optional) */}
+//           <ServiceMultiSelect
+//             value={formData.serviceIds}
+//             onChange={(ids) =>
+//               setFormData((prev) => ({ ...prev, serviceIds: ids }))
+//             }
+//             disabled={loading}
+//           />
+
 //           {/* Status */}
 //           <div>
 //             <label className="block mb-2 font-semibold text-black">
@@ -393,6 +405,7 @@
 // export default AddCustomer;
 
 
+
 import { useState } from "react";
 import { X } from "lucide-react";
 import { createCustomer } from "../api/customerApi";
@@ -448,10 +461,7 @@ function AddCustomer({ onClose, onSuccess }) {
         "Enter a valid email address";
     }
 
-    // Company
-    if (!formData.company.trim()) {
-      newErrors.company = "Company name is required";
-    }
+    // Company - optional
 
     // Status
     if (!formData.status) {
@@ -659,8 +669,7 @@ function AddCustomer({ onClose, onSuccess }) {
           {/* Company */}
           <div>
             <label className="block mb-2 font-semibold text-black">
-              Company{" "}
-              <span className="text-red-500">*</span>
+              Company
             </label>
 
             <input
