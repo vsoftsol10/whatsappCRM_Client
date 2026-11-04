@@ -374,6 +374,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
 import { loadFacebookSDK } from "../../utils/facebookSdk";
 
 const POLL_INTERVAL_MS = 4000;
@@ -630,7 +631,7 @@ const ConnectWhatsApp = ({ onConnected, hideButtons = false }) => {
                 "Failed to send WhatsApp signup code:",
                 error.response?.data || error.message
             );
-            alert(
+            toast.error(
                 error.response?.data?.message ||
                 "Failed to connect WhatsApp. Please try again."
             );
@@ -641,7 +642,7 @@ const ConnectWhatsApp = ({ onConnected, hideButtons = false }) => {
     const launchSignup = (flow) => {
         if (!window.FB) {
             console.error("Facebook SDK is not loaded");
-            alert("Facebook SDK failed to load. Please refresh the page and try again.");
+            toast.error("Facebook SDK failed to load. Please refresh the page and try again.");
             return;
         }
 
@@ -649,7 +650,7 @@ const ConnectWhatsApp = ({ onConnected, hideButtons = false }) => {
 
         if (!configId) {
             console.error("Missing VITE_META_EMBEDDED_SIGNUP_CONFIG_ID");
-            alert("WhatsApp signup is not configured correctly. Please contact support.");
+            toast.error("WhatsApp signup is not configured correctly. Please contact support.");
             return;
         }
 
@@ -686,7 +687,7 @@ const ConnectWhatsApp = ({ onConnected, hideButtons = false }) => {
                             console.error(
                                 "Timed out waiting for WABA ID / Phone Number ID"
                             );
-                            alert("WhatsApp connection incomplete. Please try again.");
+                            toast.error("WhatsApp connection incomplete. Please try again.");
                         }
                     }, 8000);
                 } else {

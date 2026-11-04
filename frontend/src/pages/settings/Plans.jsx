@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import {
   FaCheckCircle,
   FaUsers,
@@ -54,7 +55,7 @@ function Plans() {
       console.log("UPGRADE REQUEST RESULT:", result);
 
       if (result.success) {
-        alert(
+        toast.success(
           "Upgrade request submitted successfully. Waiting for Super Admin approval."
         );
 
@@ -62,7 +63,7 @@ function Plans() {
         setShowUpgradeModal(false);
         setSelectedPlan(null);
       } else {
-        alert(
+        toast.error(
           result.message ||
             "Failed to submit upgrade request."
         );
@@ -73,7 +74,7 @@ function Plans() {
         error
       );
 
-      alert(
+      toast.error(
         error.response?.data?.message ||
           "Failed to submit upgrade request."
       );

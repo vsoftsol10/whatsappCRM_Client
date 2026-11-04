@@ -598,6 +598,7 @@ import {
 import IntegrationCard from "../../components/integrations/IntegrationCard";
 import AddIntegrationModal from "../../components/integrations/AddIntegrationModal";
 import IntegrationDetailsModal from "../../components/integrations/IntegrationDetailsModal";
+import ConfirmModal from "../../components/common/ConfirmModal";
 
 const initialForm = {
   name: "",
@@ -631,6 +632,10 @@ const Integrations = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [copiedField, setCopiedField] = useState(null);
+
+  // Integration waiting for delete confirmation (null = popup closed)
+  const [integrationToDelete, setIntegrationToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // =========================================================
   // LOAD INTEGRATIONS
@@ -964,12 +969,18 @@ const Integrations = () => {
   // DELETE INTEGRATION
   // =========================================================
 
-  const handleDelete = async (integration) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${integration.name}"?\n\nThis will also remove the webhook event records associated with this integration.`
-    );
+  // Step 1: the card's Delete button only opens the confirm popup
+  const handleDelete = (integration) => {
+    setIntegrationToDelete(integration);
+  };
 
-    if (!confirmed) return;
+  // Step 2: user pressed Delete inside the popup
+  const confirmDelete = async () => {
+    const integration = integrationToDelete;
+
+    if (!integration) return;
+
+    setDeleting(true);
 
     try {
       const response = await deleteIntegration(
@@ -1000,6 +1011,9 @@ const Integrations = () => {
           error.message ||
           "Failed to delete integration"
       );
+    } finally {
+      setDeleting(false);
+      setIntegrationToDelete(null);
     }
   };
 
@@ -1237,6 +1251,17 @@ const webhookUrl = selectedIntegration?.webhookKey
         savingSettings={savingSettings}
         onSaveSecret={handleUpdateSecret}
         savingSecret={savingSecret}
+      />
+
+      <ConfirmModal
+        isOpen={!!integrationToDelete}
+        title="Delete integration?"
+        message={`Are you sure you want to delete "${integrationToDelete?.name}"? This will also remove the webhook event records associated with this integration.`}
+        confirmText={deleting ? "Deleting..." : "Delete"}
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => !deleting && setIntegrationToDelete(null)}
       />
     </div>
   );
