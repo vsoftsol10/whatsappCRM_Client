@@ -18,6 +18,7 @@
 //   LifeBuoy,
 //   History,
 //   Bot,
+//   Briefcase,
 // } from "lucide-react";
 
 // // Platform logo, imported so the bundler resolves the file path for you.
@@ -51,6 +52,7 @@
 //     id: "crm",
 //     items: [
 //       { key: "customers", name: "Customers", path: "/customers", icon: Users },
+//       { key: "services", name: "Services", path: "/services", icon: Briefcase },
 //       { key: "leads", name: "Leads", path: "/leads", icon: UserPlus },
 //       { key: "campaigns", name: "Campaigns", path: "/campaigns", icon: Megaphone },
 //       { key: "templates", name: "Templates", path: "/templates", icon: FileText },
@@ -128,6 +130,7 @@ import {
   History,
   Bot,
   Briefcase,
+  BookOpen,
 } from "lucide-react";
 
 // Platform logo, imported so the bundler resolves the file path for you.
@@ -212,6 +215,7 @@ export const settingsTabs = [
   { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
   { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
   { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
+  { key: "user-guide", name: "User Guide", path: "/settings/user-guide", icon: BookOpen },
 ];
 
 export const filterTabsByRole = (tabs, role) => tabs.filter((tab) => canSee(tab, role));
