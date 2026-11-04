@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 
 // const {
@@ -591,6 +592,134 @@
 //   }
 // };
 
+// // ================= BULK DELETE LEADS =================
+// // Admin: any lead of the company.
+// // Employee: only the leads assigned to them (the same leads they can see).
+// // There is NO limit on how many leads can be deleted at once.
+// // Internally the work is done in batches of 500 so that very large
+// // deletes never hit database limits (too many query parameters,
+// // time-outs). The user never sees or notices the batches.
+// const BULK_DELETE_BATCH_SIZE = 500;
+
+// const splitLeadIdsIntoBatches = (items, size) => {
+//   const batches = [];
+
+//   for (let index = 0; index < items.length; index += size) {
+//     batches.push(items.slice(index, index + size));
+//   }
+
+//   return batches;
+// };
+
+// const bulkDeleteLeads = async (req, res) => {
+//   try {
+//     const { ids } = req.body || {};
+
+//     if (!Array.isArray(ids) || ids.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please select at least one lead.",
+//       });
+//     }
+
+//     const uniqueIds = [
+//       ...new Set(
+//         ids
+//           .map((id) => Number(id))
+//           .filter((id) => Number.isInteger(id) && id > 0)
+//       ),
+//     ];
+
+//     if (uniqueIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please select at least one lead.",
+//       });
+//     }
+
+//     const idBatches = splitLeadIdsIntoBatches(
+//       uniqueIds,
+//       BULK_DELETE_BATCH_SIZE
+//     );
+
+//     // Find every lead this user is allowed to delete
+//     const leads = [];
+
+//     for (const batch of idBatches) {
+//       const where = {
+//         id: { in: batch },
+//         companyId: req.user.companyId,
+//       };
+
+//       if (req.user.role !== "ADMIN") {
+//         where.assignedToId = req.user.userId;
+//       }
+
+//       const found = await prisma.lead.findMany({
+//         where,
+//         select: { id: true, name: true },
+//       });
+
+//       leads.push(...found);
+//     }
+
+//     if (leads.length === 0) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Leads not found",
+//       });
+//     }
+
+//     const deletableIds = leads.map((lead) => lead.id);
+
+//     // Work notes are removed automatically (onDelete: Cascade)
+//     for (const batch of splitLeadIdsIntoBatches(
+//       deletableIds,
+//       BULK_DELETE_BATCH_SIZE
+//     )) {
+//       await prisma.lead.deleteMany({
+//         where: {
+//           id: { in: batch },
+//           companyId: req.user.companyId,
+//         },
+//       });
+//     }
+
+//     leads.forEach((lead) => {
+//       logAction({
+//         req,
+//         action: "DELETE",
+//         module: "LEAD",
+//         entityId: lead.id,
+//         entityName: lead.name,
+//       });
+//     });
+
+//     const skippedCount = uniqueIds.length - leads.length;
+
+//     return res.status(200).json({
+//       success: true,
+//       message:
+//         skippedCount > 0
+//           ? `${leads.length} deleted, ${skippedCount} skipped`
+//           : `${leads.length} lead${
+//               leads.length === 1 ? "" : "s"
+//             } deleted successfully`,
+//       deletedCount: leads.length,
+//       deletedIds: deletableIds,
+//       skippedCount,
+//     });
+//   } catch (error) {
+//     console.error("Bulk Delete Leads Error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to delete leads",
+//       error: error.message,
+//     });
+//   }
+// };
+
 // module.exports = {
 //   createLead,
 //   getLeads,
@@ -598,8 +727,8 @@
 //   updateLeadStatus,
 //   convertLeadToCustomer,
 //   deleteLead,
+//   bulkDeleteLeads,
 // };
-
 
 
 
@@ -613,6 +742,7 @@ const {
 } = require("../services/notificationService");
 
 const { logAction } = require("../services/auditLogService");
+const { normalizeIndianPhone } = require("../utils/phoneUtils");
 
 // ======================================================
 // COMMON INCLUDE
@@ -1072,8 +1202,12 @@ const convertLeadToCustomer = async (req, res) => {
       conditions.push({ email: lead.email });
     }
 
+    // Leads keep 10-digit numbers; customers are stored as 91XXXXXXXXXX.
+    const customerPhone = normalizeIndianPhone(lead.phone) || lead.phone;
+
     if (lead.phone) {
       conditions.push({ phone: lead.phone });
+      if (customerPhone !== lead.phone) conditions.push({ phone: customerPhone });
     }
 
     console.log("Search Conditions:", conditions);
@@ -1101,7 +1235,7 @@ const convertLeadToCustomer = async (req, res) => {
     const customer = await prisma.customer.create({
       data: {
         name: lead.name,
-        phone: lead.phone,
+        phone: customerPhone,
         email: lead.email,
 
         companyName: lead.companyName,

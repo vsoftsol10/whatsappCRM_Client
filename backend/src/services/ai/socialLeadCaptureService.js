@@ -1,4 +1,3 @@
-
 // const prisma = require("../../config/prisma");
 // const { completeOnce } = require("../aiService");
 // const { readProfile } = require("./businessPrompt");
@@ -393,6 +392,8 @@
 
 //   // ---------- ask the AI ----------
 //   const answer = await completeOnce({
+//     companyId,
+//     channel: info.label,
 //     systemPrompt: buildExtractionPrompt({
 //       companyName: conversation.company?.companyName,
 //       profile: settings.businessProfile,
@@ -521,6 +522,7 @@
 
 
 
+
 const prisma = require("../../config/prisma");
 const { completeOnce } = require("../aiService");
 const { readProfile } = require("./businessPrompt");
@@ -579,6 +581,11 @@ const phoneVariants = (value) => {
     variants.add(digits);
     variants.add(`+${digits}`);
     if (digits.length > 10) variants.add(digits.slice(-10));
+    // Customers are saved as 91XXXXXXXXXX, leads as 10 digits: match both.
+    if (digits.length === 10) {
+      variants.add(`91${digits}`);
+      variants.add(`+91${digits}`);
+    }
   }
 
   return [...variants];

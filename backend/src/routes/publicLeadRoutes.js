@@ -173,8 +173,7 @@
 //       return res.json({ success: true, duplicate: true, leadId: duplicate.id });
 //     }
 
-//     // Only the visitor's own message goes in Requirements (no page link)
-//     const requirements = message ? message.slice(0, 2000) : null;
+//      const requirements = message.slice(0, 2000) || null;
 
 //     const lead = await prisma.lead.create({
 //       data: {
@@ -267,6 +266,25 @@
 //     return text + " " + text.replace(/[_\-.]+/g, " ");
 //   }
 
+//   // "companyName" / "contact_no" -> "Company name" / "Contact no"
+//   function humanize(s) {
+//     s = String(s || "").replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_\-.]+/g, " ").trim();
+//     return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+//   }
+
+//   // The best human name for a field: its <label>, then aria-label, then its
+//   // name/id, and only last the placeholder (which is usually an example).
+//   function labelOf(el) {
+//     var t = "";
+//     try {
+//       if (el.labels && el.labels[0]) t = (el.labels[0].textContent || "").trim();
+//     } catch (e) {}
+//     if (!t) t = (el.getAttribute("aria-label") || "").trim();
+//     if (!t) t = humanize(el.name || el.id);
+//     if (!t) t = (el.placeholder || "").trim();
+//     return t || "Field";
+//   }
+
 //   function collect(form) {
 //     var d = { name: "", first: "", last: "", phone: "", email: "", message: "", companyName: "" };
 //     var extras = [];
@@ -293,7 +311,7 @@
 //         d.message = d.message ? d.message + "\n" + value : value;
 //       }
 //       else if (/name/.test(h)) { if (!d.name) d.name = value; }
-//       else extras.push((el.placeholder || el.name || el.id || "Field") + ": " + value);
+//       else extras.push(labelOf(el) + ": " + value);
 //     }
 
 //     d.name = d.name || (d.first + " " + d.last).trim();
@@ -447,6 +465,7 @@
 
 
 
+
 // ======================================================
 // backend/src/routes/publicLeadRoutes.js
 //
@@ -505,12 +524,13 @@ const getIp = (req) =>
   req.ip ||
   "unknown";
 
-// Indian numbers -> 91XXXXXXXXXX (same format WhatsApp uses).
+// Indian numbers -> plain 10-digit mobile number WITHOUT the 91 country code
+// (so the Edit Lead form accepts it). Same as WhatsApp / Facebook / Instagram leads.
 // Other countries: keep digits only (8-15 digits).
 const toPhone = (value) => {
   if (!value) return null;
   const indian = normalizeIndianPhone(String(value));
-  if (indian) return indian;
+  if (indian) return indian.slice(-10);
   const digits = String(value).replace(/\D/g, "");
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
 };
@@ -614,7 +634,12 @@ router.post("/leads/:publicKey", rateLimit(10, 60 * 1000), async (req, res) => {
       where: {
         companyId: integration.companyId,
         createdAt: { gte: since },
-        OR: [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])],
+        // old leads may still hold the 91XXXXXXXXXX form, so match both
+        OR: [
+          ...(phone ? [{ phone }] : []),
+          ...(phone && /^\d{10}$/.test(phone) ? [{ phone: `91${phone}` }] : []),
+          ...(email ? [{ email }] : []),
+        ],
       },
       select: { id: true },
     });

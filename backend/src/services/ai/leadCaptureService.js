@@ -1,6 +1,7 @@
 // const prisma = require("../../config/prisma");
 // const { completeOnce } = require("../aiService");
 // const { readProfile } = require("./businessPrompt");
+// const { pickNextEmployee, withCompanyLock } = require("./leadAssignment");
 // const { notifyUser, NotificationType } = require("../notificationService");
 // const { normalizeIndianPhone } = require("../../utils/phoneUtils");
 
@@ -388,38 +389,50 @@
 //   // The check above ran before a slow AI call, so look again.
 //   if (await findRecentLead(companyId, leadPhone)) return "duplicate";
 
-//   let assignee = null;
+//   const createLead = async () => {
+//     let assignee = null;
 
-//   if (settings.leadAssigneeId) {
-//     assignee = await prisma.user.findFirst({
-//       where: {
-//         id: settings.leadAssigneeId,
+//     if (settings.leadAutoAssign) {
+//       // Auto-assign: share new leads between all active employees
+//       assignee = await pickNextEmployee(companyId);
+//     } else if (settings.leadAssigneeId) {
+//       assignee = await prisma.user.findFirst({
+//         where: {
+//           id: settings.leadAssigneeId,
+//           companyId,
+//           role: "USER",
+//           status: "ACTIVE",
+//         },
+//         select: { id: true },
+//       });
+//     }
+
+//     const lead = await prisma.lead.create({
+//       data: {
 //         companyId,
-//         role: "USER",
-//         status: "ACTIVE",
+//         name: result.name || `${PLACEHOLDER_NAME_PREFIX}${leadPhone}`,
+//         phone: leadPhone,
+//         source: LEAD_SOURCE,
+//         requirements: result.requirement || null,
+//         status: "NEW",
+//         assignedToId: assignee ? assignee.id : null,
 //       },
-//       select: { id: true },
 //     });
+
+//     console.log("Lead capture: lead created:", lead.id);
+
+//     await writeAuditLog({ companyId, lead });
+//     await announceNewLead({ lead, assignee, companyId });
+
+//     return "created";
+//   };
+
+//   // Auto-assign picks + creates one lead at a time per company
+//   if (settings.leadAutoAssign) {
+//     return withCompanyLock(companyId, createLead);
 //   }
 
-//   const lead = await prisma.lead.create({
-//     data: {
-//       companyId,
-//       name: result.name || `${PLACEHOLDER_NAME_PREFIX}${leadPhone}`,
-//       phone: leadPhone,
-//       source: LEAD_SOURCE,
-//       requirements: result.requirement || null,
-//       status: "NEW",
-//       assignedToId: assignee ? assignee.id : null,
-//     },
-//   });
-
-//   console.log("Lead capture: lead created:", lead.id);
-
-//   await writeAuditLog({ companyId, lead });
-//   await announceNewLead({ lead, assignee, companyId });
-
-//   return "created";
+//   return createLead();
 // };
 
 // const captureLeadFromChat = async (conversationId) => {
@@ -444,7 +457,6 @@
 //   sameNumber,
 //   toLeadPhone,
 // };
-
 
 
 
@@ -493,14 +505,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // ============================================
 const digitsOf = (value) => String(value || "").replace(/\D/g, "");
 
-// Same format the website lead form stores (91XXXXXXXXXX for India).
+// Lead phone format: Indian numbers are stored as the plain 10-digit mobile
+// number WITHOUT the 91 country code (so the Edit Lead form accepts it).
+// WhatsApp / Facebook / Instagram all go through this function.
 const toLeadPhone = (value) => {
   const digits = digitsOf(value);
 
   if (!digits) return null;
 
-  const indian = normalizeIndianPhone(digits);
-  if (indian) return indian;
+  const indian = normalizeIndianPhone(digits); // 91XXXXXXXXXX or null
+  if (indian) return indian.slice(-10);
 
   return digits.length >= 8 && digits.length <= 15 ? digits : null;
 };
@@ -526,6 +540,11 @@ const phoneVariants = (value) => {
     variants.add(digits);
     variants.add(`+${digits}`);
     if (digits.length > 10) variants.add(digits.slice(-10));
+    // Customers are saved as 91XXXXXXXXXX, leads as 10 digits: match both.
+    if (digits.length === 10) {
+      variants.add(`91${digits}`);
+      variants.add(`+91${digits}`);
+    }
   }
 
   return [...variants];
@@ -860,7 +879,9 @@ const run = async (conversationId) => {
     const lead = await prisma.lead.create({
       data: {
         companyId,
-        name: result.name || `${PLACEHOLDER_NAME_PREFIX}${leadPhone}`,
+        name:
+          result.name ||
+          `${PLACEHOLDER_NAME_PREFIX}${normalizeIndianPhone(phone) || leadPhone}`,
         phone: leadPhone,
         source: LEAD_SOURCE,
         requirements: result.requirement || null,
