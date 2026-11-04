@@ -245,6 +245,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
 import {
   Lock,
   MessageCircle,
@@ -315,7 +316,7 @@ function SecuritySettings() {
         "Failed to disconnect WhatsApp:",
         error.response?.data || error.message
       );
-      alert(
+      toast.error(
         error.response?.data?.message ||
           "Failed to disconnect WhatsApp. Please try again."
       );

@@ -1,5 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 import BackupHeader from "../components/backup/BackupHeader";
 import BackupStats from "../components/backup/BackupStats";
@@ -129,7 +130,7 @@ const Backup = () => {
       // Refresh backup history after successful creation
       await fetchBackups();
 
-      alert("CRM backup created successfully.");
+      toast.success("CRM backup created successfully.");
     } catch (err) {
       console.error("Create backup error:", err);
 
@@ -294,4 +295,3 @@ const Backup = () => {
 };
 
 export default Backup;
-
