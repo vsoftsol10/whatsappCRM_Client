@@ -498,6 +498,8 @@
 
 
 
+
+
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
@@ -508,6 +510,15 @@ import {
 
 import toast from "react-hot-toast";
 import ServiceMultiSelect from "../components/services/ServiceMultiSelect";
+
+// Same standard sources as the Lead module
+const STANDARD_SOURCES = [
+  "Website",
+  "WhatsApp",
+  "Facebook",
+  "Instagram",
+  "Referral",
+];
 
 function EditCustomer({
   customerId,
@@ -878,18 +889,34 @@ function EditCustomer({
           {/* Source */}
           <div>
             <label className="block mb-2 font-semibold text-black">
-              Source
+              Source{" "}
+              <span className="font-normal text-gray-400">
+                (optional)
+              </span>
             </label>
 
-            <input
-              type="text"
+            <select
               name="source"
               value={formData.source}
               onChange={handleChange}
               disabled={loading}
-              placeholder="Enter source (e.g. WhatsApp, Instagram)"
               className="w-full border border-gray-300 rounded-lg px-4 py-3 outline-none focus:border-[#25D366] disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
+            >
+              <option value="">Select Source</option>
+
+              {/* Keep the customer's existing source (e.g. "Instagram AI" or imported value) selectable */}
+              {formData.source &&
+                !STANDARD_SOURCES.includes(formData.source) && (
+                  <option value={formData.source}>
+                    {formData.source}
+                  </option>
+                )}
+              <option value="Website">Website</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Facebook">Facebook</option>
+              <option value="Instagram">Instagram</option>
+              <option value="Referral">Referral</option>
+            </select>
           </div>
 
           {/* Requirements */}
