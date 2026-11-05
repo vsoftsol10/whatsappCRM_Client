@@ -70,6 +70,7 @@ model Company {
   templates                    Template[]
   leads                        Lead[]
   deals                        Deal[]
+  proposals                    Proposal[]
   tasks                        Task[]
   tickets                      Ticket[]
   employees                    Employee[]
@@ -561,6 +562,7 @@ model User {
 
   assignedDeals Deal[] @relation("AssignedDeals")
   createdDeals  Deal[] @relation("CreatedDeals")
+  createdProposals Proposal[] @relation("CreatedProposals")
 
   dealActivities DealActivity[] @relation("CreatedDealActivities")
 
@@ -617,6 +619,7 @@ model Customer {
   deals               Deal[]
   tickets             Ticket[]
   purchases           Purchase[]
+  proposals           Proposal[]
 
   // Services this customer uses (optional, many-to-many)
   customerServices CustomerService[]
@@ -2019,4 +2022,63 @@ model ChatbotMessage {
   @@index([companyId, createdAt])
   @@index([userId, createdAt])
   @@index([answered, createdAt])
+}
+
+//////////////////////////////////////////////////////
+// PROPOSAL (Proposal Builder)
+//////////////////////////////////////////////////////
+
+model Proposal {
+  id String @id @default(uuid())
+
+  companyId   Int
+  createdById String
+
+  // Optional link to an existing customer (the proposal can also be for
+  // someone who is not a customer yet).
+  customerId String?
+
+  // Who the proposal is for (typed in, or filled from a customer)
+  clientName    String  @default("")
+  clientPhone   String?
+  clientEmail   String?
+  clientCompany String?
+
+  // PROP-2026-0001 (numbering is per company, restarts every year)
+  proposalNumber String
+  title          String
+
+  // DRAFT | SENT
+  status String @default("DRAFT")
+
+  currency   String    @default("INR")
+  issueDate  DateTime  @default(now())
+  validUntil DateTime?
+
+  introMessage   String?
+  scope          String?
+  paymentDetails String?
+  terms          String?
+
+  // [{ name, description, quantity, unitPrice, discountPercent, taxPercent, lineTotal }]
+  items Json
+
+  subtotal      Float @default(0)
+  discountTotal Float @default(0)
+  taxTotal      Float @default(0)
+  total         Float @default(0)
+
+  sentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer  Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdBy User      @relation("CreatedProposals", fields: [createdById], references: [id])
+
+  @@unique([companyId, proposalNumber])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([createdById])
 }

@@ -14,6 +14,7 @@
 // const authRoutes = require("./routes/authRoutes");
 // const userRoutes = require("./routes/userRoutes");
 // const customerRoutes = require("./routes/customerRoutes");
+// const serviceRoutes = require("./routes/serviceRoutes");
 // const integrationRoutes = require("./routes/integrationRoutes");
 // const employeeRoutes = require("./routes/employeeRoutes");
 // const conversationRoutes = require("./routes/conversationRoutes");
@@ -59,7 +60,7 @@
  
 // // Use the configured CRM frontend origin(s), rather than reflecting any
 // // requesting origin. FRONTEND_URL may contain comma-separated origins.
-// const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://watsupcl.thevsoft.com")
+// const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://crm.vatupcrm.in" || "https://watsupcl.thevsoft.com")
 //   .split(",")
 //   .map((origin) => origin.trim().replace(/\/$/, ""))
 //   .filter(Boolean);
@@ -157,6 +158,8 @@
 // app.use("/api/users", userRoutes);
  
 // app.use("/api/customers", customerRoutes);
+
+// app.use("/api/services", serviceRoutes);
  
 // app.use("/api/integrations", integrationRoutes);
  
@@ -308,8 +311,6 @@
 
 
 
-
-
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
  
@@ -326,6 +327,7 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
+const proposalRoutes = require("./routes/proposalRoutes");
 const integrationRoutes = require("./routes/integrationRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
@@ -471,6 +473,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/customers", customerRoutes);
 
 app.use("/api/services", serviceRoutes);
+
+app.use("/api/proposals", proposalRoutes);
  
 app.use("/api/integrations", integrationRoutes);
  

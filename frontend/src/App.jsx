@@ -7,6 +7,7 @@
 // import AppLayout from "./layouts/AppLayout";
 // import SettingsLayout from "./layouts/SettingsLayout";
 // import SaasSupportPage from "./pages/settings/SaasSupportPage";
+// import UserGuide from "./pages/settings/UserGuide";
 // import Integrations from "./pages/settings/Integrations";
 // import Login from "./pages/Login";
 // import Dashboard from "./pages/Dashboard";
@@ -180,6 +181,8 @@
 
 //               <Route path="/settings/integrations" element={<Integrations />} />
 
+//               <Route path="/settings/user-guide" element={<UserGuide />} />
+
 //               {/* ADMIN-only tabs */}
 //               <Route element={<AdminRoute />}>
 //                 <Route path="/settings/backup" element={<Backup />} />
@@ -252,6 +255,8 @@ import CustomerProfile from "./pages/CustomerProfile";
 import CampaignDetails from "./pages/CampaignDetails";
 import Templates from "./pages/Templates";
 import Services from "./pages/Services";
+import Proposals from "./pages/Proposals";
+import ProposalBuilder from "./pages/ProposalBuilder";
 
 import AuditLogs from "./pages/settings/AuditLogs";
 import AiAutoReply from "./pages/settings/AiAutoReply";
@@ -380,6 +385,12 @@ function App() {
             <Route path="/templates" element={<Templates />} />
 
             <Route path="/services" element={<Services />} />
+
+            <Route path="/proposals" element={<Proposals />} />
+
+            <Route path="/proposals/new" element={<ProposalBuilder />} />
+
+            <Route path="/proposals/:id/edit" element={<ProposalBuilder />} />
 
             <Route path="/tasks" element={<Tasks />} />
 

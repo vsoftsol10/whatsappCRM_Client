@@ -19,6 +19,7 @@
 //   History,
 //   Bot,
 //   Briefcase,
+//   BookOpen,
 // } from "lucide-react";
 
 // // Platform logo, imported so the bundler resolves the file path for you.
@@ -99,13 +100,15 @@
 // export const settingsTabs = [
 //   { key: "security", name: "Security", path: "/settings/security", icon: Lock },
 //   { key: "integrations", name: "Integrations", path: "/settings/integrations", icon: Plug },
-//   { key: "backup", name: "Backup & Restore", path: "/settings/backup", icon: Database, roles: ["ADMIN"] },
+//   { key: "backup", name: "Backup", path: "/settings/backup", icon: Database, roles: ["ADMIN"] },
 //   { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
 //   { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
 //   { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
+//   { key: "user-guide", name: "User Guide", path: "/settings/user-guide", icon: BookOpen },
 // ];
 
 // export const filterTabsByRole = (tabs, role) => tabs.filter((tab) => canSee(tab, role));
+
 
 
 
@@ -131,6 +134,7 @@ import {
   Bot,
   Briefcase,
   BookOpen,
+  FileSignature,
 } from "lucide-react";
 
 // Platform logo, imported so the bundler resolves the file path for you.
@@ -168,6 +172,7 @@ export const navGroups = [
       { key: "leads", name: "Leads", path: "/leads", icon: UserPlus },
       { key: "campaigns", name: "Campaigns", path: "/campaigns", icon: Megaphone },
       { key: "templates", name: "Templates", path: "/templates", icon: FileText },
+      { key: "proposals", name: "Proposals", path: "/proposals", icon: FileSignature },
     ],
   },
   {
@@ -219,3 +224,4 @@ export const settingsTabs = [
 ];
 
 export const filterTabsByRole = (tabs, role) => tabs.filter((tab) => canSee(tab, role));
+ 
