@@ -211,7 +211,7 @@ export function filterByRole(groups, role) {
 export const settingsTabs = [
   { key: "security", name: "Security", path: "/settings/security", icon: Lock },
   { key: "integrations", name: "Integrations", path: "/settings/integrations", icon: Plug },
-  { key: "backup", name: "Backup & Restore", path: "/settings/backup", icon: Database, roles: ["ADMIN"] },
+  { key: "backup", name: "Backup", path: "/settings/backup", icon: Database, roles: ["ADMIN"] },
   { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
   { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
   { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
