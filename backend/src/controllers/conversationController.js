@@ -1,4 +1,5 @@
 // const prisma = require("../config/prisma");
+// const { getDefaultBotEnabled } = require("../utils/botDefault");
 
 // // CREATE CONVERSATION
 // const createConversation = async (req, res) => {
@@ -157,6 +158,8 @@
 //         channel,
 //         lastMessage,
 //         unreadCount,
+//         // Bot starts ON/OFF following Settings > AI Auto-Reply
+//         botEnabled: await getDefaultBotEnabled(companyId),
 //         ...(whatsappAccount && {
 //           whatsappAccountId: whatsappAccount.id,
 //         }),
@@ -606,6 +609,7 @@
 // };
 
 
+
 const prisma = require("../config/prisma");
 const { getDefaultBotEnabled } = require("../utils/botDefault");
 
@@ -808,6 +812,18 @@ const getConversations = async (req, res) => {
       },
       include: {
         customer: true,
+        // Which Instagram account / Facebook Page received this chat.
+        // Only safe fields - never the access token.
+        facebookPage: {
+          select: {
+            id: true,
+            pageName: true,
+            instagramAccountId: true,
+            instagramUsername: true,
+            connectionType: true,
+            status: true,
+          },
+        },
       },
       orderBy: {
         updatedAt: "desc",
@@ -894,6 +910,17 @@ const getConversationById = async (req, res) => {
         },
         include: {
           customer: true,
+          // Which Instagram account / Facebook Page received this chat.
+          facebookPage: {
+            select: {
+              id: true,
+              pageName: true,
+              instagramAccountId: true,
+              instagramUsername: true,
+              connectionType: true,
+              status: true,
+            },
+          },
           messages: {
             orderBy: {
               createdAt: "asc",

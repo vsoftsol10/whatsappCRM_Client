@@ -172,6 +172,7 @@
 //               theme={theme}
 //               onSendMessage={handleSendMessage}
 //               onSendMedia={handleSendMedia}
+//               conversationKey={selectedConversation?.id}
 //               disabled={!selectedConversation}
 //             />
 //           </>
@@ -208,6 +209,7 @@
 // export default SocialInbox;
 
 
+
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import useConversationStore from "../../../store/conversationStore";
@@ -217,7 +219,12 @@ import SocialChatHeader from "./SocialChatHeader";
 import SocialMessageList from "./SocialMessageList";
 import SocialMessageInput from "./SocialMessageInput";
 import SocialContactInfo from "./SocialContactInfo";
-import { SOCIAL_THEMES } from "./socialTheme";
+import {
+  SOCIAL_THEMES,
+  getAccountsFromConversations,
+  getAccountLabel,
+  getAccountColor,
+} from "./socialTheme";
 
 // One inbox screen used by both the Facebook and the Instagram pages.
 // variant = "facebook" | "instagram"
@@ -254,6 +261,20 @@ function SocialInbox({ variant = "facebook" }) {
         (conversation) => conversation.channel === theme.channel
       ),
     [conversations, theme.channel]
+  );
+
+  // Connected accounts that have chats here (used for filter / labels)
+  const accounts = useMemo(
+    () => getAccountsFromConversations(channelConversations, theme.variant),
+    [channelConversations, theme.variant]
+  );
+
+  const replyAccountLabel = selectedConversation
+    ? getAccountLabel(selectedConversation, theme.variant)
+    : null;
+  const replyAccountColor = getAccountColor(
+    selectedConversation?.facebookPage?.id,
+    accounts
   );
 
   // Load conversations when the page opens. The selected chat is shared
@@ -342,6 +363,7 @@ function SocialInbox({ variant = "facebook" }) {
           conversations={channelConversations}
           selectedConversation={selectedConversation}
           onSelect={setSelectedConversation}
+          accounts={accounts}
         />
       </div>
 
@@ -360,6 +382,7 @@ function SocialInbox({ variant = "facebook" }) {
               selectedConversation={selectedConversation}
               setShowChat={setShowChat}
               setShowInfo={setShowInfo}
+              accounts={accounts}
             />
 
             <div className="min-h-0 flex-1">
@@ -377,6 +400,21 @@ function SocialInbox({ variant = "facebook" }) {
                 }
               />
             </div>
+
+            {/* Reminder of which account the reply is sent from */}
+            {accounts.length > 1 && replyAccountLabel && (
+              <div className="flex items-center gap-2 border-t border-[#DBDBDB] bg-white px-4 pt-2 text-[12px] text-[#65676B]">
+                <span>Replying as</span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${replyAccountColor.chip}`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${replyAccountColor.dot}`}
+                  />
+                  {replyAccountLabel}
+                </span>
+              </div>
+            )}
 
             <SocialMessageInput
               theme={theme}
@@ -410,6 +448,7 @@ function SocialInbox({ variant = "facebook" }) {
           conversation={selectedConversation}
           showInfo={showInfo}
           setShowInfo={setShowInfo}
+          accounts={accounts}
         />
       </div>
     </div>
