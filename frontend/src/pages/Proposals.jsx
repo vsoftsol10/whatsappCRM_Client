@@ -390,6 +390,7 @@
 
 
 
+
 // Sidebar page "Proposals": list + send on WhatsApp + download + delete.
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -686,6 +687,15 @@ function Proposals() {
     return () => clearTimeout(timer);
   }, [load]);
 
+  // true when the search box or the status dropdown has a value
+  const hasFilters = search.trim() !== "" || status !== "";
+
+  // reset both filters; the existing useEffect reloads the list by itself
+  const clearFilters = () => {
+    setSearch("");
+    setStatus("");
+  };
+
   const handleDownload = async (proposal) => {
     if (downloadingId) return;
 
@@ -795,7 +805,7 @@ function Proposals() {
       </div>
 
       {/* FILTERS */}
-      <div className="mb-4 flex flex-wrap gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
         <div className="relative min-w-[220px] flex-1 sm:max-w-sm">
           <Search
             size={16}
@@ -805,8 +815,21 @@ function Proposals() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title, number or client"
-            className="w-full rounded-lg border border-gray-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/25"
+            className="w-full rounded-lg border border-gray-300 py-2.5 pl-9 pr-9 text-sm outline-none focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/25"
           />
+
+          {/* clear just the search text */}
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              title="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <select
@@ -818,6 +841,18 @@ function Proposals() {
           <option value="DRAFT">Draft</option>
           <option value="SENT">Sent</option>
         </select>
+
+        {/* clear everything (shown only when a filter is active) */}
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            <X size={14} />
+            Clear filters
+          </button>
+        )}
       </div>
 
       {/* TABLE */}

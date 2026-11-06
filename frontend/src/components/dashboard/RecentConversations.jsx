@@ -119,7 +119,10 @@ export default function RecentConversations() {
         <div className="space-y-4">
           {recentConversations.map((chat) => {
             const displayName =
-              chat.customer?.name || chat.phone || "Unknown";
+              chat.customer?.name ||
+              chat.contactName ||
+              chat.phone ||
+              "Unknown";
 
             return (
               <div
