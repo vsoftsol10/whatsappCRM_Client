@@ -1,5 +1,7 @@
+
 // const prisma = require("../config/prisma");
 // const crypto = require("crypto");
+// const { SUPPORTED_PROVIDERS } = require("../integrations/adapters");
 
 // // ==========================================
 // // CREATE INTEGRATION
@@ -47,6 +49,32 @@
 //     }
 
 //     // ------------------------------------------
+//     // VALIDATE + NORMALIZE PROVIDER
+//     // ------------------------------------------
+//     //
+//     // The provider name is what picks the adapter used to
+//     // verify signatures and normalize payloads at webhook time
+//     // (see integrations/adapters/index.js). It must exactly
+//     // match one of SUPPORTED_PROVIDERS, uppercased, or webhooks
+//     // for this integration will silently fall back to the
+//     // GENERIC adapter.
+//     //
+//     // No provider given -> defaults to GENERIC (custom/manual
+//     // integrations that already speak our internal format).
+//     // ------------------------------------------
+
+//     const normalizedProvider = provider?.trim()
+//       ? provider.trim().toUpperCase()
+//       : "GENERIC";
+
+//     if (!SUPPORTED_PROVIDERS.includes(normalizedProvider)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Unsupported provider "${provider}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
+//       });
+//     }
+
+//     // ------------------------------------------
 //     // GENERATE WEBHOOK KEY + SECRET
 //     // ------------------------------------------
 //     //
@@ -56,9 +84,19 @@
 //     // webhookSecret:
 //     // Used for authentication/verification.
 //     //
-//     // Different providers may use different
-//     // authentication methods later, so secret
-//     // remains optional in the database.
+//     // IMPORTANT for STRIPE / RAZORPAY:
+//     // A random secret is generated here as a starting point,
+//     // but Stripe and Razorpay compute their signature using
+//     // THEIR OWN signing secret from their dashboard - not
+//     // whatever your server invents. After creating a
+//     // STRIPE/RAZORPAY integration, copy the signing secret
+//     // from that provider's dashboard and overwrite
+//     // Integration.webhookSecret with it (directly in the
+//     // database, or add an "update secret" endpoint), otherwise
+//     // signature verification will always fail (401) for real
+//     // webhook deliveries.
+//     // For GENERIC integrations the auto-generated value here
+//     // is fine as-is.
 //     // ------------------------------------------
 
 //     const webhookKey = crypto.randomBytes(16).toString("hex");
@@ -72,7 +110,7 @@
 //       data: {
 //         companyId,
 //         name: name.trim(),
-//         provider: provider?.trim() || null,
+//         provider: normalizedProvider,
 //         type,
 //         webhookKey,
 //         webhookSecret,
@@ -394,6 +432,169 @@
 // };
 
 // // ==========================================
+// // UPDATE INTEGRATION WEBHOOK SECRET
+// // ==========================================
+// //
+// // Needed for STRIPE / RAZORPAY: after creating the
+// // integration, the user copies the *provider's own* signing
+// // secret from their Stripe/Razorpay dashboard and pastes it
+// // here, overwriting the auto-generated one from createIntegration.
+// // Without this endpoint, real provider signatures can never
+// // verify (401 forever) - only the DB-edit workaround worked.
+// // ==========================================
+
+// const updateIntegrationSecret = async (req, res) => {
+//   try {
+//     const companyId = req.user.companyId;
+//     const integrationId = Number(req.params.id);
+//     const { webhookSecret } = req.body;
+
+//     if (!Number.isInteger(integrationId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid integration ID",
+//       });
+//     }
+
+//     if (!webhookSecret || !webhookSecret.trim()) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "webhookSecret is required",
+//       });
+//     }
+
+//     const existingIntegration = await prisma.integration.findFirst({
+//       where: { id: integrationId, companyId },
+//     });
+
+//     if (!existingIntegration) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Integration not found",
+//       });
+//     }
+
+//     const integration = await prisma.integration.update({
+//       where: { id: integrationId },
+//       data: { webhookSecret: webhookSecret.trim() },
+//       select: {
+//         id: true,
+//         webhookKey: true,
+//         webhookSecret: true,
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Webhook secret updated successfully",
+//       integration,
+//     });
+//   } catch (error) {
+//     console.error("Update integration secret error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to update webhook secret",
+//       error:
+//         process.env.NODE_ENV === "development"
+//           ? error.message
+//           : undefined,
+//     });
+//   }
+// };
+
+// // ==========================================
+// // UPDATE INTEGRATION AUTOMATION SETTINGS
+// // ==========================================
+// //
+// // Wires up the settings form already built in
+// // IntegrationDetailsModal.jsx (frontend was calling this
+// // route, but it never existed on the backend - 404).
+// // ==========================================
+
+// const { sanitizeIncomingSettings } = require("../utils/integrationSettings");
+
+// const updateIntegrationSettings = async (req, res) => {
+//   try {
+//     const companyId = req.user.companyId;
+//     const integrationId = Number(req.params.id);
+//     const { settings } = req.body;
+
+//     if (!Number.isInteger(integrationId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid integration ID",
+//       });
+//     }
+
+//     const existingIntegration = await prisma.integration.findFirst({
+//       where: { id: integrationId, companyId },
+//     });
+
+//     if (!existingIntegration) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Integration not found",
+//       });
+//     }
+
+//     let sanitized;
+//     try {
+//       sanitized = sanitizeIncomingSettings(settings);
+//     } catch (validationError) {
+//       return res.status(400).json({
+//         success: false,
+//         message: validationError.message,
+//       });
+//     }
+
+//     const integration = await prisma.integration.update({
+//       where: { id: integrationId },
+//       data: { settings: sanitized },
+//       select: {
+//         id: true,
+//         settings: true,
+//       },
+//     });
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Integration settings updated successfully",
+//       integration,
+//     });
+//   } catch (error) {
+//     console.error("Update integration settings error:", error);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to update integration settings",
+//       error:
+//         process.env.NODE_ENV === "development"
+//           ? error.message
+//           : undefined,
+//     });
+//   }
+// };
+
+// // ==========================================
+// // GET SUPPORTED PROVIDERS
+// // ==========================================
+// //
+// // Powers the provider dropdown on the "Add Integration" form
+// // on the frontend, so the user can only pick a provider name
+// // that actually has a matching adapter - no more mismatches
+// // between what's typed here and what the webhook handler
+// // expects.
+// // ==========================================
+
+// const getSupportedProviders = async (req, res) => {
+//   return res.status(200).json({
+//     success: true,
+//     providers: SUPPORTED_PROVIDERS,
+//   });
+// };
+
+// // ==========================================
 // // EXPORT
 // // ==========================================
 
@@ -402,13 +603,18 @@
 //   getIntegrations,
 //   getIntegrationById,
 //   updateIntegrationStatus,
+//   updateIntegrationSecret,
+//   updateIntegrationSettings,
 //   deleteIntegration,
+//   getSupportedProviders,
 // };
+
 
 
 const prisma = require("../config/prisma");
 const crypto = require("crypto");
 const { SUPPORTED_PROVIDERS } = require("../integrations/adapters");
+const { checkIntegrationLimit } = require("../services/integrationLimitService");
 
 // ==========================================
 // CREATE INTEGRATION
@@ -478,6 +684,27 @@ const createIntegration = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: `Unsupported provider "${provider}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
+      });
+    }
+
+    // ------------------------------------------
+    // PLAN LIMIT
+    // WEBSITE -> "Website integrations"
+    // everything else -> "App integrations"
+    // ------------------------------------------
+    const planLimit = await checkIntegrationLimit(
+      companyId,
+      normalizedProvider === "WEBSITE" ? "website" : "app"
+    );
+
+    if (!planLimit.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: planLimit.message,
+        limitType: planLimit.limitType,
+        currentCount: planLimit.currentCount,
+        maxAllowed: planLimit.maxAllowed,
+        planName: planLimit.planName,
       });
     }
 

@@ -12,6 +12,7 @@
 // const { encryptSecret } = require("../utils/secretCrypto");
 // const ig = require("../services/instagramService");
 // const { getFrontendUrl } = require("../utils/frontendUrl");
+// const { facebookLinksInstagram } = require("../utils/socialFlags");
 
 // const CONNECTION_TYPE = "INSTAGRAM_LOGIN";
 
@@ -142,7 +143,7 @@
 //     }
 
 //     // 3. Is this Instagram account already used somewhere?
-//     const existing = await prisma.facebookPage.findUnique({
+//     let existing = await prisma.facebookPage.findUnique({
 //       where: { instagramAccountId: account.id },
 //     });
 
@@ -154,7 +155,10 @@
 //       });
 //     }
 
+//     // Old behaviour (only when FACEBOOK_LINK_INSTAGRAM=true): an Instagram
+//     // account that is linked through a Facebook Page is left as it is.
 //     if (
+//       facebookLinksInstagram() &&
 //       existing &&
 //       existing.connectionType !== CONNECTION_TYPE &&
 //       existing.status !== "DISCONNECTED"
@@ -173,6 +177,23 @@
 //     step = "subscribe to webhooks";
 //     await ig.subscribeAccount(long.accessToken);
 //     step = "save account";
+
+//     // Facebook and Instagram are connected separately now. If this account was
+//     // still linked to a Facebook Page by an older connection, unlink it from
+//     // that Page (the Page itself stays connected for Messenger) and connect
+//     // it directly instead.
+//     if (
+//       !facebookLinksInstagram() &&
+//       existing &&
+//       existing.connectionType !== CONNECTION_TYPE &&
+//       existing.status !== "DISCONNECTED"
+//     ) {
+//       await prisma.facebookPage.update({
+//         where: { id: existing.id },
+//         data: { instagramAccountId: null, instagramUsername: null },
+//       });
+//       existing = null;
+//     }
 
 //     // 5. Save (create or reconnect)
 //     const syntheticPageId = `ig_${account.id}`;
@@ -231,6 +252,7 @@
 
 
 
+
 // ============================================================
 // INSTAGRAM LOGIN CONTROLLER
 // For customers who do NOT use Facebook: the admin signs in with
@@ -246,6 +268,7 @@ const { encryptSecret } = require("../utils/secretCrypto");
 const ig = require("../services/instagramService");
 const { getFrontendUrl } = require("../utils/frontendUrl");
 const { facebookLinksInstagram } = require("../utils/socialFlags");
+const { checkIntegrationLimit } = require("../services/integrationLimitService");
 
 const CONNECTION_TYPE = "INSTAGRAM_LOGIN";
 
@@ -407,6 +430,23 @@ const instagramCallback = async (req, res) => {
     }
 
     // 4. Subscribe to webhooks so DMs reach us
+    // ---- Plan limit: Instagram accounts ----
+    // An account that is already connected for this company does not use a new slot.
+    const igAlreadyCounted =
+      existing &&
+      existing.companyId === companyId &&
+      existing.status !== "DISCONNECTED";
+
+    if (!igAlreadyCounted) {
+      const planLimit = await checkIntegrationLimit(companyId, "instagram");
+      if (!planLimit.allowed) {
+        return redirectToFrontend(res, {
+          instagram: "error",
+          message: planLimit.message,
+        });
+      }
+    }
+
     step = "subscribe to webhooks";
     await ig.subscribeAccount(long.accessToken);
     step = "save account";

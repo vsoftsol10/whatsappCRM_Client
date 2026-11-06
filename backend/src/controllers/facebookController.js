@@ -1,3 +1,4 @@
+
 // // ============================================================
 // // FACEBOOK PAGES CONTROLLER
 // // A company's admin connects their own Facebook Pages here.
@@ -6,10 +7,14 @@
 // const prisma = require("../config/prisma");
 // const { encryptSecret, decryptSecret } = require("../utils/secretCrypto");
 // const fb = require("../services/facebookService");
+// const igLogin = require("../services/instagramService");
+// const { facebookLinksInstagram } = require("../utils/socialFlags");
 
 // // What the browser is allowed to see about a Page (never the token).
 // const toPublicPage = (page) => ({
 //   id: page.id,
+//   // FACEBOOK_LOGIN | INSTAGRAM_LOGIN (Instagram connected without Facebook)
+//   connectionType: page.connectionType || "FACEBOOK_LOGIN",
 //   pageId: page.pageId,
 //   pageName: page.pageName,
 //   status: page.status,
@@ -18,6 +23,7 @@
 //   // Instagram professional account linked to this Page (if any)
 //   hasInstagram: !!page.instagramAccountId,
 //   instagramUsername: page.instagramUsername || null,
+//   tokenExpiresAt: page.tokenExpiresAt || null,
 // });
 
 // // ------------------------------------------------------------
@@ -33,9 +39,19 @@
 //       orderBy: { connectedAt: "desc" },
 //     });
 
+//     // Optional filter so the Facebook card and the Instagram card each
+//     // list only their own connections. No ?type= -> everything (as before).
+//     const type = String(req.query?.type || "").toLowerCase();
+//     const visible =
+//       type === "instagram"
+//         ? pages.filter((p) => p.connectionType === "INSTAGRAM_LOGIN")
+//         : type === "facebook"
+//         ? pages.filter((p) => p.connectionType !== "INSTAGRAM_LOGIN")
+//         : pages;
+
 //     return res.status(200).json({
 //       success: true,
-//       pages: pages.map(toPublicPage),
+//       pages: visible.map(toPublicPage),
 //     });
 //   } catch (error) {
 //     console.error("Get Facebook pages error:", error);
@@ -121,27 +137,42 @@
 //         let instagramData = { instagramAccountId: null, instagramUsername: null };
 //         let instagramNote = null;
 
-//         const { account: igAccount, error: igError } =
-//           await fb.getLinkedInstagramAccount(pageId, pageToken);
+//         // Facebook and Instagram are connected SEPARATELY now: the Facebook
+//         // button only connects the Page. The Instagram account is connected
+//         // with its own "Connect Instagram" button. Set
+//         // FACEBOOK_LINK_INSTAGRAM=true to bring the old linking back.
+//         // (When it is off, re-connecting a Page also clears an old Instagram
+//         // link, so that account can be connected directly.)
+//         if (facebookLinksInstagram()) {
+//           const { account: igAccount, error: igError } =
+//             await fb.getLinkedInstagramAccount(pageId, pageToken);
 
-//         if (igAccount) {
-//           // One Instagram account can only belong to one connected Page.
-//           const clash = await prisma.facebookPage.findFirst({
-//             where: { instagramAccountId: igAccount.id, NOT: { pageId } },
-//             select: { id: true },
-//           });
+//           if (igAccount) {
+//             // One Instagram account can only belong to one connected Page.
+//             const clash = await prisma.facebookPage.findFirst({
+//               where: { instagramAccountId: igAccount.id, NOT: { pageId } },
+//               select: { id: true, companyId: true, connectionType: true },
+//             });
 
-//           if (clash) {
-//             instagramNote =
-//               "This Instagram account is already connected to another Page or CRM account, so Instagram was not enabled for this Page.";
-//           } else {
-//             instagramData = {
-//               instagramAccountId: igAccount.id,
-//               instagramUsername: igAccount.username,
-//             };
+//             if (
+//               clash &&
+//               clash.companyId === companyId &&
+//               clash.connectionType === "INSTAGRAM_LOGIN"
+//             ) {
+//               instagramNote =
+//                 "This Instagram account is already connected directly (without Facebook). Disconnect it in the Instagram section first if you want to connect it through this Page instead.";
+//             } else if (clash) {
+//               instagramNote =
+//                 "This Instagram account is already connected to another Page or CRM account, so Instagram was not enabled for this Page.";
+//             } else {
+//               instagramData = {
+//                 instagramAccountId: igAccount.id,
+//                 instagramUsername: igAccount.username,
+//               };
+//             }
+//           } else if (igError) {
+//             instagramNote = `Instagram could not be checked: ${igError.message}`;
 //           }
-//         } else if (igError) {
-//           instagramNote = `Instagram could not be checked: ${igError.message}`;
 //         }
 
 //         const data = {
@@ -228,15 +259,19 @@
 //         .json({ success: false, message: "Facebook Page not found" });
 //     }
 
-//     // Best effort: tell Meta to stop sending this Page's events to us.
+//     // Best effort: tell Meta to stop sending this account's events to us.
 //     const token = decryptSecret(page.pageAccessToken);
 //     if (token) {
 //       try {
-//         await fb.unsubscribePageFromApp(page.pageId, token);
+//         if (page.connectionType === "INSTAGRAM_LOGIN") {
+//           await igLogin.unsubscribeAccount(token);
+//         } else {
+//           await fb.unsubscribePageFromApp(page.pageId, token);
+//         }
 //       } catch (err) {
 //         console.warn(
-//           "Facebook unsubscribe failed (continuing):",
-//           fb.extractError(err).message
+//           "Unsubscribe failed (continuing):",
+//           (page.connectionType === "INSTAGRAM_LOGIN" ? igLogin : fb).extractError(err).message
 //         );
 //       }
 //     }
@@ -246,6 +281,7 @@
 //       data: {
 //         status: "DISCONNECTED",
 //         pageAccessToken: null,
+//         tokenExpiresAt: null,
 //         disconnectedAt: new Date(),
 //         // Free the Instagram link too (another account may connect it later)
 //         instagramAccountId: null,
@@ -255,7 +291,10 @@
 
 //     return res.status(200).json({
 //       success: true,
-//       message: "Facebook Page disconnected",
+//       message:
+//         page.connectionType === "INSTAGRAM_LOGIN"
+//           ? "Instagram account disconnected"
+//           : "Facebook Page disconnected",
 //     });
 //   } catch (error) {
 //     console.error("Disconnect Facebook page error:", error);
@@ -271,8 +310,7 @@
 //   connectFacebookPages,
 //   disconnectFacebookPage,
 // };
-
-
+ 
 
 
 // ============================================================
@@ -285,6 +323,11 @@ const { encryptSecret, decryptSecret } = require("../utils/secretCrypto");
 const fb = require("../services/facebookService");
 const igLogin = require("../services/instagramService");
 const { facebookLinksInstagram } = require("../utils/socialFlags");
+const {
+  getIntegrationLimitContext,
+  isLimitReached,
+  limitMessage,
+} = require("../services/integrationLimitService");
 
 // What the browser is allowed to see about a Page (never the token).
 const toPublicPage = (page) => ({
@@ -365,6 +408,14 @@ const connectFacebookPages = async (req, res) => {
     //    Normal case: the browser already received an access token from the
     //    login popup. (A code is still supported as a fallback.)
     //    Meta checks the token itself when we extend it / read the Pages.
+    // ---- Plan limits (Facebook Pages / Instagram accounts) ----
+    const limitCtx = await getIntegrationLimitContext(companyId);
+    if (!limitCtx.ok) {
+      return res.status(403).json({ success: false, message: limitCtx.message });
+    }
+    let facebookUsed = limitCtx.used.facebook;
+    let instagramUsed = limitCtx.used.instagram;
+
     const shortToken = accessToken || (await fb.exchangeCodeForToken(code));
     const userToken = await fb.extendUserToken(shortToken);
 
@@ -406,6 +457,26 @@ const connectFacebookPages = async (req, res) => {
         }
 
         // Subscribe the Page to our app so Meta sends its messages to us.
+        // ---- Plan limit: Facebook Pages ----
+        // Re-connecting a Page that already counts does not use a new slot.
+        const pageAlreadyCounted =
+          existing &&
+          existing.companyId === companyId &&
+          existing.connectionType === "FACEBOOK_LOGIN" &&
+          existing.status !== "DISCONNECTED";
+
+        if (
+          !pageAlreadyCounted &&
+          isLimitReached(limitCtx, "facebook", facebookUsed)
+        ) {
+          skipped.push({
+            pageId,
+            pageName,
+            reason: limitMessage(limitCtx, "facebook"),
+          });
+          continue;
+        }
+
         await fb.subscribePageToApp(pageId, pageToken);
 
         // Instagram: find the professional account linked to this Page.
@@ -440,6 +511,20 @@ const connectFacebookPages = async (req, res) => {
             } else if (clash) {
               instagramNote =
                 "This Instagram account is already connected to another Page or CRM account, so Instagram was not enabled for this Page.";
+            } else if (
+              !(
+                existing &&
+                existing.companyId === companyId &&
+                existing.status !== "DISCONNECTED" &&
+                existing.instagramAccountId === igAccount.id
+              ) &&
+              isLimitReached(limitCtx, "instagram", instagramUsed)
+            ) {
+              // Plan limit: Instagram accounts. The Page itself is still connected.
+              instagramNote = `${limitMessage(
+                limitCtx,
+                "instagram"
+              )} Your Facebook Page was connected without Instagram.`;
             } else {
               instagramData = {
                 instagramAccountId: igAccount.id,
@@ -465,6 +550,20 @@ const connectFacebookPages = async (req, res) => {
         const saved = existing
           ? await prisma.facebookPage.update({ where: { pageId }, data })
           : await prisma.facebookPage.create({ data: { ...data, pageId } });
+
+        // keep the in-request counters accurate for the next Page
+        if (!pageAlreadyCounted) facebookUsed += 1;
+        if (
+          instagramData.instagramAccountId &&
+          !(
+            existing &&
+            existing.companyId === companyId &&
+            existing.status !== "DISCONNECTED" &&
+            existing.instagramAccountId === instagramData.instagramAccountId
+          )
+        ) {
+          instagramUsed += 1;
+        }
 
         connected.push({ ...toPublicPage(saved), instagramNote });
       } catch (pageError) {

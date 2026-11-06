@@ -255,6 +255,12 @@ model SubscriptionPlan {
   maxCampaigns Int
   maxTemplates Int @default(20)
 
+  // Integration limits (-1 = unlimited). Managed from Super Admin.
+  maxFacebookPages       Int @default(-1)
+  maxInstagramAccounts   Int @default(-1)
+  maxWebsiteIntegrations Int @default(-1)
+  maxAppIntegrations     Int @default(-1)
+
   features Json
 
   isTrial Boolean @default(false)
