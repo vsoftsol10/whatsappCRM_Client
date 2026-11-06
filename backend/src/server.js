@@ -349,6 +349,7 @@ const supportTicketRoutes = require("./routes/supportTicketRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
 const aiSettingsRoutes = require("./routes/aiSettingsRoutes");
+const supportBotRoutes = require("./routes/supportBotRoutes");
 const companyRoutes = require("./routes/companyRoutes");
 const backupRoutes = require("./routes/backupRoutes");
  
@@ -536,6 +537,12 @@ app.use(
 app.use(
   "/api/ai-settings",
   aiSettingsRoutes
+);
+
+// AI Support chatbot (Super Admin manages it; clients ask CRM questions)
+app.use(
+  "/api/support-bot",
+  supportBotRoutes
 );
 
 app.use("/api/company", companyRoutes);
