@@ -69,6 +69,7 @@ import TopHeader from "../components/header/TopHeader";
 import { useAuthStore } from "../store/authStore";
 import useChatSocket from "../hooks/useChatSocket";
 import ProductTour from "../components/tour/ProductTour";
+import SupportChatWidget from "../components/supportBot/SupportChatWidget";
 
 function AppLayout() {
   const location = useLocation();
@@ -106,6 +107,9 @@ function AppLayout() {
     <div className="h-screen overflow-hidden bg-gray-100">
       <ProductTour />
 
+      {/* AI Support chatbot (only shows when Super Admin enabled it for this company) */}
+      <SupportChatWidget />
+
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
@@ -129,4 +133,3 @@ function AppLayout() {
 }
 
 export default AppLayout;
-
