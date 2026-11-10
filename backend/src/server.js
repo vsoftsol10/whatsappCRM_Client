@@ -345,6 +345,7 @@ const userNotificationRoutes = require("./routes/userNotificationRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const planRoutes = require("./routes/planRoutes");
 const upgradeRequestRoutes = require("./routes/upgradeRequestRoutes");
+const billingRoutes = require("./routes/billingRoutes");
 const supportTicketRoutes = require("./routes/supportTicketRoutes");
 const auditLogRoutes = require("./routes/auditLogRoutes");
 const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
@@ -527,6 +528,11 @@ app.use(
 app.use(
   "/api/upgrade-requests",
   upgradeRequestRoutes
+);
+ 
+app.use(
+  "/api/billing",
+  billingRoutes
 );
  
 app.use(

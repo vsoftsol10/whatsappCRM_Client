@@ -1,4 +1,3 @@
-
 // // src/config/navigation.js
 // import { FaWhatsapp, FaFacebook, FaInstagram } from "react-icons/fa";
 // import {
@@ -20,6 +19,7 @@
 //   Bot,
 //   Briefcase,
 //   BookOpen,
+//   FileSignature,
 // } from "lucide-react";
 
 // // Platform logo, imported so the bundler resolves the file path for you.
@@ -57,6 +57,7 @@
 //       { key: "leads", name: "Leads", path: "/leads", icon: UserPlus },
 //       { key: "campaigns", name: "Campaigns", path: "/campaigns", icon: Megaphone },
 //       { key: "templates", name: "Templates", path: "/templates", icon: FileText },
+//       { key: "proposals", name: "Proposals", path: "/proposals", icon: FileSignature },
 //     ],
 //   },
 //   {
@@ -108,7 +109,7 @@
 // ];
 
 // export const filterTabsByRole = (tabs, role) => tabs.filter((tab) => canSee(tab, role));
-
+ 
 
 
 
@@ -135,6 +136,7 @@ import {
   Briefcase,
   BookOpen,
   FileSignature,
+  CreditCard,
 } from "lucide-react";
 
 // Platform logo, imported so the bundler resolves the file path for you.
@@ -187,6 +189,7 @@ export const navGroups = [
     id: "system",
     items: [
       // Sidebar shows ONE "Settings" link. Its sections live as tabs inside the page (see settingsTabs).
+      { key: "plans", name: "Plans", path: "/plans", icon: CreditCard, roles: ["ADMIN"] },
       { key: "settings", name: "Settings", path: "/settings", icon: Settings },
     ],
   },
