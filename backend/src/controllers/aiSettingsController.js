@@ -423,6 +423,15 @@ const updateAiSettings = async (req, res) => {
       data.isEnabled = body.isEnabled;
     }
 
+    // ---------- knowledge base switch ----------
+    if (body.useKnowledgeBase !== undefined) {
+      if (typeof body.useKnowledgeBase !== "boolean") {
+        return badRequest(res, "useKnowledgeBase must be true or false");
+      }
+
+      data.useKnowledgeBase = body.useKnowledgeBase;
+    }
+
     // ---------- lead capture ----------
     if (body.leadCaptureEnabled !== undefined) {
       if (typeof body.leadCaptureEnabled !== "boolean") {
@@ -578,6 +587,7 @@ const testAiSettings = async (req, res) => {
       reply: result.reply,
       handoff: Boolean(result.handoff),
       latencyMs: result.latencyMs,
+      kbMatches: result.kbMatches || [],
     });
   } catch (error) {
     console.error("Test AI settings error:", error);

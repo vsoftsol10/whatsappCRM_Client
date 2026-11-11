@@ -75,6 +75,7 @@ model Company {
   tickets                      Ticket[]
   employees                    Employee[]
   crmAuditLogs                 CrmAuditLog[]
+  backupSetting                BackupSetting?
   subscriptionUpgradeRequests  SubscriptionUpgradeRequest[]
 
   integrations Integration[]
@@ -84,6 +85,9 @@ model Company {
 
   // AI auto-reply configuration (one row per company)
   aiSettings AiSettings?
+
+  // Company knowledge base used by the AI auto-reply (strictly per company)
+  kbEntries KbEntry[]
 
   // AI support chatbot
   chatbotTenantSetting ChatbotTenantSetting?
@@ -1561,6 +1565,10 @@ model AiSettings {
   // { enabled, name, phone, email, other, wording }
   contactRequest Json?
 
+  // true = the auto-reply answers from this company's own knowledge base
+  // entries (KbEntry). Has no effect until the company adds entries.
+  useKnowledgeBase Boolean @default(true)
+
   // Last failure of the auto-reply pipeline, shown on the settings page
   lastError   String?
   lastErrorAt DateTime?
@@ -1637,6 +1645,7 @@ model Backup {
 
 enum BackupType {
   MANUAL
+  AUTOMATIC
 }
 
 enum BackupStatus {
@@ -1644,6 +1653,45 @@ enum BackupStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
+}
+
+//////////////////////////////////////////////////////
+// AUTOMATIC BACKUP SETTINGS (one row per company)
+//////////////////////////////////////////////////////
+
+model BackupSetting {
+  id String @id @default(uuid())
+
+  companyId Int @unique
+
+  // Automatic backup is ON by default for every company
+  enabled   Boolean         @default(true)
+  frequency BackupFrequency @default(WEEKLY)
+
+  // Used when frequency = WEEKLY (0 = Sunday ... 6 = Saturday)
+  dayOfWeek Int @default(1)
+
+  // Used when frequency = MONTHLY (1 - 28)
+  dayOfMonth Int @default(1)
+
+  // How many automatic backups to keep (older ones are deleted)
+  retentionCount Int @default(7)
+
+  lastRunAt DateTime?
+  nextRunAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, nextRunAt])
+}
+
+enum BackupFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
 }
 
 //////////////////////////////////////////////////////
@@ -2087,4 +2135,39 @@ model Proposal {
   @@index([companyId])
   @@index([customerId])
   @@index([createdById])
+}
+
+//////////////////////////////////////////////////////
+// COMPANY KNOWLEDGE BASE (used by the AI auto-reply)
+//////////////////////////////////////////////////////
+// Every row belongs to exactly ONE company. NOTE: separate from
+// KnowledgeDoc / KnowledgeChunk above, which are the GLOBAL docs of the
+// CRM help chatbot (managed by Super Admin, no companyId on purpose).
+// Every read and write of this table MUST filter by companyId.
+model KbEntry {
+  id Int @id @default(autoincrement())
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  title    String
+  category String  @default("General")
+  // Optional synonyms / other ways customers ask, e.g. "shipping, delivery charge"
+  keywords String?
+  content  String
+
+  isActive Boolean @default(true)
+
+  createdById String?
+
+  // Search index column. Filled by a database trigger (installed automatically
+  // when the server starts, see services/ai/knowledgeBaseSetup.js); the app
+  // never writes it directly. Makes the AI search fast for large catalogs.
+  searchVector Unsupported("tsvector")?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, isActive])
+  @@index([searchVector], type: Gin)
 }

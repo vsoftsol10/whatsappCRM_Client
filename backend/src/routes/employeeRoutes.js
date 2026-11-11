@@ -31,6 +31,7 @@ const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const allowWriteAccess = require("../middleware/allowWriteAccess");
 const { checkUserLimit } = require("../middleware/planLimitMiddleware");
+const adminOnly = require("../middleware/adminOnly");
 
 const {
   createEmployee,
@@ -43,14 +44,14 @@ const {
 const router = express.Router();
 
 // Expired / inactive companies cannot add, edit or delete employees.
-router.post("/", authMiddleware, allowWriteAccess, checkUserLimit, createEmployee);
+router.post("/", authMiddleware, adminOnly, allowWriteAccess, checkUserLimit, createEmployee);
 
 router.get("/", authMiddleware, getEmployees);
 
 router.get("/:id", authMiddleware, getEmployeeById);
 
-router.put("/:id", authMiddleware, allowWriteAccess, updateEmployee);
+router.put("/:id", authMiddleware, adminOnly, allowWriteAccess, updateEmployee);
 
-router.delete("/:id", authMiddleware, allowWriteAccess, deleteEmployee);
+router.delete("/:id", authMiddleware, adminOnly, allowWriteAccess, deleteEmployee);
 
 module.exports = router;

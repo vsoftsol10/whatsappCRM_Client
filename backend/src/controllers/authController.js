@@ -700,6 +700,15 @@ const loginUser = async (req, res) => {
 
     const { email, password, companyId } = req.body;
 
+    if (
+      typeof email !== "string" || !email.trim() ||
+      typeof password !== "string" || !password
+    ) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
     const users = await prisma.user.findMany({
       where: {
         email: email.trim().toLowerCase(),
@@ -1244,6 +1253,12 @@ const resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
+    if (typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+      });
+    }
+
     const user = await prisma.user.findFirst({
       where: {
         resetToken: token,
@@ -1294,7 +1309,7 @@ module.exports = {
   registerUser,
   loginUser,
   getMe,
-  markTourSeen, // NEW
+  markTourSeen, 
   updateProfile,
   changePassword,
   forgotPassword,
