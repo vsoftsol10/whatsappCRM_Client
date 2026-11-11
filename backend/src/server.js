@@ -1,4 +1,3 @@
-
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
 
@@ -73,7 +72,8 @@ const app = express();
 // GLOBAL MIDDLEWARE
 // ======================================================
 
-// Allowed frontend origins
+// Use the configured CRM frontend origin(s), rather than reflecting any
+// requesting origin. FRONTEND_URL may contain comma-separated origins.
 const allowedFrontendOrigins = (
   process.env.FRONTEND_URL || "https://crm.vatupcrm.in"
 )
@@ -240,7 +240,7 @@ app.use("/api/support-tickets", supportTicketRoutes);
 // Backup routes
 app.use("/api/backups", backupRoutes);
 
-// Automatic backup settings
+// Automatic backup schedule (admin only)
 app.use("/api/backup-settings", backupSettingRoutes);
 
 // ======================================================
