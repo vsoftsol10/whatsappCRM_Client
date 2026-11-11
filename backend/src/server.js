@@ -15,6 +15,7 @@
 // const userRoutes = require("./routes/userRoutes");
 // const customerRoutes = require("./routes/customerRoutes");
 // const serviceRoutes = require("./routes/serviceRoutes");
+// const proposalRoutes = require("./routes/proposalRoutes");
 // const integrationRoutes = require("./routes/integrationRoutes");
 // const employeeRoutes = require("./routes/employeeRoutes");
 // const conversationRoutes = require("./routes/conversationRoutes");
@@ -32,10 +33,12 @@
 // const subscriptionRoutes = require("./routes/subscriptionRoutes");
 // const planRoutes = require("./routes/planRoutes");
 // const upgradeRequestRoutes = require("./routes/upgradeRequestRoutes");
+// const billingRoutes = require("./routes/billingRoutes");
 // const supportTicketRoutes = require("./routes/supportTicketRoutes");
 // const auditLogRoutes = require("./routes/auditLogRoutes");
 // const whatsappAccountRoutes = require("./routes/whatsappAccountRoutes");
 // const aiSettingsRoutes = require("./routes/aiSettingsRoutes");
+// const supportBotRoutes = require("./routes/supportBotRoutes");
 // const companyRoutes = require("./routes/companyRoutes");
 // const backupRoutes = require("./routes/backupRoutes");
  
@@ -60,7 +63,7 @@
  
 // // Use the configured CRM frontend origin(s), rather than reflecting any
 // // requesting origin. FRONTEND_URL may contain comma-separated origins.
-// const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://crm.vatupcrm.in" || "https://watsupcl.thevsoft.com")
+// const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://crm.vatupcrm.in" || "https://watsupcl.thevsoft.com" || " http://localhost:5174" || " http://localhost:5173/")
 //   .split(",")
 //   .map((origin) => origin.trim().replace(/\/$/, ""))
 //   .filter(Boolean);
@@ -160,6 +163,8 @@
 // app.use("/api/customers", customerRoutes);
 
 // app.use("/api/services", serviceRoutes);
+
+// app.use("/api/proposals", proposalRoutes);
  
 // app.use("/api/integrations", integrationRoutes);
  
@@ -214,6 +219,11 @@
 // );
  
 // app.use(
+//   "/api/billing",
+//   billingRoutes
+// );
+ 
+// app.use(
 //   "/api/audit-logs",
 //   auditLogRoutes
 // );
@@ -221,6 +231,12 @@
 // app.use(
 //   "/api/ai-settings",
 //   aiSettingsRoutes
+// );
+
+// // AI Support chatbot (Super Admin manages it; clients ask CRM questions)
+// app.use(
+//   "/api/support-bot",
+//   supportBotRoutes
 // );
 
 // app.use("/api/company", companyRoutes);
@@ -310,7 +326,6 @@
 
 
 
-
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
  
@@ -353,6 +368,7 @@ const aiSettingsRoutes = require("./routes/aiSettingsRoutes");
 const supportBotRoutes = require("./routes/supportBotRoutes");
 const companyRoutes = require("./routes/companyRoutes");
 const backupRoutes = require("./routes/backupRoutes");
+const backupSettingRoutes = require("./routes/backupSettingRoutes");
  
 const saasWebhookRoutes = require("./routes/saasWebhook");
 const verifyMetaWebhookSignature = require("./middleware/verifyMetaWebhookSignature");
@@ -365,6 +381,9 @@ const {
 const {
   startCampaignScheduler,
 } = require("./jobs/campaignScheduler");
+const {
+  startAutoBackupScheduler,
+} = require("./jobs/autoBackupScheduler");
  
 const app = express();
  
@@ -375,7 +394,7 @@ const app = express();
  
 // Use the configured CRM frontend origin(s), rather than reflecting any
 // requesting origin. FRONTEND_URL may contain comma-separated origins.
-const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://crm.vatupcrm.in" || "https://watsupcl.thevsoft.com" || " http://localhost:5174")
+const allowedFrontendOrigins = (process.env.FRONTEND_URL || "https://crm.vatupcrm.in" || "https://watsupcl.thevsoft.com" || " http://localhost:5174" || " http://localhost:5173/")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
@@ -588,6 +607,12 @@ app.use(
   "/api/backups",
   backupRoutes
 );
+
+// Automatic backup schedule (admin only)
+app.use(
+  "/api/backup-settings",
+  backupSettingRoutes
+);
  
 // ======================================================
 // TEST ROUTE
@@ -630,6 +655,7 @@ httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   startInstagramTokenRefreshJob();
   startCampaignScheduler();
+  startAutoBackupScheduler();
   console.log(
     "FRONTEND_URL:",
     process.env.FRONTEND_URL
