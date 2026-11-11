@@ -269,6 +269,7 @@ import ProposalBuilder from "./pages/ProposalBuilder";
 
 import AuditLogs from "./pages/settings/AuditLogs";
 import AiAutoReply from "./pages/settings/AiAutoReply";
+import KnowledgeBase from "./pages/settings/KnowledgeBase";
 import AddCustomer from "./pages/AddCustomer";
 // import EditCustomer from "./pages/EditCustomer";
 
@@ -438,6 +439,7 @@ function App() {
                 <Route path="/settings/audit-logs" element={<AuditLogs />} />
 
                 <Route path="/settings/ai-auto-reply" element={<AiAutoReply />} />
+                <Route path="/settings/knowledge-base" element={<KnowledgeBase />} />
               </Route>
             </Route>
 

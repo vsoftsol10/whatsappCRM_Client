@@ -744,6 +744,14 @@ const {
 const { logAction } = require("../services/auditLogService");
 const { normalizeIndianPhone } = require("../utils/phoneUtils");
 
+// Which lead the caller may work on: an admin - any lead of the company;
+// an employee - only a lead assigned to them (the same leads they can see).
+const leadScope = (req, id) => ({
+  id: Number(id),
+  companyId: req.user.companyId,
+  ...(req.user.role === "ADMIN" ? {} : { assignedToId: req.user.userId }),
+});
+
 // ======================================================
 // COMMON INCLUDE
 // ======================================================
@@ -934,10 +942,7 @@ const updateLead = async (req, res) => {
     } = req.body;
 
     const existingLead = await prisma.lead.findFirst({
-      where: {
-        id: Number(id),
-        companyId: req.user.companyId
-      }
+      where: leadScope(req, id),
     });
 
     if (!existingLead) {
@@ -1091,10 +1096,7 @@ const updateLeadStatus = async (req, res) => {
     }
 
     const existingLead = await prisma.lead.findFirst({
-      where: {
-        id: Number(id),
-        companyId: req.user.companyId
-      }
+      where: leadScope(req, id),
     });
 
     if (!existingLead) {
@@ -1157,10 +1159,7 @@ const convertLeadToCustomer = async (req, res) => {
     const { id } = req.params;
 
     const lead = await prisma.lead.findFirst({
-      where: {
-        id: Number(id),
-        companyId: req.user.companyId
-      }
+      where: leadScope(req, id),
     });
 
     if (!lead) {
@@ -1216,6 +1215,8 @@ const convertLeadToCustomer = async (req, res) => {
       conditions.length > 0
         ? await prisma.customer.findFirst({
           where: {
+            // Only look for duplicates inside the caller's OWN company.
+            companyId: req.user.companyId,
             OR: conditions,
           },
         })
@@ -1291,10 +1292,7 @@ const deleteLead = async (req, res) => {
     const { id } = req.params;
 
     const lead = await prisma.lead.findFirst({
-      where: {
-        id: Number(id),
-        companyId: req.user.companyId
-      }
+      where: leadScope(req, id),
     });
 
     if (!lead) {

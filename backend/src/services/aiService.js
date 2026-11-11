@@ -580,6 +580,7 @@ const {
   readContactRequest,
 } = require("./ai/businessPrompt");
 const { assertSafeHttpsUrl, safeHttpsAgent } = require("../utils/safeUrl");
+const { buildKnowledgeContext } = require("./ai/knowledgeBase");
 
 // Reasoning models can be slow, so give providers plenty of time.
 const AI_TIMEOUT_MS = 90000;
@@ -676,6 +677,7 @@ const serializeSettings = (settings) => ({
   leadAssigneeId: settings.leadAssigneeId || null,
   leadAutoAssign: Boolean(settings.leadAutoAssign),
   contactRequest: readContactRequest(settings.contactRequest),
+  useKnowledgeBase: settings.useKnowledgeBase !== false,
   lastError: settings.lastError,
   lastErrorAt: settings.lastErrorAt,
   updatedAt: settings.updatedAt,
@@ -988,6 +990,37 @@ const clearFailure = (companyId) =>
     .catch(() => {});
 
 // ============================================
+// KNOWLEDGE BASE (company's own entries)
+// ============================================
+// What to search for: the customer's latest message. A very short one
+// ("price?", "and delivery?") is searched together with the one before it.
+const queryFromHistory = (history) => {
+  const userTurns = history.filter((turn) => turn.role === "user");
+  const last = userTurns[userTurns.length - 1]?.content || "";
+  const previous = userTurns[userTurns.length - 2]?.content || "";
+
+  const wordCount = last.trim().split(/\s+/).filter(Boolean).length;
+
+  return wordCount < 4 && previous ? `${last}\n${previous}` : last;
+};
+
+// Entries of THIS company only (companyId comes from the conversation row,
+// never from the customer). If the lookup itself fails, the reply carries
+// on without it, exactly as it worked before the knowledge base existed.
+const loadKnowledgeContext = async (companyId, settings, query) => {
+  const none = { entries: [], block: "" };
+
+  if (settings.useKnowledgeBase === false) return none;
+
+  try {
+    return await buildKnowledgeContext({ companyId, query });
+  } catch (error) {
+    console.error("Knowledge base lookup failed (replying without it):", error.message);
+    return none;
+  }
+};
+
+// ============================================
 // AUTO-REPLY FOR A CONVERSATION
 // ============================================
 // Returns { success: true, reply, handoff } or { success: false, error }.
@@ -1044,9 +1077,18 @@ const getAutoReply = async (conversationId, options = {}) => {
       return { success: false, error: "Latest message is not from the customer" };
     }
 
-    const systemPrompt = await composeSystemPrompt(companyId, settings, {
+    let systemPrompt = await composeSystemPrompt(companyId, settings, {
       channel: options.channel, // undefined for WhatsApp
     });
+
+    // Company knowledge base: only this company's entries (see ai/knowledgeBase.js)
+    const kb = await loadKnowledgeContext(
+      companyId,
+      settings,
+      queryFromHistory(history)
+    );
+
+    systemPrompt += kb.block;
 
     const raw = await callProvider({
       providerId: platform.providerId,
@@ -1063,7 +1105,12 @@ const getAutoReply = async (conversationId, options = {}) => {
 
     if (settings.lastError) await clearFailure(companyId);
 
-    return { success: true, reply, handoff };
+    return {
+      success: true,
+      reply,
+      handoff,
+      kbEntryIds: kb.entries.map((entry) => entry.id),
+    };
   } catch (error) {
     const message = friendlyError(error, apiKey);
 
@@ -1091,13 +1138,18 @@ const testAutoReply = async (companyId, overrides = {}) => {
       return { success: false, error: "The AI service is temporarily unavailable." };
     }
 
-    const systemPrompt = await composeSystemPrompt(companyId, settings, {
+    const sample = (overrides.message || "").trim() || "Hi, I need some help.";
+
+    let systemPrompt = await composeSystemPrompt(companyId, settings, {
       businessProfile: overrides.businessProfile,
       systemPrompt: overrides.systemPrompt,
       contactRequest: overrides.contactRequest,
       channel: overrides.channel,
     });
-    const sample = (overrides.message || "").trim() || "Hi, I need some help.";
+
+    const kb = await loadKnowledgeContext(companyId, settings, sample);
+
+    systemPrompt += kb.block;
 
     const startedAt = Date.now();
 
@@ -1113,7 +1165,14 @@ const testAutoReply = async (companyId, overrides = {}) => {
 
     const { reply, handoff } = splitHandoff(raw);
 
-    return { success: true, reply, handoff, latencyMs: Date.now() - startedAt };
+    return {
+      success: true,
+      reply,
+      handoff,
+      latencyMs: Date.now() - startedAt,
+      // Titles of the knowledge base entries the AI was given (own company only)
+      kbMatches: kb.entries.map((entry) => ({ id: entry.id, title: entry.title })),
+    };
   } catch (error) {
     return { success: false, error: friendlyError(error, platform.apiKey) };
   }

@@ -135,6 +135,7 @@ import {
   Bot,
   Briefcase,
   BookOpen,
+  Library,
   FileSignature,
   CreditCard,
 } from "lucide-react";
@@ -223,6 +224,7 @@ export const settingsTabs = [
   { key: "support", name: "Support", path: "/settings/support", icon: LifeBuoy, roles: ["ADMIN"] },
   { key: "audit-logs", name: "Audit Logs", path: "/settings/audit-logs", icon: History, roles: ["ADMIN"] },
   { key: "ai-auto-reply", name: "AI Auto-Reply", path: "/settings/ai-auto-reply", icon: Bot, roles: ["ADMIN"] },
+  { key: "knowledge-base", name: "Knowledge Base", path: "/settings/knowledge-base", icon: Library, roles: ["ADMIN"] },
   { key: "user-guide", name: "User Guide", path: "/settings/user-guide", icon: BookOpen },
 ];
 
