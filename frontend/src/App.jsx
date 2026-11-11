@@ -27,6 +27,8 @@
 // import CampaignDetails from "./pages/CampaignDetails";
 // import Templates from "./pages/Templates";
 // import Services from "./pages/Services";
+// import Proposals from "./pages/Proposals";
+// import ProposalBuilder from "./pages/ProposalBuilder";
 
 // import AuditLogs from "./pages/settings/AuditLogs";
 // import AiAutoReply from "./pages/settings/AiAutoReply";
@@ -156,6 +158,12 @@
 
 //             <Route path="/services" element={<Services />} />
 
+//             <Route path="/proposals" element={<Proposals />} />
+
+//             <Route path="/proposals/new" element={<ProposalBuilder />} />
+
+//             <Route path="/proposals/:id/edit" element={<ProposalBuilder />} />
+
 //             <Route path="/tasks" element={<Tasks />} />
 
 //             <Route path="/tickets" element={<TicketsPage />} />
@@ -223,6 +231,7 @@
 // }
 
 // export default App;
+
 
 
 
@@ -406,7 +415,8 @@ function App() {
 
             <Route path="/settings/profile" element={<ProfileSettings />} />
 
-            <Route path="/settings/plans" element={<Plans />} />
+            {/* old URL kept so existing links still work */}
+            <Route path="/settings/plans" element={<Navigate to="/plans" replace />} />
 
             <Route path="/change-password" element={<ChangePassword />} />
 
@@ -437,6 +447,8 @@ function App() {
                 ADMIN ROUTES
             ================================================== */}
             <Route element={<AdminRoute />}>
+              <Route path="/plans" element={<Plans />} />
+
               <Route path="/employees" element={<ManageEmployees />} />
 
               <Route path="/employees/edit/:id" element={<EditEmployee />} />
