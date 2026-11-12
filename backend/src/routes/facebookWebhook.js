@@ -1,4 +1,3 @@
-
 // // ============================================================
 // // FACEBOOK PAGE + INSTAGRAM WEBHOOK  (Messenger and Instagram DMs)
 // //
@@ -581,6 +580,8 @@ const processMessagingEvent = async (page, event, channel) => {
     metaMessageId: message.mid,
     messageType,
     imageUrl,
+    // Messenger / Instagram: the message the person tagged ("replied to")
+    replyToMetaId: message.reply_to?.mid,
   });
 
   // null = duplicate

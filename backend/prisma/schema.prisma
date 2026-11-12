@@ -759,6 +759,11 @@ model Message {
 
   metaMessageId String? @unique
 
+  // Customer messages only: the Meta id of the message they tagged
+  // ("reply" in WhatsApp / Messenger / Instagram). Lets the AI know which
+  // campaign or message a short question like "how much is this?" is about.
+  replyToMetaId String?
+
   failureReason String?
   isEdited      Boolean @default(false)
 

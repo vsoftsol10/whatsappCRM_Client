@@ -25,6 +25,14 @@ const MAX_ENTRY_CHARS_IN_PROMPT = 1200;
 const MAX_QUERY_WORDS = 12;
 const MAX_QUERY_CHARS = 600;
 
+// A customer message with this many meaningful words or fewer ("price?",
+// "how much is this?", "is it available?") says too little to search with.
+// For those, the message it refers to (a campaign, a tagged message) is used.
+const VAGUE_MAX_WORDS = 2;
+
+// How many words of that earlier message are searched with
+const CONTEXT_QUERY_WORDS = 20;
+
 // The substring fallback reads every row of the company, so it only runs
 // for catalogs up to this size. Bigger catalogs rely on the indexed search
 // (use the "Also known as" keywords for other spellings).
@@ -57,7 +65,7 @@ const requireCompanyId = (companyId) => {
 // Letters, combining marks (needed for Tamil/Hindi/etc.) and digits only.
 // Anything else (quotes, operators, SQL, tsquery syntax) becomes a space,
 // so what reaches the search query is always plain words.
-const extractWords = (text) => {
+const extractWords = (text, maxWords = MAX_QUERY_WORDS) => {
   const cleaned = String(text || "")
     .slice(0, MAX_QUERY_CHARS)
     .toLowerCase()
@@ -74,8 +82,11 @@ const extractWords = (text) => {
       return word.length >= (isAscii ? 3 : 2);
     });
 
-  return [...new Set(words)].slice(0, MAX_QUERY_WORDS);
+  return [...new Set(words)].slice(0, maxWords);
 };
+
+// true when the message has too few meaningful words to search with
+const isVagueQuery = (text) => extractWords(text).length <= VAGUE_MAX_WORDS;
 
 const clip = (text, max) => {
   const value = String(text || "").trim();
@@ -153,11 +164,11 @@ const searchContains = async (companyId, words, limit) => {
 // ============================================
 // searchCompanyKb(companyId, query) -> [{ id, title, category, content }]
 // ============================================
-const searchCompanyKb = async (companyId, query, limit = MAX_RESULTS) => {
+const searchCompanyKb = async (companyId, query, limit = MAX_RESULTS, options = {}) => {
   const cid = requireCompanyId(companyId);
   const max = Math.min(Math.max(Number(limit) || MAX_RESULTS, 1), 8);
 
-  const words = extractWords(query);
+  const words = extractWords(query, options.maxWords);
 
   if (words.length === 0) return [];
 
@@ -214,44 +225,126 @@ const MATCH_RULES = [
   "- Use an entry only if it is relevant to the customer's latest message. Do not mention the knowledge base or entries to the customer.",
   "- If an entry conflicts with the general business details above, prefer the entry.",
   "- If the answer is not covered by these entries or the business details above, do not guess. Use the human hand-off.",
+  "- If the customer's message is too vague to tell what they mean and the entries above do not clearly fit, ask one short question about which product or topic they mean instead of guessing.",
 ].join("\n");
 
 const NO_MATCH_BLOCK = [
   "Company knowledge base:",
   "- This business keeps its own knowledge base, but no entry matched the customer's latest message.",
   "- For business-specific questions (prices, services, availability, policies, timings, procedures) do not answer from general knowledge and do not guess. Use the human hand-off.",
+  "- If the customer's message is too vague to tell what they mean (for example \"how much is this?\" with no product named and nothing earlier in the chat that shows which one), do not guess and do not hand off. Ask one short question about which product or topic they mean.",
   "- Greetings and simple courtesy replies are fine.",
 ].join("\n");
 
+// What the short message most likely refers to (see replyContext.js).
+//  - "reply":  the customer tagged this message, so it is always stated
+//  - "recent": the latest message the business sent, stated only when the
+//              customer's message is vague (otherwise it would only add noise)
+const formatContext = (context, vague) => {
+  if (!context || !context.text) return "";
+
+  if (context.source === "reply") {
+    return (
+      `The customer is replying to this earlier message from the business: "${context.text}". ` +
+      'A short or vague question (for example "how much is this?") is about that message.\n\n'
+    );
+  }
+
+  if (vague) {
+    return (
+      `The most recent message the business sent to this customer was: "${context.text}". ` +
+      'If the customer\'s latest message is short or vague ("this", "it", "how much?"), it most likely refers to that message.\n\n'
+    );
+  }
+
+  return "";
+};
+
+// customer's own matches first (when they said enough), or the earlier
+// message's matches first (when they said little); no duplicates
+const mergeEntries = (first, second, max) => {
+  const seen = new Set();
+  const merged = [];
+
+  for (const entry of [...first, ...second]) {
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    merged.push(entry);
+    if (merged.length >= max) break;
+  }
+
+  return merged;
+};
+
 // ============================================
-// buildKnowledgeContext({ companyId, query })
-// -> { entries, block }
+// buildKnowledgeContext({ companyId, query, context })
+// -> { entries, block, contextUsed }
 // ============================================
 // block is appended to the company's system prompt ("" = add nothing).
 //   - entries matched     -> the entries + usage rules
 //   - none matched, but the company HAS entries -> "do not guess" rule
+//     (and "ask which product" for vague messages)
 //   - company has no entries -> nothing (behaves exactly as before KB)
-const buildKnowledgeContext = async ({ companyId, query }) => {
+//
+// context (optional): { text, source: "reply" | "recent" } from
+// replyContext.js. When the customer's message is vague, the entries that
+// match THAT message are searched too, so "how much is this?" after a
+// campaign finds the campaign's product. contextUsed = the source when
+// it contributed entries, else null.
+//
+// Isolation: every search below is scoped to companyId.
+const buildKnowledgeContext = async ({ companyId, query, context = null }) => {
   const cid = requireCompanyId(companyId);
 
-  const entries = await searchCompanyKb(cid, query);
+  const contextText =
+    context && typeof context.text === "string" ? context.text.trim() : "";
+
+  const vague = isVagueQuery(query);
+
+  const own = await searchCompanyKb(cid, query);
+
+  let entries = own;
+  let contextUsed = null;
+
+  if (contextText && vague) {
+    const fromContext = await searchCompanyKb(cid, contextText, 2, {
+      maxWords: CONTEXT_QUERY_WORDS,
+    });
+
+    if (fromContext.length > 0) {
+      entries = mergeEntries(fromContext, own, MAX_RESULTS);
+      contextUsed = context.source || "recent";
+    }
+  }
+
+  const contextLine = formatContext(context, vague);
 
   if (entries.length > 0) {
-    return { entries, block: `\n\n${MATCH_RULES}\n\n${formatEntries(entries)}` };
+    return {
+      entries,
+      contextUsed,
+      block: `\n\n${contextLine}${MATCH_RULES}\n\n${formatEntries(entries)}`,
+    };
   }
 
   const activeCount = await prisma.kbEntry.count({
     where: { companyId: cid, isActive: true },
   });
 
-  if (activeCount === 0) return { entries: [], block: "" };
+  if (activeCount === 0) return { entries: [], contextUsed: null, block: "" };
 
-  return { entries: [], block: `\n\n${NO_MATCH_BLOCK}` };
+  return {
+    entries: [],
+    contextUsed: null,
+    block: `\n\n${contextLine}${NO_MATCH_BLOCK}`,
+  };
 };
 
 module.exports = {
   MAX_RESULTS,
+  VAGUE_MAX_WORDS,
   extractWords,
+  isVagueQuery,
   searchCompanyKb,
   buildKnowledgeContext,
 };
