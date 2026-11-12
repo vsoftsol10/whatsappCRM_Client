@@ -9,6 +9,11 @@
 // const fb = require("../services/facebookService");
 // const igLogin = require("../services/instagramService");
 // const { facebookLinksInstagram } = require("../utils/socialFlags");
+// const {
+//   getIntegrationLimitContext,
+//   isLimitReached,
+//   limitMessage,
+// } = require("../services/integrationLimitService");
 
 // // What the browser is allowed to see about a Page (never the token).
 // const toPublicPage = (page) => ({
@@ -89,6 +94,14 @@
 //     //    Normal case: the browser already received an access token from the
 //     //    login popup. (A code is still supported as a fallback.)
 //     //    Meta checks the token itself when we extend it / read the Pages.
+//     // ---- Plan limits (Facebook Pages / Instagram accounts) ----
+//     const limitCtx = await getIntegrationLimitContext(companyId);
+//     if (!limitCtx.ok) {
+//       return res.status(403).json({ success: false, message: limitCtx.message });
+//     }
+//     let facebookUsed = limitCtx.used.facebook;
+//     let instagramUsed = limitCtx.used.instagram;
+
 //     const shortToken = accessToken || (await fb.exchangeCodeForToken(code));
 //     const userToken = await fb.extendUserToken(shortToken);
 
@@ -130,6 +143,26 @@
 //         }
 
 //         // Subscribe the Page to our app so Meta sends its messages to us.
+//         // ---- Plan limit: Facebook Pages ----
+//         // Re-connecting a Page that already counts does not use a new slot.
+//         const pageAlreadyCounted =
+//           existing &&
+//           existing.companyId === companyId &&
+//           existing.connectionType === "FACEBOOK_LOGIN" &&
+//           existing.status !== "DISCONNECTED";
+
+//         if (
+//           !pageAlreadyCounted &&
+//           isLimitReached(limitCtx, "facebook", facebookUsed)
+//         ) {
+//           skipped.push({
+//             pageId,
+//             pageName,
+//             reason: limitMessage(limitCtx, "facebook"),
+//           });
+//           continue;
+//         }
+
 //         await fb.subscribePageToApp(pageId, pageToken);
 
 //         // Instagram: find the professional account linked to this Page.
@@ -164,6 +197,20 @@
 //             } else if (clash) {
 //               instagramNote =
 //                 "This Instagram account is already connected to another Page or CRM account, so Instagram was not enabled for this Page.";
+//             } else if (
+//               !(
+//                 existing &&
+//                 existing.companyId === companyId &&
+//                 existing.status !== "DISCONNECTED" &&
+//                 existing.instagramAccountId === igAccount.id
+//               ) &&
+//               isLimitReached(limitCtx, "instagram", instagramUsed)
+//             ) {
+//               // Plan limit: Instagram accounts. The Page itself is still connected.
+//               instagramNote = `${limitMessage(
+//                 limitCtx,
+//                 "instagram"
+//               )} Your Facebook Page was connected without Instagram.`;
 //             } else {
 //               instagramData = {
 //                 instagramAccountId: igAccount.id,
@@ -189,6 +236,20 @@
 //         const saved = existing
 //           ? await prisma.facebookPage.update({ where: { pageId }, data })
 //           : await prisma.facebookPage.create({ data: { ...data, pageId } });
+
+//         // keep the in-request counters accurate for the next Page
+//         if (!pageAlreadyCounted) facebookUsed += 1;
+//         if (
+//           instagramData.instagramAccountId &&
+//           !(
+//             existing &&
+//             existing.companyId === companyId &&
+//             existing.status !== "DISCONNECTED" &&
+//             existing.instagramAccountId === instagramData.instagramAccountId
+//           )
+//         ) {
+//           instagramUsed += 1;
+//         }
 
 //         connected.push({ ...toPublicPage(saved), instagramNote });
 //       } catch (pageError) {
@@ -426,7 +487,7 @@ const connectFacebookPages = async (req, res) => {
       return res.status(422).json({
         success: false,
         message:
-          "No Facebook Page was shared. Please try again and select at least one Page.",
+          "We could not access any Facebook Page. Please select at least one Page and make sure you have full access to it. If the Page belongs to a Business Portfolio, ask the owner to give you full access in Business Settings, then try again.",
       });
     }
 

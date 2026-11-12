@@ -3,8 +3,13 @@
 // // FACEBOOK / MESSENGER SERVICE
 // // Thin wrapper around the Meta Graph API for Facebook Pages.
 // // Nothing here touches the database - it only talks to Meta.
+// //
+// // DIAGNOSTIC VERSION: all original logic is unchanged. Only logging was
+// // added (search for "DIAGNOSTIC") to find out why the Instagram account is
+// // not returned when connecting through the Facebook button.
 // // ============================================================
 // const axios = require("axios");
+// const { facebookLinksInstagram } = require("../utils/socialFlags");
 
 // const GRAPH_API_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 // const GRAPH = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -117,6 +122,71 @@
 //   }
 // };
 
+// // ---------------------------------------------------------------
+// // DIAGNOSTIC (log only - never changes behaviour, never throws)
+// // Prints which permissions the token really has, and for which assets
+// // (Pages / Instagram accounts) they were granted. This shows whether the
+// // Instagram account was shared in the Facebook login dialog.
+// // ---------------------------------------------------------------
+// const logTokenDiagnostics = async (userToken) => {
+//   try {
+//     // 1) Permissions granted / declined
+//     const permRes = await axios.get(`${GRAPH}/me/permissions`, {
+//       params: { access_token: userToken },
+//       timeout: REQUEST_TIMEOUT_MS,
+//     });
+//     const perms = permRes.data?.data || [];
+//     const granted = perms.filter((p) => p.status === "granted").map((p) => p.permission);
+//     const declined = perms.filter((p) => p.status !== "granted").map((p) => p.permission);
+//     console.log("[FB DIAG] granted permissions:", granted.join(", ") || "(none)");
+//     if (declined.length) {
+//       console.log("[FB DIAG] declined/expired permissions:", declined.join(", "));
+//     }
+
+//     const needed = [
+//       "pages_show_list",
+//       "pages_messaging",
+//       "pages_manage_metadata",
+//       "pages_read_engagement",
+//       "instagram_basic",
+//       "instagram_manage_messages",
+//     ];
+//     const missing = needed.filter((n) => !granted.includes(n));
+//     if (missing.length) {
+//       console.log(
+//         "[FB DIAG] MISSING permissions (add them to the Facebook Login for Business Configuration):",
+//         missing.join(", ")
+//       );
+//     }
+
+//     // 2) Which assets each permission was granted for (granular scopes)
+//     if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+//       const dbg = await axios.get(`${GRAPH}/debug_token`, {
+//         params: {
+//           input_token: userToken,
+//           access_token: `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`,
+//         },
+//         timeout: REQUEST_TIMEOUT_MS,
+//       });
+//       const granular = dbg.data?.data?.granular_scopes || [];
+//       for (const g of granular) {
+//         if (
+//           g.scope === "instagram_basic" ||
+//           g.scope === "instagram_manage_messages" ||
+//           g.scope === "pages_show_list"
+//         ) {
+//           console.log(
+//             `[FB DIAG] ${g.scope} granted for asset ids:`,
+//             (g.target_ids || []).join(", ") || "(all / none listed)"
+//           );
+//         }
+//       }
+//     }
+//   } catch (err) {
+//     console.log("[FB DIAG] could not read token diagnostics:", extractError(err).message);
+//   }
+// };
+
 // // All Pages the person granted access to, each with its own Page token.
 // const getManagedPages = async (userToken) => {
 //   const pages = [];
@@ -137,6 +207,13 @@
 //     params = undefined; // `next` already contains every query param
 //   }
 
+//   // DIAGNOSTIC: log only
+//   console.log(
+//     "[FB DIAG] pages returned by Meta:",
+//     pages.map((p) => `${p.name} (${p.id})`).join(" | ") || "(none)"
+//   );
+//   await logTokenDiagnostics(userToken);
+
 //   return pages;
 // };
 
@@ -152,7 +229,73 @@
 //     },
 //     timeout: REQUEST_TIMEOUT_MS,
 //   });
+
+//   // ADDED (best effort, never throws, never changes the return value):
+//   // 1) log what Meta now shows for this Page
+//   // 2) also subscribe the linked Instagram account itself to the app's
+//   //    "messages" webhook. The "Connect Instagram" button does this for its
+//   //    own account; the Facebook route only subscribed the Page.
+//   await subscribeLinkedInstagramBestEffort(pageId, pageToken);
+
 //   return res.data;
+// };
+
+// const subscribeLinkedInstagramBestEffort = async (pageId, pageToken) => {
+//   // 1) DIAGNOSTIC: what is the Page subscribed to now?
+//   try {
+//     const check = await axios.get(`${GRAPH}/${pageId}/subscribed_apps`, {
+//       params: { access_token: pageToken },
+//       timeout: REQUEST_TIMEOUT_MS,
+//     });
+//     console.log("[FB DIAG] subscribed_apps for page", pageId, JSON.stringify(check.data));
+//   } catch (e) {
+//     console.log("[FB DIAG] subscribed_apps check failed:", extractError(e).message);
+//   }
+
+//   // 2) Subscribe the linked Instagram account (if there is one)
+//   //    Facebook and Instagram are connected separately now, so the Facebook
+//   //    button leaves the Instagram account alone (the Instagram button does
+//   //    its own subscription). Set FACEBOOK_LINK_INSTAGRAM=true to restore the
+//   //    old behaviour.
+//   if (!facebookLinksInstagram()) {
+//     console.log("[IG subscribe] skipped - Instagram is connected separately");
+//     return;
+//   }
+//   try {
+//     const lookup = await axios.get(`${GRAPH}/${pageId}`, {
+//       params: {
+//         fields: "instagram_business_account{id,username}",
+//         access_token: pageToken,
+//       },
+//       timeout: REQUEST_TIMEOUT_MS,
+//     });
+//     const igId = lookup.data?.instagram_business_account?.id;
+//     if (!igId) {
+//       console.log("[IG subscribe] no linked Instagram account on page", pageId, "- skipped");
+//       return;
+//     }
+
+//     const sub = await axios.post(`${GRAPH}/${igId}/subscribed_apps`, null, {
+//       params: {
+//         subscribed_fields: "messages",
+//         access_token: pageToken,
+//       },
+//       timeout: REQUEST_TIMEOUT_MS,
+//     });
+//     console.log("[IG subscribe] subscribed Instagram", igId, "->", JSON.stringify(sub.data));
+
+//     try {
+//       const igCheck = await axios.get(`${GRAPH}/${igId}/subscribed_apps`, {
+//         params: { access_token: pageToken },
+//         timeout: REQUEST_TIMEOUT_MS,
+//       });
+//       console.log("[IG subscribe] subscribed_apps for Instagram", igId, JSON.stringify(igCheck.data));
+//     } catch (e) {
+//       console.log("[IG subscribe] read-back failed:", extractError(e).message);
+//     }
+//   } catch (e) {
+//     console.log("[IG subscribe] failed (Page subscription is unaffected):", JSON.stringify(extractError(e)));
+//   }
 // };
 
 // const unsubscribePageFromApp = async (pageId, pageToken) => {
@@ -239,14 +382,43 @@
 //       timeout: REQUEST_TIMEOUT_MS,
 //     });
 
+//     // DIAGNOSTIC: log exactly what Meta returned for this Page
+//     console.log("[IG lookup]", pageId, JSON.stringify(res.data));
+
 //     const ig = res.data?.instagram_business_account;
-//     if (!ig?.id) return { account: null, error: null };
+//     if (!ig?.id) {
+//       // DIAGNOSTIC: second look, log only (result is NOT used)
+//       try {
+//         const alt = await axios.get(`${GRAPH}/${pageId}`, {
+//           params: {
+//             fields: "connected_instagram_account{id,username}",
+//             access_token: pageToken,
+//           },
+//           timeout: REQUEST_TIMEOUT_MS,
+//         });
+//         console.log("[IG lookup][connected_instagram_account]", pageId, JSON.stringify(alt.data));
+//       } catch (altErr) {
+//         console.log(
+//           "[IG lookup][connected_instagram_account] failed:",
+//           extractError(altErr).message
+//         );
+//       }
+//       console.log(
+//         "[IG lookup] No instagram_business_account returned. Most likely: " +
+//           "(1) Instagram account was not selected in the Facebook login dialog, " +
+//           "(2) instagram_basic / instagram_manage_messages missing in the Configuration, " +
+//           "(3) Instagram is not Professional or not linked to this Page."
+//       );
+//       return { account: null, error: null };
+//     }
 
 //     return {
 //       account: { id: String(ig.id), username: ig.username || null },
 //       error: null,
 //     };
 //   } catch (err) {
+//     // DIAGNOSTIC: log only
+//     console.log("[IG lookup] ERROR for page", pageId, JSON.stringify(extractError(err)));
 //     return { account: null, error: extractError(err) };
 //   }
 // };
@@ -385,7 +557,6 @@
 //   sendInstagramAttachment,
 //   getUserProfile,
 // };
- 
 
 
 
@@ -597,6 +768,46 @@ const getManagedPages = async (userToken) => {
     }
     url = res.data?.paging?.next || null;
     params = undefined; // `next` already contains every query param
+  }
+
+  // FALLBACK: some Pages (for example Pages owned by a Business Portfolio)
+  // are granted in the login popup but are not listed by /me/accounts.
+  // Read the granted Page IDs from the token and fetch each Page directly.
+  if (!pages.length) {
+    try {
+      const dbg = await axios.get(`${GRAPH}/debug_token`, {
+        params: {
+          input_token: userToken,
+          access_token: `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+      const granular = dbg.data?.data?.granular_scopes || [];
+      const ids = new Set();
+      for (const g of granular) {
+        if (
+          ["pages_show_list", "pages_messaging", "pages_manage_metadata"].includes(g.scope)
+        ) {
+          (g.target_ids || []).forEach((id) => ids.add(String(id)));
+        }
+      }
+      console.log("[FB DIAG] fallback page ids from token:", [...ids].join(", ") || "(none)");
+
+      for (const id of ids) {
+        try {
+          const r = await axios.get(`${GRAPH}/${id}`, {
+            params: { fields: "id,name,access_token", access_token: userToken },
+            timeout: REQUEST_TIMEOUT_MS,
+          });
+          if (r.data?.id && r.data?.access_token) pages.push(r.data);
+          else console.log("[FB DIAG] fallback: no page token returned for", id);
+        } catch (e) {
+          console.log("[FB DIAG] fallback page fetch failed for", id, JSON.stringify(extractError(e)));
+        }
+      }
+    } catch (e) {
+      console.log("[FB DIAG] fallback page lookup failed:", extractError(e).message);
+    }
   }
 
   // DIAGNOSTIC: log only
