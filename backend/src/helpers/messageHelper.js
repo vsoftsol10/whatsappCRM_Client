@@ -59,7 +59,7 @@ const prisma = require("../config/prisma");
  *   saveIncomingMessage(conversationId, text)
  *
  * New optional 3rd argument:
- *   { metaMessageId, messageType, imageUrl }
+ *   { metaMessageId, messageType, imageUrl, replyToMetaId }
  *
  * Returns the saved message, or NULL when Meta re-delivered a message
  * we already have (same metaMessageId). Callers must skip any follow-up
@@ -70,7 +70,12 @@ const saveIncomingMessage = async (
   text,
   options = {}
 ) => {
-  const { metaMessageId, messageType = "TEXT", imageUrl = null } = options;
+  const {
+    metaMessageId,
+    messageType = "TEXT",
+    imageUrl = null,
+    replyToMetaId = null, // the message the customer tagged, if any
+  } = options;
 
   try {
     console.log("========== SAVE MESSAGE ==========");
@@ -87,6 +92,7 @@ const saveIncomingMessage = async (
         status: "RECEIVED",
         ...(imageUrl && { imageUrl }),
         ...(metaMessageId && { metaMessageId }),
+        ...(replyToMetaId && { replyToMetaId }),
       },
     });
 

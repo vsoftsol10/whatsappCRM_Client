@@ -580,7 +580,8 @@ const {
   readContactRequest,
 } = require("./ai/businessPrompt");
 const { assertSafeHttpsUrl, safeHttpsAgent } = require("../utils/safeUrl");
-const { buildKnowledgeContext } = require("./ai/knowledgeBase");
+const { buildKnowledgeContext, isVagueQuery } = require("./ai/knowledgeBase");
+const { findReplyTag, resolveReplyContext } = require("./ai/replyContext");
 
 // Reasoning models can be slow, so give providers plenty of time.
 const AI_TIMEOUT_MS = 90000;
@@ -1007,13 +1008,13 @@ const queryFromHistory = (history) => {
 // Entries of THIS company only (companyId comes from the conversation row,
 // never from the customer). If the lookup itself fails, the reply carries
 // on without it, exactly as it worked before the knowledge base existed.
-const loadKnowledgeContext = async (companyId, settings, query) => {
-  const none = { entries: [], block: "" };
+const loadKnowledgeContext = async (companyId, settings, query, context = null) => {
+  const none = { entries: [], block: "", contextUsed: null };
 
   if (settings.useKnowledgeBase === false) return none;
 
   try {
-    return await buildKnowledgeContext({ companyId, query });
+    return await buildKnowledgeContext({ companyId, query, context });
   } catch (error) {
     console.error("Knowledge base lookup failed (replying without it):", error.message);
     return none;
@@ -1082,11 +1083,25 @@ const getAutoReply = async (conversationId, options = {}) => {
     });
 
     // Company knowledge base: only this company's entries (see ai/knowledgeBase.js)
-    const kb = await loadKnowledgeContext(
-      companyId,
-      settings,
-      queryFromHistory(history)
-    );
+    const kbQuery = queryFromHistory(history);
+
+    // A short message ("how much is this?") is about the message the
+    // customer tagged, or the latest thing the business sent (a campaign).
+    // Looked up only when needed (recentMessages is oldest -> newest here).
+    let replyContext = null;
+    const replyTag = findReplyTag(recentMessages);
+
+    if (settings.useKnowledgeBase !== false && (replyTag || isVagueQuery(kbQuery))) {
+      replyContext = await resolveReplyContext({
+        conversationId,
+        replyToMetaId: replyTag,
+      }).catch((error) => {
+        console.error("Reply context lookup failed (continuing without it):", error.message);
+        return null;
+      });
+    }
+
+    const kb = await loadKnowledgeContext(companyId, settings, kbQuery, replyContext);
 
     systemPrompt += kb.block;
 
@@ -1110,6 +1125,7 @@ const getAutoReply = async (conversationId, options = {}) => {
       reply,
       handoff,
       kbEntryIds: kb.entries.map((entry) => entry.id),
+      kbContext: kb.contextUsed || null, // "reply" | "recent" | null
     };
   } catch (error) {
     const message = friendlyError(error, apiKey);
