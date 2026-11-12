@@ -36,31 +36,30 @@
 
 // module.exports = router;
 
-
 const express = require("express");
+
+const {
+  createBackup,
+  getBackups,
+  getBackupById,
+  downloadBackupExcel,
+} = require("../controllers/backupController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 const adminOnly = require("../middleware/adminOnly");
 
-const {
-  createOrder,
-  verifyPayment,
-} = require("../controllers/billingController");
-
-const {
-  razorpayWebhook,
-} = require("../controllers/billingWebhookController");
-
 const router = express.Router();
 
-// POST /api/billing/create-order
-router.post("/create-order", authMiddleware, adminOnly, createOrder);
+// POST /api/backups  -> create manual backup
+router.post("/", authMiddleware, adminOnly, createBackup);
 
-// POST /api/billing/verify-payment
-router.post("/verify-payment", authMiddleware, adminOnly, verifyPayment);
+// GET /api/backups  -> list company backups
+router.get("/", authMiddleware, adminOnly, getBackups);
 
-// POST /api/billing/webhook
-// Called by Razorpay (no login). Protected by the webhook signature.
-router.post("/webhook", razorpayWebhook);
+// GET /api/backups/:id  -> one backup
+router.get("/:id", authMiddleware, adminOnly, getBackupById);
+
+// GET /api/backups/:id/download/excel  -> download
+router.get("/:id/download/excel", authMiddleware, adminOnly, downloadBackupExcel);
 
 module.exports = router;

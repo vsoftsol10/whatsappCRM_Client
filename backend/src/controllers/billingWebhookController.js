@@ -129,7 +129,8 @@ const notifySuperAdmin = async (title, message) => {
 // ------------------------------------------------------
 // PAID  (order.paid / payment.captured)
 // ------------------------------------------------------
-const handlePaid = async (payment, orderFromPayload) => {
+// source = who found the payment ("webhook" or "reconciliation") - only used in the message
+const handlePaid = async (payment, orderFromPayload, source = "webhook") => {
   const paymentId = payment.id;
   const orderId = payment.order_id;
 
@@ -295,7 +296,7 @@ const handlePaid = async (payment, orderFromPayload) => {
       title,
       `${company.companyName} (${company.companyId}) ${
         result.type === "RENEW" ? "renewed" : "switched to"
-      } the ${plan.planName} plan. Payment of ₹${totalAmount} received (confirmed by webhook). Payment ID: ${
+      } the ${plan.planName} plan. Payment of ₹${totalAmount} received (confirmed by ${source}). Payment ID: ${
         result.payment.paymentId
       }.`
     );
@@ -466,4 +467,5 @@ const razorpayWebhook = async (req, res) => {
   }
 };
 
-module.exports = { razorpayWebhook };
+// handlePaid is also used by the reconciliation job
+module.exports = { razorpayWebhook, handlePaid };
