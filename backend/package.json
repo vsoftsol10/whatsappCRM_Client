@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test tests/auth.test.js tests/permissions.test.js tests/isolation.test.js"
+      "test": "node --test tests/auth.test.js tests/permissions.test.js tests/isolation.test.js tests/whatsappWebhook.test.js tests/leadCapture.test.js tests/campaigns.test.js tests/tickets.test.js"
   },
   "keywords": [],
   "author": "",

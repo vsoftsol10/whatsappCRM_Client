@@ -9,13 +9,17 @@
 
 const crypto = require("crypto");
 
-const INT_ID_MODELS = new Set(["lead", "leadWorkNote", "company"]);
+const INT_ID_MODELS = new Set(["lead", "leadWorkNote", "company", "integration", "whatsAppAccount"]);
 
 // Relation filters used by the code under test, e.g.
 //   prisma.message.findFirst({ where: { conversation: { companyId } } })
 const RELATIONS = {
   message: { conversation: { table: "conversation", localKey: "conversationId" } },
   leadWorkNote: { lead: { table: "lead", localKey: "leadId" } },
+  // tickets, ticket notes and campaigns
+  ticket: { customer: { table: "customer", localKey: "customerId" } },
+  ticketWorkNote: { ticket: { table: "ticket", localKey: "ticketId" } },
+  campaignRecipient: { campaign: { table: "campaign", localKey: "campaignId" } },
 };
 
 // To-one relations that controllers load with `include: { company: true }`.
@@ -23,6 +27,32 @@ const INCLUDES = {
   user: { company: { table: "company", localKey: "companyId" } },
   conversation: { customer: { table: "customer", localKey: "customerId" } },
   lead: { assignedTo: { table: "user", localKey: "assignedToId" } },
+  // tickets, ticket notes, campaigns and plans
+  ticket: {
+    customer: { table: "customer", localKey: "customerId" },
+    createdBy: { table: "user", localKey: "createdById" },
+    assignedTo: { table: "user", localKey: "assignedToId" },
+  },
+  ticketWorkNote: { employee: { table: "user", localKey: "employeeId" } },
+  campaign: {
+    createdBy: { table: "user", localKey: "createdById" },
+    template: { table: "template", localKey: "templateId" },
+  },
+  campaignRecipient: { customer: { table: "customer", localKey: "customerId" } },
+  subscription: { plan: { table: "subscriptionPlan", localKey: "planId" } },
+};
+
+// To-many relations that controllers load with `include`.
+const INCLUDES_MANY = {
+  company: { subscriptions: { table: "subscription", foreignKey: "companyId" } },
+  campaign: { recipients: { table: "campaignRecipient", foreignKey: "campaignId" } },
+};
+
+// Nested writes the fake understands:
+//   connect  -> { customer: { connect: { id } } }  becomes  customerId = id
+//   create   -> { recipients: { create: [ ... ] } } creates child rows
+const NESTED_CREATE = {
+  campaign: { recipients: { table: "campaignRecipient", foreignKey: "campaignId" } },
 };
 
 const clone = (v) => (v === undefined ? v : structuredClone(v));
@@ -93,11 +123,22 @@ function createDb() {
   const project = (row, args, name) => {
     if (!row) return row;
     const out = clone(row);
-    if (args && args.include && name && INCLUDES[name]) {
-      for (const [key, rel] of Object.entries(INCLUDES[name])) {
+    if (args && args.include && name) {
+      for (const [key, rel] of Object.entries(INCLUDES[name] || {})) {
         if (args.include[key]) {
           const target = table(rel.table).find((r) => r.id === row[rel.localKey]);
-          out[key] = target ? clone(target) : null;
+          const sub = isPlainObject(args.include[key]) ? args.include[key] : null;
+          out[key] = target ? project(target, sub && sub.include ? { include: sub.include } : null, rel.table) : null;
+        }
+      }
+      for (const [key, rel] of Object.entries(INCLUDES_MANY[name] || {})) {
+        if (args.include[key]) {
+          const sub = isPlainObject(args.include[key]) ? args.include[key] : {};
+          let children = table(rel.table).filter(
+            (r) => r[rel.foreignKey] === row.id && matches(rel.table, r, sub.where)
+          );
+          if (sub.take) children = children.slice(0, sub.take);
+          out[key] = children.map((c) => project(c, sub.include ? { include: sub.include } : null, rel.table));
         }
       }
     }
@@ -125,29 +166,76 @@ function createDb() {
     }
   };
 
+  // Turns { customer: { connect: { id } } } into { customerId: id } and
+  // pulls out { recipients: { create: [...] } } so it can be created afterwards.
+  const prepareCreateData = (name, data) => {
+    const flat = {};
+    const children = [];
+    for (const [k, v] of Object.entries(data)) {
+      if (isPlainObject(v) && v.connect && Object.keys(v).length === 1) {
+        flat[`${k}Id`] = v.connect.id;
+      } else if (isPlainObject(v) && v.create !== undefined && NESTED_CREATE[name] && NESTED_CREATE[name][k]) {
+        children.push({ rel: NESTED_CREATE[name][k], rows: [].concat(v.create) });
+      } else {
+        flat[k] = v;
+      }
+    }
+    assertScalarData(name, flat);
+    return { flat, children };
+  };
+
+  // Applies an update to a row. Supports { increment: n } / { decrement: n }.
+  const applyUpdate = (name, row, data) => {
+    const plain = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (isPlainObject(v) && (v.increment !== undefined || v.decrement !== undefined)) {
+        plain[k] = (row[k] || 0) + (v.increment || 0) - (v.decrement || 0);
+      } else {
+        plain[k] = v;
+      }
+    }
+    assertScalarData(name, plain);
+    Object.assign(row, clone(plain), { updatedAt: new Date() });
+  };
+
   const model = (name) => ({
     async findUnique(args) { return project(table(name).find((r) => matches(name, r, args.where)), args, name) || null; },
     async findFirst(args = {}) { return project(table(name).find((r) => matches(name, r, args.where)), args, name) || null; },
     async findMany(args = {}) { return table(name).filter((r) => matches(name, r, args.where)).map((r) => project(r, args, name)); },
     async count(args = {}) { return table(name).filter((r) => matches(name, r, args.where)).length; },
     async create(args) {
-      assertScalarData(name, args.data);
+      const { flat, children } = prepareCreateData(name, args.data);
       const now = new Date();
-      const row = { id: nextId(name), createdAt: now, updatedAt: now, ...clone(args.data) };
+      const row = { id: nextId(name), createdAt: now, updatedAt: now, ...clone(flat) };
       table(name).push(row);
+      for (const { rel, rows } of children) {
+        for (const child of rows) {
+          table(rel.table).push({
+            id: nextId(rel.table), createdAt: now, updatedAt: now, status: "PENDING",
+            ...clone(child), [rel.foreignKey]: row.id,
+          });
+        }
+      }
       return project(row, args, name);
+    },
+    async createMany(args) {
+      const now = new Date();
+      const list = [].concat(args.data);
+      list.forEach((d) => {
+        assertScalarData(name, d);
+        table(name).push({ id: nextId(name), createdAt: now, updatedAt: now, ...clone(d) });
+      });
+      return { count: list.length };
     },
     async update(args) {
       const row = table(name).find((r) => matches(name, r, args.where));
       if (!row) throw Object.assign(new Error("Record to update not found."), { code: "P2025" });
-      assertScalarData(name, args.data);
-      Object.assign(row, clone(args.data), { updatedAt: new Date() });
+      applyUpdate(name, row, args.data);
       return project(row, args, name);
     },
     async updateMany(args) {
-      assertScalarData(name, args.data);
       const rows = table(name).filter((r) => matches(name, r, args.where));
-      rows.forEach((r) => Object.assign(r, clone(args.data), { updatedAt: new Date() }));
+      rows.forEach((r) => applyUpdate(name, r, args.data));
       return { count: rows.length };
     },
     async delete(args) {
@@ -167,6 +255,9 @@ function createDb() {
     "user", "company", "customer", "lead", "leadWorkNote", "conversation", "message",
     "ticket", "deal", "task", "service", "customerService", "whatsAppAccount",
     "userNotification", "subscription",
+    // added for the WhatsApp / lead / campaign / ticket tests
+    "ticketWorkNote", "campaign", "campaignRecipient", "template", "integration",
+    "subscriptionPlan", "aiSettings",
   ];
 
   const db = {
