@@ -75,6 +75,36 @@
 // };
 
 // // ============================================================
+// // UPLOAD TEMPLATE HEADER IMAGE  👈 NEW
+// // ============================================================
+// // Uploads a sample header image (used when headerType === "IMAGE")
+// // to the backend, which is expected to push it to Cloudinary and
+// // return back a public URL Meta can fetch.
+// //
+// // NOTE: this requires a matching backend route —
+// // POST /api/templates/upload-header-image — that accepts
+// // multipart/form-data and returns { data: { imageUrl } }.
+// // If that route doesn't exist yet on your server, this call
+// // will 404. Let me know if you need that endpoint built too.
+
+// export const uploadTemplateHeaderImage = async (file) => {
+//   const formData = new FormData();
+//   formData.append("headerImage", file);
+
+//   const response = await apiClient.post(
+//     "/api/templates/upload-header-image",
+//     formData,
+//     {
+//       headers: {
+//         "Content-Type": "multipart/form-data",
+//       },
+//     }
+//   );
+
+//   return response.data;
+// };
+
+// // ============================================================
 // // UPDATE TEMPLATE
 // // ============================================================
 
@@ -133,6 +163,10 @@
 
 //   return response.data;
 // };
+
+
+
+
 
 import apiClient from "./apiClient";
 
@@ -273,13 +307,15 @@ export const deleteTemplate = async (id) => {
 
 export const sendTemplate = async (
   templateId,
-  customerIds
+  customerIds,
+  variableValues = [] // 👈 NEW: [{ index, source, value }]
 ) => {
   const response = await apiClient.post(
     "/api/templates/send",
     {
       templateId,
       customerIds,
+      variableValues,
     }
   );
 

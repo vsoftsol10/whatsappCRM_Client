@@ -900,6 +900,12 @@
 //             status: sendStatus,
 
 //             metaMessageId,
+
+//             // 👈 NEW: keep the template's buttons so the chat can show them
+//             buttons:
+//               Array.isArray(template.buttons) && template.buttons.length > 0
+//                 ? template.buttons
+//                 : undefined,
 //           },
 //         });
 
@@ -1429,6 +1435,7 @@
 
 
 
+
 const prisma = require("../config/prisma");
 const { generateTemplate } = require("../services/geminiService");
 const {
@@ -1445,6 +1452,12 @@ const {
   validateTemplateButtons,
   buildButtonSendComponents,
 } = require("../utils/templateButtons");
+// 👈 NEW: fills {{1}}, {{2}}... when a template is sent directly to customers
+const {
+  fillTemplateContent,
+  validateVariableValues,
+  resolveVariablesForCustomer,
+} = require("../utils/templateVariables");
 // 👈 NEW: reuses the same Cloudinary upload helper campaignController
 // already uses for campaign images — just pointed at its own folder
 // so template header samples don't mix in with campaign images.
@@ -2139,6 +2152,7 @@ const sendTemplate = async (req, res) => {
     const {
       templateId,
       customerIds,
+      variableValues, // 👈 NEW: [{ index, source: "name"|"company"|"custom", value }]
     } = req.body;
 
     // ----------------------------------------------------------
@@ -2216,6 +2230,31 @@ const sendTemplate = async (req, res) => {
     }
 
     // ----------------------------------------------------------
+    // 👈 NEW: TEMPLATE VARIABLE VALUES
+    // ----------------------------------------------------------
+    // If the frontend did not send values (old behaviour), use
+    // {{1}} = customer name, {{2}} = customer company.
+
+    const effectiveVariableValues = Array.isArray(variableValues)
+      ? variableValues
+      : [
+          { index: 1, source: "name" },
+          { index: 2, source: "company" },
+        ];
+
+    const variableCheck = validateVariableValues(
+      template.content,
+      effectiveVariableValues
+    );
+
+    if (!variableCheck.ok) {
+      return res.status(400).json({
+        success: false,
+        message: variableCheck.message,
+      });
+    }
+
+    // ----------------------------------------------------------
     // SEND TO CUSTOMERS
     // ----------------------------------------------------------
 
@@ -2262,34 +2301,21 @@ const sendTemplate = async (req, res) => {
 
         const metaTemplateName = template.name;
 
-        // FIX: count DISTINCT variables (highest {{n}} used) and fill each one.
-        // {{1}} = customer name, {{2}} = customer's company name
-        // (falls back to "-" because Meta rejects empty values).
-        const variableCount = Math.max(
-          0,
-          ...[...template.content.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(
-            (match) => Number(match[1])
-          )
+        // 👈 CHANGED: values now come from the Send Template popup
+        // (name / company / custom value) and are resolved per customer.
+        const resolved = resolveVariablesForCustomer(
+          template.content,
+          effectiveVariableValues,
+          customer
         );
 
-        const availableValues = [
-          customer.name,
-          customer.companyName?.trim() || "-",
-        ];
+        const variables = resolved.list;
 
-        // Templates sent from this page can only fill {{1}} and {{2}}.
-        // Fail clearly instead of letting Meta return a confusing error.
-        if (variableCount > availableValues.length) {
-          results.push({
-            customerId,
-            status: "FAILED",
-            reason: `This template uses ${variableCount} variables, but only {{1}} and {{2}} are supported.`,
-          });
-
-          continue;
-        }
-
-        const variables = availableValues.slice(0, variableCount);
+        // The text the customer actually receives (shown in the CRM chat)
+        const filledContent = fillTemplateContent(
+          template.content,
+          resolved.byNumber
+        );
 
         const result = await sendTemplateMessage(
           req.user.companyId,

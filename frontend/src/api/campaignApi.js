@@ -35,7 +35,7 @@
 //     formData.append("scheduledAt", campaignData.scheduledAt);
 //   }
 
-//   campaignData.customerIds.forEach((id) => {
+//   (campaignData.customerIds || []).forEach((id) => {
 //     formData.append("customerIds", id);
 //   });
 
@@ -165,6 +165,7 @@
 
 
 
+
 import apiClient from "./apiClient";
 
 // ===============================
@@ -192,6 +193,14 @@ export const createCampaign = async (campaignData) => {
   formData.append("name", campaignData.name);
   formData.append("type", campaignData.type);
   formData.append("messageContent", campaignData.messageContent);
+
+  // 👈 NEW: values for {{1}}, {{2}}, {{3}}... (sent as JSON text)
+  if (campaignData.variableValues !== undefined) {
+    formData.append(
+      "variableValues",
+      JSON.stringify(campaignData.variableValues)
+    );
+  }
 
   if (campaignData.templateId) {
     formData.append("templateId", campaignData.templateId);
@@ -236,6 +245,14 @@ export const updateCampaign = async (id, campaignData) => {
 
   if (campaignData.messageContent !== undefined) {
     formData.append("messageContent", campaignData.messageContent);
+  }
+
+  // 👈 NEW: values for {{1}}, {{2}}, {{3}}... (sent as JSON text)
+  if (campaignData.variableValues !== undefined) {
+    formData.append(
+      "variableValues",
+      JSON.stringify(campaignData.variableValues)
+    );
   }
 
   if (campaignData.status !== undefined) {

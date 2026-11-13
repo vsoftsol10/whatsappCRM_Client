@@ -889,6 +889,13 @@ model Campaign {
   // Optional custom message for future use
   messageContent String?
 
+  // Values for the template variables {{1}}, {{2}}, {{3}}...
+  // Stored as a JSON array, e.g.
+  // [{ "index": 1, "source": "name" }, { "index": 2, "source": "custom", "value": "50% off" }]
+  // source = "name" | "company" | "custom"
+  // Empty/null = old behaviour ({{1}} = customer name, {{2}} = messageContent)
+  variableValues Json?
+
   status CampaignStatus @default(DRAFT)
 
   // Audience

@@ -60,6 +60,56 @@
 //   Math.max(1, parseInt(process.env.CAMPAIGN_CONCURRENCY, 10) || 10)
 // );
 
+// // =====================================================
+// // RETRY ON TEMPORARY META ERRORS
+// // =====================================================
+// // Rate-limit / "try again later" errors from Meta are retried up to
+// // 3 times (waits about 2s, 4s, 8s). Permanent errors (wrong number,
+// // template problem, etc.) are NOT retried. A timeout is NOT retried
+// // either, because the message may already have reached the customer
+// // and retrying could send it twice.
+// const CAMPAIGN_RETRY_MAX = 3;
+// const TEMPORARY_META_CODES = new Set([2, 4, 17, 32, 341, 613, 80007, 130429, 131016]);
+
+// const isTemporaryMetaError = (error) => {
+//   if (!error) return false;
+
+//   // Network problem where the request never reached Meta
+//   if (typeof error === "string") {
+//     return /ECONNREFUSED|ENOTFOUND|EAI_AGAIN/i.test(error);
+//   }
+
+//   const metaError = error.error || error;
+
+//   if (metaError.is_transient === true) return true;
+
+//   return TEMPORARY_META_CODES.has(Number(metaError.code));
+// };
+
+// const sendWithRetry = async (sendFn) => {
+//   let result = await sendFn();
+
+//   for (
+//     let attempt = 1;
+//     attempt <= CAMPAIGN_RETRY_MAX &&
+//     !result?.success &&
+//     isTemporaryMetaError(result?.error);
+//     attempt++
+//   ) {
+//     const waitMs = 2000 * 2 ** (attempt - 1) + Math.floor(Math.random() * 500);
+
+//     console.log(
+//       `Meta temporary error - retry ${attempt}/${CAMPAIGN_RETRY_MAX} in ${waitMs}ms`
+//     );
+
+//     await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+//     result = await sendFn();
+//   }
+
+//   return result;
+// };
+
 // const sendToRecipients = async (
 //   campaign,
 //   recipientsToSend,
@@ -81,20 +131,16 @@
 //     )
 //   );
 
-//   // The code inside is exactly the same as the old loop body.
-//   // It only moved into a function so several customers can run together.
+//   // Sends to ONE customer (conversation + Meta call) and returns what
+//   // happened. The database saving for the whole batch is done together
+//   // afterwards in flushBatch (far fewer database calls).
 //   const processRecipient = async (recipient) => {
 //     const customer = recipient.customer;
 
 //     if (!customer || !customer.phone) {
 //       failedCount++;
 
-//       await prisma.campaignRecipient.update({
-//         where: { id: recipient.id },
-//         data: { status: "FAILED" },
-//       });
-
-//       return; // (was "continue" in the old loop)
+//       return { recipient, ok: false };
 //     }
 
 //     try {
@@ -127,27 +173,29 @@
 //       );
 
 //       if (campaign.imageUrl) {
-//         result = await sendCampaignImageTemplate(
-//           customer.phone,
-//           campaign.template.name,
-//           campaign.imageUrl,
-//           templateParams,
-//           campaign.template.language || "en_US",
-//           whatsappAccount,
-//           buttonComponents // 👈 NEW
+//         result = await sendWithRetry(() =>
+//           sendCampaignImageTemplate(
+//             customer.phone,
+//             campaign.template.name,
+//             campaign.imageUrl,
+//             templateParams,
+//             campaign.template.language || "en_US",
+//             whatsappAccount,
+//             buttonComponents // 👈 NEW
+//           )
 //         );
 //       } else {
-//         result = await sendTemplateMessage(
-//           customer.phone,
-//           campaign.template.name,
-//           templateParams,
-//           whatsappAccount,
-//           campaign.template.language || "en_US",
-//           buttonComponents // 👈 NEW
+//         result = await sendWithRetry(() =>
+//           sendTemplateMessage(
+//             customer.phone,
+//             campaign.template.name,
+//             templateParams,
+//             whatsappAccount,
+//             campaign.template.language || "en_US",
+//             buttonComponents // 👈 NEW
+//           )
 //         );
 //       }
-
-//       console.log("WhatsApp Result:", result);
 
 //       // =====================================================
 //       // SUCCESS
@@ -158,14 +206,6 @@
 
 //         sentCount++;
 
-//         await prisma.campaignRecipient.update({
-//           where: { id: recipient.id },
-//           data: {
-//             status: "SENT",
-//             sentAt: new Date(),
-//           },
-//         });
-
 //         // Show the template body with {{1}}, {{2}} etc. actually
 //         // filled in with templateParams — the same values just sent
 //         // to Meta — instead of the raw messageContent field.
@@ -174,45 +214,142 @@
 //           templateParams
 //         );
 
-//         await prisma.message.create({
-//           data: {
-//             conversationId: conversation.id,
-//             sender: "AGENT",
-//             content: sentContent,
-//             imageUrl: campaign.imageUrl,
-//             messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
-//             status: "SENT",
-//             metaMessageId,
-//             // 👈 NEW: keep the template's buttons so the chat can show them
-//             buttons:
-//               Array.isArray(campaign.template.buttons) &&
-//               campaign.template.buttons.length > 0
-//                 ? campaign.template.buttons
-//                 : undefined,
-//           },
-//         });
-
-//         await prisma.conversation.update({
-//           where: { id: conversation.id },
-//           data: { lastMessage: sentContent },
-//         });
-//       } else {
-//         failedCount++;
-
-//         await prisma.campaignRecipient.update({
-//           where: { id: recipient.id },
-//           data: { status: "FAILED" },
-//         });
+//         return {
+//           recipient,
+//           ok: true,
+//           conversationId: conversation.id,
+//           metaMessageId,
+//           sentContent,
+//         };
 //       }
+
+//       // Failed: log it (successful sends are no longer logged one by one)
+//       console.log(`WhatsApp send failed for ${customer.phone}:`, result?.error);
+
+//       failedCount++;
+
+//       return { recipient, ok: false };
 //     } catch (error) {
 //       console.error(`Campaign send failed for ${customer.phone}:`, error);
 
 //       failedCount++;
 
-//       await prisma.campaignRecipient.update({
-//         where: { id: recipient.id },
-//         data: { status: "FAILED" },
-//       });
+//       return { recipient, ok: false };
+//     }
+//   };
+
+//   // Template buttons are saved with every sent message so the chat can show them
+//   const messageButtons =
+//     Array.isArray(campaign.template.buttons) &&
+//     campaign.template.buttons.length > 0
+//       ? campaign.template.buttons
+//       : undefined;
+
+//   // =====================================================
+//   // SAVE A WHOLE BATCH TOGETHER
+//   // =====================================================
+//   // Before: 3 database calls per customer (recipient status, message,
+//   // conversation). Now: one transaction per batch of customers.
+//   // If the batch save ever fails, it falls back to saving one by one
+//   // exactly like the old code did.
+//   const flushBatch = async (outcomes) => {
+//     const sentOutcomes = outcomes.filter((o) => o.ok);
+//     const failedOutcomes = outcomes.filter((o) => !o.ok);
+
+//     try {
+//       const writes = [];
+
+//       if (sentOutcomes.length > 0) {
+//         writes.push(
+//           prisma.campaignRecipient.updateMany({
+//             where: { id: { in: sentOutcomes.map((o) => o.recipient.id) } },
+//             data: { status: "SENT", sentAt: new Date() },
+//           })
+//         );
+
+//         writes.push(
+//           prisma.message.createMany({
+//             data: sentOutcomes.map((o) => ({
+//               conversationId: o.conversationId,
+//               sender: "AGENT",
+//               content: o.sentContent,
+//               imageUrl: campaign.imageUrl,
+//               messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+//               status: "SENT",
+//               metaMessageId: o.metaMessageId,
+//               buttons: messageButtons,
+//             })),
+//           })
+//         );
+
+//         // lastMessage is different for every customer (their name is in it)
+//         sentOutcomes.forEach((o) => {
+//           writes.push(
+//             prisma.conversation.update({
+//               where: { id: o.conversationId },
+//               data: { lastMessage: o.sentContent },
+//             })
+//           );
+//         });
+//       }
+
+//       if (failedOutcomes.length > 0) {
+//         writes.push(
+//           prisma.campaignRecipient.updateMany({
+//             where: { id: { in: failedOutcomes.map((o) => o.recipient.id) } },
+//             data: { status: "FAILED" },
+//           })
+//         );
+//       }
+
+//       if (writes.length > 0) {
+//         await prisma.$transaction(writes);
+//       }
+//     } catch (batchError) {
+//       console.error(
+//         "Batch save failed, saving one by one:",
+//         batchError.message
+//       );
+
+//       for (const o of sentOutcomes) {
+//         try {
+//           await prisma.campaignRecipient.update({
+//             where: { id: o.recipient.id },
+//             data: { status: "SENT", sentAt: new Date() },
+//           });
+
+//           await prisma.message.create({
+//             data: {
+//               conversationId: o.conversationId,
+//               sender: "AGENT",
+//               content: o.sentContent,
+//               imageUrl: campaign.imageUrl,
+//               messageType: campaign.imageUrl ? "IMAGE" : "TEXT",
+//               status: "SENT",
+//               metaMessageId: o.metaMessageId,
+//               buttons: messageButtons,
+//             },
+//           });
+
+//           await prisma.conversation.update({
+//             where: { id: o.conversationId },
+//             data: { lastMessage: o.sentContent },
+//           });
+//         } catch (singleError) {
+//           console.error("Save failed for one customer:", singleError.message);
+//         }
+//       }
+
+//       for (const o of failedOutcomes) {
+//         try {
+//           await prisma.campaignRecipient.update({
+//             where: { id: o.recipient.id },
+//             data: { status: "FAILED" },
+//           });
+//         } catch (singleError) {
+//           console.error("Save failed for one customer:", singleError.message);
+//         }
+//       }
 //     }
 //   };
 
@@ -221,7 +358,19 @@
 //   for (let i = 0; i < recipientsToSend.length; i += CAMPAIGN_CONCURRENCY) {
 //     const batch = recipientsToSend.slice(i, i + CAMPAIGN_CONCURRENCY);
 
-//     await Promise.allSettled(batch.map((recipient) => processRecipient(recipient)));
+//     const settled = await Promise.allSettled(
+//       batch.map((recipient) => processRecipient(recipient))
+//     );
+
+//     const outcomes = settled.map((item, index) => {
+//       if (item.status === "fulfilled") return item.value;
+
+//       // Should not happen (processRecipient catches its own errors)
+//       failedCount++;
+//       return { recipient: batch[index], ok: false };
+//     });
+
+//     await flushBatch(outcomes);
 
 //     if (typeof onProgress === "function") {
 //       try {
@@ -1391,7 +1540,6 @@
 
 
 
-
 const prisma = require("../config/prisma");
 
 const {
@@ -1414,6 +1562,39 @@ const {
 const { logAction } = require("../services/auditLogService");
 // 👈 NEW: extra parameters needed to send a template with a copy-code button
 const { buildButtonSendComponents } = require("../utils/templateButtons");
+// 👈 NEW: fills {{1}}, {{2}}, {{3}}... per customer for campaigns
+const {
+  validateVariableValues,
+  resolveVariablesForCustomer,
+} = require("../utils/templateVariables");
+
+// 👈 NEW: reads `variableValues` from the request (FormData sends it as a JSON string).
+// Returns undefined when the field was not sent, otherwise an array.
+const parseVariableValues = (raw) => {
+  if (raw === undefined) return undefined;
+  if (raw === null || raw === "") return [];
+
+  let parsed = raw;
+
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      throw new Error("Invalid template variable values.");
+    }
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Invalid template variable values.");
+  }
+
+  return parsed.map((item) => ({
+    index: Number(item?.index),
+    source: item?.source,
+    value:
+      typeof item?.value === "string" ? item.value.trim() : "",
+  }));
+};
 
 // =====================================================
 // build the text that was ACTUALLY sent, for local display
@@ -1553,12 +1734,28 @@ const sendToRecipients = async (
 
       let result;
 
-      const allPossibleParams = [
-        customer.name,
-        campaign.messageContent || "",
-      ];
+      // 👈 CHANGED: campaigns with saved variable settings fill ANY number
+      // of variables per customer. Older campaigns (no saved settings)
+      // keep the old behaviour: {{1}} = customer name, {{2}} = messageContent.
+      let templateParams;
 
-      const templateParams = allPossibleParams.slice(0, variableCount);
+      if (
+        Array.isArray(campaign.variableValues) &&
+        campaign.variableValues.length > 0
+      ) {
+        templateParams = resolveVariablesForCustomer(
+          campaign.template.content,
+          campaign.variableValues,
+          customer
+        ).list;
+      } else {
+        const allPossibleParams = [
+          customer.name,
+          campaign.messageContent || "",
+        ];
+
+        templateParams = allPossibleParams.slice(0, variableCount);
+      }
 
       // 👈 NEW: empty unless the template has a copy-code button
       const buttonComponents = buildButtonSendComponents(
@@ -1786,6 +1983,18 @@ exports.createCampaign = async (req, res) => {
     let { name, type, templateId, messageContent, scheduledAt, customerIds } =
       req.body;
 
+    // 👈 NEW: values for {{1}}, {{2}}, {{3}}...
+    let variableValues;
+
+    try {
+      variableValues = parseVariableValues(req.body.variableValues);
+    } catch (parseError) {
+      return res.status(400).json({
+        success: false,
+        message: parseError.message,
+      });
+    }
+
     const companyId = req.user.companyId;
     const createdById = req.user.userId;
 
@@ -1831,6 +2040,21 @@ exports.createCampaign = async (req, res) => {
           success: false,
           message: "Only approved WhatsApp templates can be used for campaigns.",
         });
+      }
+
+      // 👈 NEW: every {{n}} of the template needs a value
+      if (variableValues && variableValues.length > 0) {
+        const variableCheck = validateVariableValues(
+          template.content,
+          variableValues
+        );
+
+        if (!variableCheck.ok) {
+          return res.status(400).json({
+            success: false,
+            message: variableCheck.message,
+          });
+        }
       }
     }
 
@@ -1893,6 +2117,8 @@ exports.createCampaign = async (req, res) => {
         type,
         templateId: template ? template.id : null,
         messageContent: messageContent?.trim() || null,
+        // 👈 NEW
+        ...(variableValues !== undefined && { variableValues }),
         status: campaignStatus,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         audienceCount: validCustomerIds.length,
@@ -2059,6 +2285,18 @@ exports.updateCampaign = async (req, res) => {
     const { name, type, templateId, messageContent, status, scheduledAt } =
       req.body;
 
+    // 👈 NEW: values for {{1}}, {{2}}, {{3}}...
+    let variableValues;
+
+    try {
+      variableValues = parseVariableValues(req.body.variableValues);
+    } catch (parseError) {
+      return res.status(400).json({
+        success: false,
+        message: parseError.message,
+      });
+    }
+
     const existingCampaign = await prisma.campaign.findFirst({
       where: { id, companyId },
     });
@@ -2108,6 +2346,34 @@ exports.updateCampaign = async (req, res) => {
       }
     }
 
+    // 👈 NEW: validate the variable values against the FINAL template, and
+    // clear old values if the template was changed without sending new ones
+    // (values of the previous template would not fit the new one).
+    let finalVariableValues = variableValues;
+
+    if (variableValues && variableValues.length > 0 && validatedTemplateId) {
+      const finalTemplate = await prisma.template.findFirst({
+        where: { id: String(validatedTemplateId), companyId },
+      });
+
+      const variableCheck = validateVariableValues(
+        finalTemplate?.content || "",
+        variableValues
+      );
+
+      if (!variableCheck.ok) {
+        return res.status(400).json({
+          success: false,
+          message: variableCheck.message,
+        });
+      }
+    } else if (
+      variableValues === undefined &&
+      validatedTemplateId !== existingCampaign.templateId
+    ) {
+      finalVariableValues = [];
+    }
+
     let imageUrl = existingCampaign.imageUrl;
 
     if (req.file) {
@@ -2155,6 +2421,10 @@ exports.updateCampaign = async (req, res) => {
         templateId: validatedTemplateId,
         ...(messageContent !== undefined && {
           messageContent: messageContent?.trim() || null,
+        }),
+        // 👈 NEW
+        ...(finalVariableValues !== undefined && {
+          variableValues: finalVariableValues,
         }),
         status: finalStatus,
         scheduledAt: finalScheduledAt,
