@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 // const fs = require("fs");
 // const path = require("path");
@@ -11,7 +12,7 @@
 //  * - Never accept companyId from the frontend.
 //  * - Sensitive credentials/tokens are intentionally excluded.
 //  */
-// const createManualBackup = async (companyId, createdById) => {
+// const createManualBackup = async (companyId, createdById, options = {}) => {
 //     const startedAt = new Date();
 
 //     // =====================================================
@@ -22,7 +23,8 @@
 //         data: {
 //             companyId,
 //             createdById,
-//             backupType: "MANUAL",
+//             // Manual by default. The automatic scheduler passes { backupType: "AUTOMATIC" }.
+//             backupType: options.backupType || "MANUAL",
 //             status: "IN_PROGRESS",
 //             startedAt,
 //         },
@@ -751,10 +753,12 @@
 
 
 
+
 const prisma = require("../config/prisma");
 const fs = require("fs");
 const path = require("path");
 const { buildBackupExcelBuffer } = require("./backupExcelService");
+const { saveBackupFile, deleteBackupFile } = require("./backupStorage");
 
 /**
  * Create a manual CRM backup for one company.
@@ -1345,44 +1349,22 @@ const createManualBackup = async (companyId, createdById, options = {}) => {
         // 22. SAVE EXCEL FILE
         // =====================================================
 
-        const backupDirectory = path.join(
-            process.cwd(),
-            "backups"
-        );
-
-        if (!fs.existsSync(backupDirectory)) {
-            fs.mkdirSync(backupDirectory, {
-                recursive: true,
-            });
-        }
-
         const fileName =
             `vatup-backup-${company.companyId}-${Date.now()}.xlsx`;
 
-        excelPath = path.join(
-            backupDirectory,
-            fileName
+        if (!excelBuffer || excelBuffer.length === 0) {
+            throw new Error("Backup Excel file is empty");
+        }
+
+        // Saved to private Supabase Storage (falls back to local disk).
+        // excelPath holds the storage reference either way.
+        excelPath = await saveBackupFile(
+            String(company.companyId),
+            fileName,
+            excelBuffer
         );
 
-        fs.writeFileSync(excelPath, excelBuffer);
-
-        // =====================================================
-        // 23. CHECK EXCEL FILE
-        // =====================================================
-
-        if (!fs.existsSync(excelPath)) {
-            throw new Error(
-                "Backup Excel file was not created"
-            );
-        }
-
-        const stats = fs.statSync(excelPath);
-
-        if (stats.size === 0) {
-            throw new Error(
-                "Backup Excel file is empty"
-            );
-        }
+        const stats = { size: excelBuffer.length };
 
         // =====================================================
         // 25. UPDATE BACKUP RECORD
@@ -1462,14 +1444,9 @@ const createManualBackup = async (companyId, createdById, options = {}) => {
         // ---------------------------------------------
 
         try {
-            if (excelPath && fs.existsSync(excelPath)) {
-                fs.unlinkSync(excelPath);
-            }
+            if (excelPath) await deleteBackupFile(excelPath);
         } catch (fileError) {
-            console.error(
-                "Failed to remove incomplete backup file:",
-                fileError
-            );
+            console.error("Failed to remove incomplete backup file:", fileError);
         }
 
         // ---------------------------------------------
