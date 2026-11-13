@@ -154,11 +154,12 @@ export default function EditTaskModal({
     try {
       await editTask(task.id, formData);
 
-      toast.success("Task updated successfully!");
-
       setErrors({});
 
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success("Task updated successfully!");
     } catch (error) {
       console.error("Failed to update task:", error);
 

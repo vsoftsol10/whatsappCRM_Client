@@ -50,10 +50,6 @@ export default function RaiseSupportTicketModal({
         priority: formData.priority,
       });
 
-      toast.success(
-        response.message || "Support ticket created successfully."
-      );
-
       setFormData({
         title: "",
         description: "",
@@ -61,6 +57,11 @@ export default function RaiseSupportTicketModal({
       });
 
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success(
+        response.message || "Support ticket created successfully."
+      );
 
       if (onSuccess) {
         onSuccess(response.ticket);

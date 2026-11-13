@@ -1,5 +1,4 @@
 
-
 // import apiClient from "./apiClient";
 
 // // ================= GET ALL LEADS =================
@@ -56,6 +55,16 @@
 //   return response.data;
 // };
 
+// // ================= BULK DELETE LEADS =================
+// export const bulkDeleteLeads = async (ids) => {
+//   const response = await apiClient.post(
+//     "/api/leads/bulk-delete",
+//     { ids }
+//   );
+
+//   return response.data;
+// };
+
 // // ================= WORK NOTES =================
 
 // export const getLeadWorkNotes = async (leadId) => {
@@ -93,12 +102,22 @@
 // };
 
 
-
 import apiClient from "./apiClient";
 
-// ================= GET ALL LEADS =================
-export const getLeads = async () => {
-  const response = await apiClient.get("/api/leads");
+// ================= GET LEADS (server side page) =================
+// params: { page, limit, search, status }
+export const getLeads = async (params = {}) => {
+  const response = await apiClient.get("/api/leads", { params });
+  return response.data;
+};
+
+// ================= GET ALL MATCHING LEAD IDS =================
+// Used by "Select all N" - returns the ids of every lead that matches
+// the current search + status filter (not only the current page).
+export const getLeadIds = async (params = {}) => {
+  const response = await apiClient.get("/api/leads", {
+    params: { ...params, idsOnly: true },
+  });
   return response.data;
 };
 

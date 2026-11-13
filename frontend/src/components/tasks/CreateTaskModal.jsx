@@ -112,8 +112,6 @@ const handleSubmit = async (e) => {
 
     await addTask(formData);
 
-    toast.success("Task created successfully!");
-
     setFormData({
       title: "",
       description: "",
@@ -126,6 +124,9 @@ const handleSubmit = async (e) => {
 
     // Close after successful creation
     onClose();
+
+    // Success message (shown AFTER the popup is closed)
+    toast.success("Task created successfully!");
 
   } catch (error) {
     console.error(

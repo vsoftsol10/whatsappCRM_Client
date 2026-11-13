@@ -49,12 +49,13 @@ function ServiceFormModal({ service, onClose, onSaved }) {
         ? await updateService(service.id, payload)
         : await createService(payload);
 
+      await onSaved(result.service);
+      onClose();
+
+      // Success message (shown AFTER the popup is closed)
       toast.success(
         isEdit ? "Service updated successfully!" : "Service created successfully!"
       );
-
-      await onSaved(result.service);
-      onClose();
     } catch (err) {
       console.error("Save service error:", err);
 
@@ -252,10 +253,11 @@ function ServiceCustomersModal({ service, onClose, onSaved }) {
 
       await setServiceCustomers(service.id, selected);
 
-      toast.success("Service customers updated!");
-
       await onSaved();
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success("Service customers updated!");
     } catch (error) {
       console.error("Save service customers error:", error);
 

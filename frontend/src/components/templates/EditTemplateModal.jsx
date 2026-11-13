@@ -210,11 +210,12 @@ export default function EditTemplateModal({
  buttons: formData.buttons, // 👈 NEW
  });
 
-      toast.success("Template updated successfully!");
-
       setErrors({});
 
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success("Template updated successfully!");
     } catch (error) {
       console.error("Failed to update template:", error);
 

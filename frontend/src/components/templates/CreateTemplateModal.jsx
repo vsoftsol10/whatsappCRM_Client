@@ -377,10 +377,11 @@ export default function CreateTemplateModal({ isOpen, onClose }) {
         bodyExamples,
       });
 
-      toast.success("Template saved as draft successfully!");
-
       resetForm();
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success("Template saved as draft successfully!");
     } catch (error) {
       console.error("Failed to create template:", error);
 

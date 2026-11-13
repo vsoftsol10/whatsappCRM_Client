@@ -1,4 +1,5 @@
 
+
 // import { useEffect, useMemo, useRef, useState } from "react";
 
 // import {
@@ -14,8 +15,15 @@
 
 // import { getCustomers } from "../../api/customerApi";
 // import { getTemplates } from "../../api/templateApi";
+// import CampaignVariableInputs from "./CampaignVariableInputs"; // 👈 NEW
+// import {
+//   mergeVariableConfigs,
+//   configsToPayload,
+//   hasMissingVariable,
+// } from "../../utils/templateVariables"; // 👈 NEW
 
 // import useCampaignStore from "../../store/campaignStore";
+// import { configsFromSaved } from "../../utils/templateVariables"; // 👈 NEW
 
 // export default function EditCampaignModal({
 //   isOpen,
@@ -61,6 +69,9 @@
 //   // FORM
 //   // ============================================================
 
+//   // 👈 NEW: how each template variable is filled
+//   const [variableConfigs, setVariableConfigs] = useState({});
+
 //   const [formData, setFormData] = useState({
 //     name: "",
 //     type: "PROMOTIONAL",
@@ -73,6 +84,8 @@
 //   // ============================================================
 
 //   const resetForm = () => {
+//     setVariableConfigs({}); // 👈 NEW
+
 //     setFormData({
 //       name: "",
 //       type: "PROMOTIONAL",
@@ -127,6 +140,11 @@
 //           ? formatDateTimeLocal(campaign.scheduledAt)
 //           : "",
 //       });
+
+//       // 👈 NEW: saved variable settings (old campaigns: {{1}} name, {{2}} campaign content)
+//       setVariableConfigs(
+//         configsFromSaved(campaign.variableValues, campaign.messageContent)
+//       );
 
 //       // ----------------------------------------------------------
 //       // EXISTING CUSTOMERS
@@ -393,6 +411,18 @@
 //       (a, b) => a - b
 //     );
 //   }, [selectedTemplate]);
+
+//   // 👈 NEW: give every variable of the selected template a default setting
+//   useEffect(() => {
+//     setVariableConfigs((prev) =>
+//       mergeVariableConfigs(
+//         templateVariables,
+//         prev,
+//         formData.messageContent
+//       )
+//     );
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [templateVariables]);
 
 //   // ============================================================
 //   // IMAGE CHANGE
@@ -672,6 +702,15 @@
 //       return;
 //     }
 
+//     // 👈 NEW: every template variable needs a value
+//     if (hasMissingVariable(templateVariables, variableConfigs)) {
+//       toast.error(
+//         "Please fill all template variable values."
+//       );
+
+//       return;
+//     }
+
 //     // ==========================================================
 //     // SUBMIT
 //     // ==========================================================
@@ -687,8 +726,15 @@
 //         templateId:
 //           selectedTemplateId,
 
+//         // 👈 CHANGED: messageContent keeps the {{2}} custom value (old field),
+//         // the full list of variable settings goes in variableValues.
 //         messageContent:
-//           formData.messageContent.trim(),
+//           templateVariables.includes(2) &&
+//           variableConfigs[2]?.source === "custom"
+//             ? (variableConfigs[2].value || "").trim()
+//             : formData.messageContent.trim(),
+
+//         variableValues: configsToPayload(templateVariables, variableConfigs), // 👈 NEW
 
 //         scheduledAt:
 //           formData.scheduledAt
@@ -1080,54 +1126,23 @@
 //             </div>
 
 //             {/* ==================================================
-//                 TEMPLATE VARIABLES
+//                 TEMPLATE VARIABLES (👈 CHANGED: one input per variable)
 //             ================================================== */}
 
-//             {selectedTemplate &&
-//               templateVariables.length > 0 && (
-
-//                 <div>
-
-//                   <label className="mb-2 block font-medium text-gray-700">
-//                     Campaign Variable Content
-//                   </label>
-
-//                   <p className="mb-3 text-xs text-gray-500">
-//                     Variable content stored with this campaign.
-//                   </p>
-
-//                   <textarea
-//                     rows={4}
-//                     name="messageContent"
-//                     value={formData.messageContent}
-//                     onChange={handleChange}
-//                     placeholder="Example: {{1}} = customer name, {{2}} = special offer"
-//                     disabled={isSubmitting}
-//                     className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-[#25D366] disabled:bg-gray-100"
-//                   />
-
-//                   <div className="mt-3 flex flex-wrap gap-2">
-
-//                     {templateVariables.map(
-//                       (variable) => (
-
-//                         <span
-//                           key={variable}
-//                           className="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
-//                         >
-//                           {"{{"}
-//                           {variable}
-//                           {"}}"}
-//                         </span>
-
-//                       )
-//                     )}
-
-//                   </div>
-
-//                 </div>
-
-//               )}
+//             {selectedTemplate && templateVariables.length > 0 && (
+//               <CampaignVariableInputs
+//                 content={selectedTemplate.content}
+//                 numbers={templateVariables}
+//                 configs={variableConfigs}
+//                 onChange={(number, changes) =>
+//                   setVariableConfigs((prev) => ({
+//                     ...prev,
+//                     [number]: { ...prev[number], ...changes },
+//                   }))
+//                 }
+//                 disabled={isSubmitting}
+//               />
+//             )}
 
 //             {/* ==================================================
 //                 SCHEDULE
@@ -1598,7 +1613,6 @@
 //     </div>
 //   );
 // }
-
 
 
 
@@ -2361,13 +2375,14 @@ export default function EditCampaignModal({
         updateData
       );
 
-      toast.success(
-        "Campaign updated successfully!"
-      );
-
       resetForm();
 
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success(
+        "Campaign updated successfully!"
+      );
     } catch (error) {
       console.error(
         "Failed to update campaign:",

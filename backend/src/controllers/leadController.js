@@ -7,6 +7,15 @@
 // } = require("../services/notificationService");
 
 // const { logAction } = require("../services/auditLogService");
+// const { normalizeIndianPhone } = require("../utils/phoneUtils");
+
+// // Which lead the caller may work on: an admin - any lead of the company;
+// // an employee - only a lead assigned to them (the same leads they can see).
+// const leadScope = (req, id) => ({
+//   id: Number(id),
+//   companyId: req.user.companyId,
+//   ...(req.user.role === "ADMIN" ? {} : { assignedToId: req.user.userId }),
+// });
 
 // // ======================================================
 // // COMMON INCLUDE
@@ -198,10 +207,7 @@
 //     } = req.body;
 
 //     const existingLead = await prisma.lead.findFirst({
-//       where: {
-//         id: Number(id),
-//         companyId: req.user.companyId
-//       }
+//       where: leadScope(req, id),
 //     });
 
 //     if (!existingLead) {
@@ -355,10 +361,7 @@
 //     }
 
 //     const existingLead = await prisma.lead.findFirst({
-//       where: {
-//         id: Number(id),
-//         companyId: req.user.companyId
-//       }
+//       where: leadScope(req, id),
 //     });
 
 //     if (!existingLead) {
@@ -421,10 +424,7 @@
 //     const { id } = req.params;
 
 //     const lead = await prisma.lead.findFirst({
-//       where: {
-//         id: Number(id),
-//         companyId: req.user.companyId
-//       }
+//       where: leadScope(req, id),
 //     });
 
 //     if (!lead) {
@@ -466,8 +466,12 @@
 //       conditions.push({ email: lead.email });
 //     }
 
+//     // Leads keep 10-digit numbers; customers are stored as 91XXXXXXXXXX.
+//     const customerPhone = normalizeIndianPhone(lead.phone) || lead.phone;
+
 //     if (lead.phone) {
 //       conditions.push({ phone: lead.phone });
+//       if (customerPhone !== lead.phone) conditions.push({ phone: customerPhone });
 //     }
 
 //     console.log("Search Conditions:", conditions);
@@ -476,6 +480,8 @@
 //       conditions.length > 0
 //         ? await prisma.customer.findFirst({
 //           where: {
+//             // Only look for duplicates inside the caller's OWN company.
+//             companyId: req.user.companyId,
 //             OR: conditions,
 //           },
 //         })
@@ -495,7 +501,7 @@
 //     const customer = await prisma.customer.create({
 //       data: {
 //         name: lead.name,
-//         phone: lead.phone,
+//         phone: customerPhone,
 //         email: lead.email,
 
 //         companyName: lead.companyName,
@@ -551,10 +557,7 @@
 //     const { id } = req.params;
 
 //     const lead = await prisma.lead.findFirst({
-//       where: {
-//         id: Number(id),
-//         companyId: req.user.companyId
-//       }
+//       where: leadScope(req, id),
 //     });
 
 //     if (!lead) {
@@ -732,8 +735,6 @@
 
 
 
-
-
 const prisma = require("../config/prisma");
 
 const {
@@ -875,44 +876,163 @@ const createLead = async (req, res) => {
   }
 };
 
-// ================= GET ALL LEADS =================
+// ================= GET ALL LEADS (SERVER SIDE) =================
+//
+// Query params (all optional):
+//   page     - page number, default 1
+//   limit    - items per page, default 10, max 100
+//   search   - matches name / email / phone
+//   status   - ALL | NEW | CONTACTED | QUALIFIED | WON | CONVERTED
+//   idsOnly  - "true" => returns only the ids of EVERY lead that matches
+//              the search + status (used by "Select all N")
+//
+// Response:
+//   { success, count, data, pagination: { total, page, limit, totalPages },
+//     stats: { total, new, contacted, qualified, won } }
+//
+// `stats` always covers the caller's whole lead list (not affected by
+// search / status filter), exactly like the old client-side counters.
+
+const LEAD_FILTER_STATUSES = ["NEW", "CONTACTED", "QUALIFIED", "WON"];
+const MAX_LEADS_PAGE_SIZE = 100;
+
+const parsePositiveInt = (value, fallback) => {
+  const parsed = parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 const getLeads = async (req, res) => {
   try {
-    let leads;
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = Math.min(
+      parsePositiveInt(req.query.limit, 10),
+      MAX_LEADS_PAGE_SIZE
+    );
 
-    if (req.user.role === "ADMIN") {
+    const search = String(req.query.search || "").trim();
+    const status = String(req.query.status || "ALL")
+      .trim()
+      .toUpperCase();
 
-      leads = await prisma.lead.findMany({
+    // Stat-card counters are only calculated when the page asks for them
+    // (first load, and after add / edit / delete / status change).
+    // Plain page / search / filter changes skip that extra query.
+    const withStats = req.query.withStats === "true";
 
-        where: {
-          companyId: req.user.companyId
-        },
+    // Admin: every lead of the company.
+    // Employee: only leads assigned to them.
+    const scope = {
+      companyId: req.user.companyId,
+      ...(req.user.role === "ADMIN"
+        ? {}
+        : { assignedToId: req.user.userId }),
+    };
 
-        include: leadInclude,
+    const where = { ...scope };
 
-        orderBy: {
-          createdAt: "desc"
-        }
-
-      });
+    // ---------- STATUS FILTER ----------
+    // ALL        -> not converted
+    // CONVERTED  -> converted only
+    // NEW ... WON -> that status and not converted
+    if (status === "CONVERTED") {
+      where.isConverted = true;
+    } else if (LEAD_FILTER_STATUSES.includes(status)) {
+      where.status = status;
+      where.isConverted = false;
     } else {
-      // Employees can only view leads assigned to them
-      leads = await prisma.lead.findMany({
-        where: {
-          assignedToId: req.user.userId,
-          companyId: req.user.companyId
-        },
-        include: leadInclude,
-        orderBy: {
-          createdAt: "desc",
-        },
+      where.isConverted = false;
+    }
+
+    // ---------- SEARCH ----------
+    // NOTE: `mode: "insensitive"` works on PostgreSQL / MongoDB.
+    // If you use MySQL, remove `mode` (MySQL is already case-insensitive).
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    // ---------- ONLY IDS (Select all N) ----------
+    if (req.query.idsOnly === "true") {
+      const rows = await prisma.lead.findMany({
+        where,
+        select: { id: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return res.status(200).json({
+        success: true,
+        count: rows.length,
+        data: rows.map((row) => row.id),
       });
     }
+
+    const [leads, total, statusGroups] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        include: leadInclude,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+
+      prisma.lead.count({ where }),
+
+      // Counters for the stat cards (whole scope, ignores search/filter)
+      withStats
+        ? prisma.lead.groupBy({
+            by: ["status"],
+            where: scope,
+            _count: { _all: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const stats = {
+      total: 0,
+      new: 0,
+      contacted: 0,
+      qualified: 0,
+      won: 0,
+    };
+
+    (statusGroups || []).forEach((group) => {
+      const count = group._count._all;
+
+      stats.total += count;
+
+      switch (group.status) {
+        case "NEW":
+          stats.new = count;
+          break;
+        case "CONTACTED":
+          stats.contacted = count;
+          break;
+        case "QUALIFIED":
+          stats.qualified = count;
+          break;
+        case "WON":
+          stats.won = count;
+          break;
+        default:
+          break;
+      }
+    });
 
     return res.status(200).json({
       success: true,
       count: leads.length,
       data: leads,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      // null when the page did not ask for stats (it keeps the old ones)
+      stats: statusGroups ? stats : null,
     });
   } catch (error) {
     console.error("Get Leads Error:", error);

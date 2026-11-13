@@ -97,8 +97,6 @@ export default function AddLeadModal({
 
       await addLead(formData);
 
-      toast.success("Lead created successfully!");
-
       // Reset form
       setFormData(initialFormData);
       setErrors({});
@@ -108,6 +106,9 @@ export default function AddLeadModal({
 
       // Automatically close modal
       onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success("Lead created successfully!");
     } catch (error) {
       console.error("Create lead error:", error);
 

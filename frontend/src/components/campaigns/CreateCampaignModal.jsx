@@ -1,3 +1,4 @@
+
 // import { useEffect, useMemo, useRef, useState } from "react";
 // import { X, ImagePlus, CalendarClock, FileText, Search, Users } from "lucide-react";
 // import toast from "react-hot-toast";
@@ -11,6 +12,12 @@
 
 // // NEW: used to load the customer list for the audience picker
 // import { getCustomers } from "../../api/customerApi";
+// import CampaignVariableInputs from "./CampaignVariableInputs"; // 👈 NEW
+// import {
+//   mergeVariableConfigs,
+//   configsToPayload,
+//   hasMissingVariable,
+// } from "../../utils/templateVariables"; // 👈 NEW
 
 // export default function CreateCampaignModal({
 //   isOpen,
@@ -62,6 +69,9 @@
 //   // FORM
 //   // ============================================================
 
+//   // 👈 NEW: how each template variable is filled
+//   const [variableConfigs, setVariableConfigs] = useState({});
+
 //   const [formData, setFormData] = useState({
 //     name: "",
 //     type: "PROMOTIONAL",
@@ -74,6 +84,8 @@
 //   // ============================================================
 
 //   const resetForm = () => {
+//     setVariableConfigs({}); // 👈 NEW
+
 //     setFormData({
 //       name: "",
 //       type: "PROMOTIONAL",
@@ -133,6 +145,12 @@
 //        */
 //       messageContent:
 //         aiCampaign.messageContent || "",
+//     }));
+
+//     // 👈 NEW: the AI text fills {{2}} (same as before)
+//     setVariableConfigs((prev) => ({
+//       ...prev,
+//       2: { source: "custom", value: aiCampaign.messageContent || "" },
 //     }));
 //   }, [aiCampaign]);
 
@@ -303,6 +321,18 @@
 //       (a, b) => a - b
 //     );
 //   }, [selectedTemplate]);
+
+//   // 👈 NEW: give every variable of the selected template a default setting
+//   useEffect(() => {
+//     setVariableConfigs((prev) =>
+//       mergeVariableConfigs(
+//         templateVariables,
+//         prev,
+//         formData.messageContent
+//       )
+//     );
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [templateVariables]);
 
 //   // ============================================================
 //   // IMAGE UPLOAD
@@ -551,6 +581,15 @@
 //       return;
 //     }
 
+//     // 👈 NEW: every template variable needs a value
+//     if (hasMissingVariable(templateVariables, variableConfigs)) {
+//       toast.error(
+//         "Please fill all template variable values."
+//       );
+
+//       return;
+//     }
+
 //     // ==========================================================
 //     // SCHEDULE
 //     // ==========================================================
@@ -597,8 +636,15 @@
 //          * Later we can replace this with
 //          * structured template variables.
 //          */
+//         // 👈 CHANGED: messageContent keeps the {{2}} custom value (old field),
+//         // the full list of variable settings goes in variableValues.
 //         messageContent:
-//           formData.messageContent.trim(),
+//           templateVariables.includes(2) &&
+//           variableConfigs[2]?.source === "custom"
+//             ? (variableConfigs[2].value || "").trim()
+//             : formData.messageContent.trim(),
+
+//         variableValues: configsToPayload(templateVariables, variableConfigs), // 👈 NEW
 
 //         // NEW: send a real UTC time so the server schedules the
 //         // exact moment you picked (not shifted by timezone).
@@ -974,51 +1020,23 @@
 //             </div>
 
 //             {/* ==================================================
-//                 TEMPLATE VARIABLES
+//                 TEMPLATE VARIABLES (👈 CHANGED: one input per variable)
 //             ================================================== */}
 
-//             {selectedTemplate &&
-//               templateVariables.length > 0 && (
-
-//                 <div>
-
-//                   <label className="mb-2 block font-medium text-gray-700">
-//                     Campaign Variable Content
-//                   </label>
-
-//                   <p className="mb-3 text-xs text-gray-500">
-//                     This field is currently stored as campaign content. We will move to structured template variables when the Meta integration is connected.
-//                   </p>
-
-//                   <textarea
-//                     rows={4}
-//                     name="messageContent"
-//                     value={formData.messageContent}
-//                     onChange={handleChange}
-//                     placeholder={`Example: {{1}} = customer name, {{2}} = special offer`}
-//                     disabled={submitting}
-//                     className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-[#25D366] disabled:bg-gray-100"
-//                   />
-
-//                   <div className="mt-3 flex flex-wrap gap-2">
-
-//                     {templateVariables.map(
-//                       (variable) => (
-//                         <span
-//                           key={variable}
-//                           className="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
-//                         >
-//                           {"{{"}
-//                           {variable}
-//                           {"}}"}
-//                         </span>
-//                       )
-//                     )}
-
-//                   </div>
-
-//                 </div>
-//               )}
+//             {selectedTemplate && templateVariables.length > 0 && (
+//               <CampaignVariableInputs
+//                 content={selectedTemplate.content}
+//                 numbers={templateVariables}
+//                 configs={variableConfigs}
+//                 onChange={(number, changes) =>
+//                   setVariableConfigs((prev) => ({
+//                     ...prev,
+//                     [number]: { ...prev[number], ...changes },
+//                   }))
+//                 }
+//                 disabled={submitting}
+//               />
+//             )}
 
 //             {/* ==================================================
 //                 AUDIENCE (NEW)
@@ -1430,6 +1448,8 @@
 //     </div>
 //   );
 // }
+
+
 
 
 
@@ -2098,15 +2118,16 @@ export default function CreateCampaignModal({
         campaign
       );
 
+      resetForm();
+
+      onClose();
+
+      // Success message (shown AFTER the popup is closed)
       toast.success(
         formData.scheduledAt
           ? "Campaign scheduled successfully."
           : "Campaign created successfully."
       );
-
-      resetForm();
-
-      onClose();
 
       // Open the Send Campaign flow for the campaign we just created.
       // NEW: skipped for scheduled campaigns - they send automatically

@@ -1,6 +1,6 @@
 
 // import { useEffect, useMemo, useState } from "react";
-// import { LayoutGrid, PanelsTopLeft } from "lucide-react";
+// import { LayoutGrid, PanelsTopLeft, Trash2 } from "lucide-react";
 
 // import useLeadStore from "../store/leadStore";
 // import useEmployeeStore from "../store/employeeStore";
@@ -57,6 +57,7 @@
 //     isLoading,
 //     fetchLeads,
 //     removeLead,
+//     removeLeads,
 //     changeLeadStatus,
 //     convertLead,
 //   } = useLeadStore();
@@ -90,13 +91,30 @@
 //   const [deleteTargetId, setDeleteTargetId] =
 //     useState(null);
 
+//   // Bulk selection / bulk delete
+//   const [selectedIds, setSelectedIds] = useState([]);
+//   const [showBulkDeleteModal, setShowBulkDeleteModal] =
+//     useState(false);
+//   const [isBulkDeleting, setIsBulkDeleting] =
+//     useState(false);
+
 //   const [currentPage, setCurrentPage] =
 //     useState(1);
 
 //   // Grid view: 12 per page, because 12 divides evenly into the 3-column
 //   // (xl), 2-column (md) and 1-column layouts, so the last row is never
 //   // left with a single stray card. List/table view keeps 10 per page.
-//   const itemsPerPage = viewMode === "grid" ? 12 : 10;
+//   // The user can pick another size from the "Page size" dropdown;
+//   // it resets to the default whenever the view (grid/table) changes.
+//   const [pageSizeOverride, setPageSizeOverride] =
+//     useState(null);
+
+//   const itemsPerPage =
+//     pageSizeOverride ?? (viewMode === "grid" ? 12 : 10);
+
+//   useEffect(() => {
+//     setPageSizeOverride(null);
+//   }, [viewMode]);
 
 //   useEffect(() => {
 //     fetchLeads();
@@ -114,6 +132,11 @@
 //     selectedStatus,
 //     viewMode,
 //   ]);
+
+//   // Selection only makes sense for the list the user is looking at
+//   useEffect(() => {
+//     setSelectedIds([]);
+//   }, [searchTerm, selectedStatus]);
 
 //   // =========================
 //   // LEAD STATS
@@ -190,6 +213,113 @@
 //       startIndex + itemsPerPage
 //     );
 
+
+//   // =========================
+//   // BULK SELECTION
+//   // =========================
+
+//   // Only keep ids that are still in the current (filtered) list
+//   const validSelectedIds = useMemo(() => {
+//     const visible = new Set(
+//       filteredLeads.map((lead) => lead.id)
+//     );
+
+//     return selectedIds.filter((id) => visible.has(id));
+//   }, [selectedIds, filteredLeads]);
+
+//   const selectedSet = new Set(validSelectedIds);
+
+//   const pageIds = paginatedLeads.map((lead) => lead.id);
+
+//   const allPageSelected =
+//     pageIds.length > 0 &&
+//     pageIds.every((id) => selectedSet.has(id));
+
+//   const somePageSelected = pageIds.some((id) =>
+//     selectedSet.has(id)
+//   );
+
+//   const handleToggleSelect = (id) => {
+//     setSelectedIds((prev) =>
+//       prev.includes(id)
+//         ? prev.filter((item) => item !== id)
+//         : [...prev, id]
+//     );
+//   };
+
+//   const handleToggleSelectPage = () => {
+//     setSelectedIds((prev) => {
+//       if (allPageSelected) {
+//         return prev.filter((id) => !pageIds.includes(id));
+//       }
+
+//       return [...new Set([...prev, ...pageIds])];
+//     });
+//   };
+
+//   const handleSelectAllFiltered = () => {
+//     setSelectedIds(filteredLeads.map((lead) => lead.id));
+//   };
+
+//   const handleClearSelection = () => {
+//     setSelectedIds([]);
+//   };
+
+//   const confirmBulkDelete = async () => {
+//     const ids = [...validSelectedIds];
+
+//     setShowBulkDeleteModal(false);
+
+//     if (ids.length === 0) return;
+
+//     setIsBulkDeleting(true);
+
+//     try {
+//       const response = await removeLeads(ids);
+
+//       const deletedCount = response?.deletedCount || 0;
+
+//       if (deletedCount > 0) {
+//         toast.success(
+//           response?.message ||
+//           `${deletedCount} leads deleted successfully`
+//         );
+//       } else {
+//         toast.error("No leads were deleted");
+//       }
+
+//       setSelectedIds([]);
+
+//       // Make sure we are not left on an empty page
+//       const remainingItems =
+//         filteredLeads.length - deletedCount;
+
+//       const newTotalPages = Math.ceil(
+//         remainingItems / itemsPerPage
+//       );
+
+//       if (
+//         currentPage > newTotalPages &&
+//         newTotalPages > 0
+//       ) {
+//         setCurrentPage(newTotalPages);
+//       }
+//     } catch (error) {
+//       console.error(error);
+
+//       // 403 is already handled by apiClient interceptor
+//       if (error?.response?.status === 403) {
+//         return;
+//       }
+
+//       toast.error(
+//         error?.response?.data?.message ||
+//         "Failed to delete leads"
+//       );
+//     } finally {
+//       setIsBulkDeleting(false);
+//     }
+//   };
 
 //   // =========================
 //   // HANDLERS
@@ -341,6 +471,69 @@
 //         setSelectedStatus={setSelectedStatus}
 //       />
 
+//       {/* ================= BULK SELECT BAR ================= */}
+
+//       {!isLoading && filteredLeads.length > 0 && (
+//         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+
+//           <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-slate-700">
+//             <input
+//               type="checkbox"
+//               checked={allPageSelected}
+//               ref={(el) => {
+//                 if (el) {
+//                   el.indeterminate =
+//                     somePageSelected && !allPageSelected;
+//                 }
+//               }}
+//               onChange={handleToggleSelectPage}
+//               className="h-4 w-4 cursor-pointer accent-[#25D366]"
+//             />
+
+//             {validSelectedIds.length > 0
+//               ? `${validSelectedIds.length} selected`
+//               : "Select all on this page"}
+//           </label>
+
+//           {validSelectedIds.length > 0 && (
+//             <div className="flex flex-wrap items-center gap-2">
+
+//               {validSelectedIds.length < filteredLeads.length && (
+//                 <button
+//                   type="button"
+//                   onClick={handleSelectAllFiltered}
+//                   className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#25D366] hover:bg-[#DCF8C6]"
+//                 >
+//                   Select all {filteredLeads.length}
+//                 </button>
+//               )}
+
+//               <button
+//                 type="button"
+//                 onClick={handleClearSelection}
+//                 className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-gray-100"
+//               >
+//                 Clear
+//               </button>
+
+//               <button
+//                 type="button"
+//                 onClick={() => setShowBulkDeleteModal(true)}
+//                 disabled={isBulkDeleting}
+//                 className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+//               >
+//                 <Trash2 size={16} />
+//                 {isBulkDeleting
+//                   ? "Deleting..."
+//                   : "Delete Selected"}
+//               </button>
+
+//             </div>
+//           )}
+
+//         </div>
+//       )}
+
 //       {/* ================= CONTENT ================= */}
 
 //       {isLoading ? (
@@ -372,6 +565,8 @@
 //               onDelete={handleDelete}
 //               onStatusChange={handleStatusChange}
 //               onConvert={handleConvert}
+//               selected={selectedSet.has(lead.id)}
+//               onToggleSelect={handleToggleSelect}
 //             />
 //           ))}
 
@@ -386,6 +581,9 @@
 //           onDelete={handleDelete}
 //           onStatusChange={handleStatusChange}
 //           onConvert={handleConvert}
+//           selectedIds={validSelectedIds}
+//           onToggleSelect={handleToggleSelect}
+//           onToggleSelectPage={handleToggleSelectPage}
 //         />
 
 //       )}
@@ -397,6 +595,12 @@
 //           totalItems={filteredLeads.length}
 //           itemsPerPage={itemsPerPage}
 //           onPageChange={setCurrentPage}
+//           onPageSizeChange={(size) => { setPageSizeOverride(size); setCurrentPage(1); }}
+//           pageSizeOptions={
+//             viewMode === "grid"
+//               ? [12, 24, 48, 96]
+//               : [10, 20, 50, 100]
+//           }
 //         />
 //       )}
 
@@ -438,13 +642,22 @@
 //         onCancel={() => setDeleteTargetId(null)}
 //       />
 
+//       {/* ================= BULK DELETE CONFIRM MODAL ================= */}
+
+//       <ConfirmModal
+//         isOpen={showBulkDeleteModal}
+//         title="Delete Selected Leads"
+//         message={`Are you sure you want to delete ${validSelectedIds.length} selected lead${validSelectedIds.length === 1 ? "" : "s"}? This cannot be undone.`}
+//         confirmText={`Delete ${validSelectedIds.length}`}
+//         cancelText="Cancel"
+//         variant="danger"
+//         onConfirm={confirmBulkDelete}
+//         onCancel={() => setShowBulkDeleteModal(false)}
+//       />
+
 //     </div>
 //   );
 // }
-
-
-
-
 
 
 import { useEffect, useMemo, useState } from "react";
@@ -462,9 +675,13 @@ import EditLeadModal from "../components/leads/EditLeadModal";
 import ViewLeadModal from "../components/leads/ViewLeadModal";
 import toast from "react-hot-toast";
 import { getCustomers } from "../api/customerApi";
+import { getLeadIds } from "../api/leadApi";
 import useCustomerStore from "../store/customerStore";
 import Pagination from "../components/common/Pagination";
 import ConfirmModal from "../components/common/ConfirmModal";
+
+// Wait this long after the user stops typing before calling the server
+const SEARCH_DEBOUNCE_MS = 400;
 
 // Table / Grid switch with icon + label (active option is green)
 function ViewToggle({ viewMode, setViewMode }) {
@@ -502,6 +719,8 @@ function ViewToggle({ viewMode, setViewMode }) {
 export default function Lead() {
   const {
     leads,
+    pagination,
+    stats,
     isLoading,
     fetchLeads,
     removeLead,
@@ -516,7 +735,13 @@ export default function Lead() {
 
   const { employees, fetchEmployees } = useEmployeeStore();
 
+  // What the user types (updates on every keystroke)
   const [searchTerm, setSearchTerm] = useState("");
+
+  // What is actually sent to the server (updates after the user pauses)
+  const [debouncedSearch, setDebouncedSearch] =
+    useState("");
+
   const [selectedStatus, setSelectedStatus] =
     useState("ALL");
 
@@ -560,122 +785,105 @@ export default function Lead() {
   const itemsPerPage =
     pageSizeOverride ?? (viewMode === "grid" ? 12 : 10);
 
-  useEffect(() => {
+  // Switching grid/table: reset page size override and go to page 1
+  // (done together, so only ONE server request is made)
+  const handleViewModeChange = (mode) => {
+    if (mode === viewMode) return;
+
+    setViewMode(mode);
     setPageSizeOverride(null);
-  }, [viewMode]);
+    setCurrentPage(1);
+  };
+
+  // Changing the status chip: go to page 1
+  const handleStatusFilterChange = (status) => {
+    setSelectedStatus(status);
+    setCurrentPage(1);
+  };
+
+  // =========================
+  // SEARCH DEBOUNCE
+  // =========================
 
   useEffect(() => {
-    fetchLeads();
+    const timer = setTimeout(() => {
+      setDebouncedSearch((prev) => {
+        const next = searchTerm.trim();
+
+        if (prev !== next) {
+          setCurrentPage(1);
+        }
+
+        return next;
+      });
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // =========================
+  // FETCH FROM SERVER
+  // (page, page size, search or status changed)
+  // =========================
+
+  useEffect(() => {
+    fetchLeads({
+      page: currentPage,
+      limit: itemsPerPage,
+      search: debouncedSearch,
+      status: selectedStatus,
+    });
+  }, [
+    fetchLeads,
+    currentPage,
+    itemsPerPage,
+    debouncedSearch,
+    selectedStatus,
+  ]);
+
+  useEffect(() => {
     fetchEmployees();
-  }, [fetchLeads, fetchEmployees]);
+  }, [fetchEmployees]);
 
   useEffect(() => {
     console.log("Leads:", leads);
   }, [leads]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
-    searchTerm,
-    selectedStatus,
-    viewMode,
-  ]);
-
   // Selection only makes sense for the list the user is looking at
   useEffect(() => {
     setSelectedIds([]);
-  }, [searchTerm, selectedStatus]);
+  }, [debouncedSearch, selectedStatus]);
 
   // =========================
-  // LEAD STATS
+  // LEAD STATS (from server, whole lead list)
   // =========================
 
-  const totalLeads = leads.length;
-
-  const newLeads = leads.filter(
-    (lead) => lead.status === "NEW"
-  ).length;
-
-  const contactedLeads = leads.filter(
-    (lead) => lead.status === "CONTACTED"
-  ).length;
-
-  const qualifiedLeads = leads.filter(
-    (lead) => lead.status === "QUALIFIED"
-  ).length;
-
-  const wonLeads = leads.filter(
-    (lead) => lead.status === "WON"
-  ).length;
+  const totalLeads = stats.total;
+  const newLeads = stats.new;
+  const contactedLeads = stats.contacted;
+  const qualifiedLeads = stats.qualified;
+  const wonLeads = stats.won;
 
   // =========================
-  // SEARCH
+  // PAGINATION (from server)
   // =========================
 
-  const searchedLeads = useMemo(() => {
-    return leads.filter((lead) =>
-      `${lead.name || ""} ${lead.email || ""} ${lead.phone || ""
-        }`
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-    );
-  }, [leads, searchTerm]);
+  const totalItems = pagination.total;
+  const totalPages = pagination.totalPages;
 
-  // =========================
-  // STATUS FILTER
-  // =========================
-
-  const filteredLeads = useMemo(() => {
-    if (selectedStatus === "ALL") {
-      return searchedLeads.filter(
-        (lead) => !lead.isConverted
-      );
-    }
-
-    if (selectedStatus === "CONVERTED") {
-      return searchedLeads.filter(
-        (lead) => lead.isConverted
-      );
-    }
-
-    return searchedLeads.filter(
-      (lead) =>
-        lead.status === selectedStatus &&
-        !lead.isConverted
-    );
-  }, [searchedLeads, selectedStatus]);
-  // =========================
-  // PAGINATION
-  // =========================
-
-  const totalPages = Math.ceil(
-    filteredLeads.length / itemsPerPage
-  );
-
-  const startIndex =
-    (currentPage - 1) * itemsPerPage;
-
-  const paginatedLeads =
-    filteredLeads.slice(
-      startIndex,
-      startIndex + itemsPerPage
-    );
-
+  // The server already returns only the current page
+  const paginatedLeads = leads;
 
   // =========================
   // BULK SELECTION
   // =========================
 
-  // Only keep ids that are still in the current (filtered) list
-  const validSelectedIds = useMemo(() => {
-    const visible = new Set(
-      filteredLeads.map((lead) => lead.id)
-    );
+  const validSelectedIds = selectedIds;
 
-    return selectedIds.filter((id) => visible.has(id));
-  }, [selectedIds, filteredLeads]);
-
-  const selectedSet = new Set(validSelectedIds);
+  const selectedSet = useMemo(
+    () => new Set(validSelectedIds),
+    [validSelectedIds]
+  );
 
   const pageIds = paginatedLeads.map((lead) => lead.id);
 
@@ -705,8 +913,30 @@ export default function Lead() {
     });
   };
 
-  const handleSelectAllFiltered = () => {
-    setSelectedIds(filteredLeads.map((lead) => lead.id));
+  // Ask the server for the ids of EVERY lead matching the
+  // current search + status (not only the current page)
+  const handleSelectAllFiltered = async () => {
+    try {
+      const response = await getLeadIds({
+        search: debouncedSearch,
+        status: selectedStatus,
+      });
+
+      setSelectedIds(
+        Array.isArray(response?.data) ? response.data : []
+      );
+    } catch (error) {
+      console.error(error);
+
+      if (error?.response?.status === 403) {
+        return;
+      }
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to select all leads"
+      );
+    }
   };
 
   const handleClearSelection = () => {
@@ -740,7 +970,7 @@ export default function Lead() {
 
       // Make sure we are not left on an empty page
       const remainingItems =
-        filteredLeads.length - deletedCount;
+        totalItems - deletedCount;
 
       const newTotalPages = Math.ceil(
         remainingItems / itemsPerPage
@@ -797,7 +1027,7 @@ export default function Lead() {
       toast.success("Lead deleted successfully");
 
       // Check whether the current page becomes empty
-      const remainingItems = filteredLeads.length - 1;
+      const remainingItems = totalItems - 1;
 
       const newTotalPages = Math.ceil(
         remainingItems / itemsPerPage
@@ -849,6 +1079,7 @@ export default function Lead() {
       const response = await getCustomers();
       setCustomers(response.data);
 
+      // Reloads the current page with the same search / filter / page
       await fetchLeads();
 
       toast.success("Lead converted to customer successfully");
@@ -886,7 +1117,7 @@ export default function Lead() {
 
           <ViewToggle
             viewMode={viewMode}
-            setViewMode={setViewMode}
+            setViewMode={handleViewModeChange}
           />
 
           <button
@@ -916,12 +1147,12 @@ export default function Lead() {
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         selectedStatus={selectedStatus}
-        setSelectedStatus={setSelectedStatus}
+        setSelectedStatus={handleStatusFilterChange}
       />
 
       {/* ================= BULK SELECT BAR ================= */}
 
-      {!isLoading && filteredLeads.length > 0 && (
+      {totalItems > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
 
           <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-slate-700">
@@ -946,13 +1177,13 @@ export default function Lead() {
           {validSelectedIds.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
 
-              {validSelectedIds.length < filteredLeads.length && (
+              {validSelectedIds.length < totalItems && (
                 <button
                   type="button"
                   onClick={handleSelectAllFiltered}
                   className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-[#25D366] hover:bg-[#DCF8C6]"
                 >
-                  Select all {filteredLeads.length}
+                  Select all {totalItems}
                 </button>
               )}
 
@@ -983,12 +1214,23 @@ export default function Lead() {
       )}
 
       {/* ================= CONTENT ================= */}
+      {/* The old list stays on screen (slightly faded) while the next
+          page loads. The "Loading leads..." text shows only on the
+          very first load, when there is nothing to show yet. */}
 
-      {isLoading ? (
+      <div
+        className={`transition-opacity duration-150 ${
+          isLoading && paginatedLeads.length > 0
+            ? "pointer-events-none opacity-60"
+            : "opacity-100"
+        }`}
+      >
+
+      {isLoading && paginatedLeads.length === 0 ? (
         <div className="py-10 text-center">
           Loading leads...
         </div>
-      ) : filteredLeads.length === 0 ? (
+      ) : paginatedLeads.length === 0 ? (
         <div className="crm-page-surface p-8 text-center sm:p-10">
 
           <h3 className="text-xl font-semibold">
@@ -1036,11 +1278,13 @@ export default function Lead() {
 
       )}
 
-      {filteredLeads.length > 0 && (
+      </div>
+
+      {totalItems > 0 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={filteredLeads.length}
+          totalItems={totalItems}
           itemsPerPage={itemsPerPage}
           onPageChange={setCurrentPage}
           onPageSizeChange={(size) => { setPageSizeOverride(size); setCurrentPage(1); }}
@@ -1106,4 +1350,3 @@ export default function Lead() {
     </div>
   );
 }
-
