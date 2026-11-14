@@ -83,7 +83,7 @@ model Company {
   integrations Integration[]
   purchases    Purchase[]
 
-  backups Backup[]
+  backups        Backup[]
   backupRestores BackupRestore[]
 
   // AI auto-reply configuration (one row per company)
@@ -268,9 +268,13 @@ model SubscriptionPlan {
   maxWebsiteIntegrations Int @default(-1)
   maxAppIntegrations     Int @default(-1)
 
-  features Json
+  features      Json
+  featureConfig Json?
+  isTrial       Boolean @default(false)
 
-  isTrial Boolean @default(false)
+  // true = custom plan (no fixed price / duration / limits, features only).
+  // Existing plans automatically get false.
+  isCustom Boolean @default(false)
 
   status String @default("ACTIVE")
 
@@ -543,7 +547,7 @@ model User {
 
   isFirstLogin Boolean @default(true)
 
-  // NEW: set when the user finishes / skips the product tour (user guide),
+  // Set when the user finishes / skips the product tour (user guide),
   // so it is shown only once per account, not once per browser.
   tourSeenAt DateTime?
 
@@ -848,16 +852,16 @@ model Lead {
   @@index([assignedToId])
   @@index([companyId, conversationId])
 
-  // ---- NEW: list + pagination (admin) ----
+  // ---- list + pagination (admin) ----
   @@index([companyId, isConverted, createdAt])
 
-  // ---- NEW: list + pagination (employee: only their assigned leads) ----
+  // ---- list + pagination (employee: only their assigned leads) ----
   @@index([companyId, assignedToId, isConverted, createdAt])
 
-  // ---- NEW: stat cards (count by status) ----
+  // ---- stat cards (count by status) ----
   @@index([companyId, status])
 
-  // ---- NEW: fast search (contains / ILIKE '%text%') ----
+  // ---- fast search (contains / ILIKE '%text%') ----
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([email(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin)
