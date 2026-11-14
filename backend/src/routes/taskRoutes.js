@@ -1,117 +1,9 @@
-// const express = require("express");
-
-// const router = express.Router();
-
-// const {
-//   createTask,
-//   getTasks,
-//   getTaskById,
-//   updateTask,
-//   deleteTask,
-//   updateTaskStatus,
-// } = require("../controllers/taskController");
-
-// const {
-//   getTaskWorkNotes,
-//   createTaskWorkNote,
-//   updateTaskWorkNote,
-//   deleteTaskWorkNote,
-// } = require("../controllers/taskworknoteController");
-
-// const authMiddleware = require("../middleware/authMiddleware");
-
-
-// // ================= WORK NOTES =================
-
-// // Get task work notes
-// router.get(
-//   "/:id/work-notes",
-//   authMiddleware,
-//   getTaskWorkNotes
-// );
-
-
-// // Create task work note
-// router.post(
-//   "/:id/work-notes",
-//   authMiddleware,
-//   createTaskWorkNote
-// );
-
-
-// // Update work note
-// router.put(
-//   "/work-notes/:noteId",
-//   authMiddleware,
-//   updateTaskWorkNote
-// );
-
-
-// // Delete work note
-// router.delete(
-//   "/work-notes/:noteId",
-//   authMiddleware,
-//   deleteTaskWorkNote
-// );
-
-
-// // ================= TASK CRUD =================
-
-
-// // Create Task
-// router.post(
-//   "/",
-//   authMiddleware,
-//   createTask
-// );
-
-
-// // Get All Tasks
-// router.get(
-//   "/",
-//   authMiddleware,
-//   getTasks
-// );
-
-
-// // Get Single Task
-// router.get(
-//   "/:id",
-//   authMiddleware,
-//   getTaskById
-// );
-
-
-// // Update Task
-// router.put(
-//   "/:id",
-//   authMiddleware,
-//   updateTask
-// );
-
-
-// // Update Task Status
-// router.patch(
-//   "/:id/status",
-//   authMiddleware,
-//   updateTaskStatus
-// );
-
-
-// // Delete Task
-// router.delete(
-//   "/:id",
-//   authMiddleware,
-//   deleteTask
-// );
-
-
-// module.exports = router;
 
 const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requireFeature } = require("../middleware/requireFeature");
 const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
@@ -131,7 +23,7 @@ const {
 } = require("../controllers/taskworknoteController");
 
 // Apply authentication to all routes
-router.use(authMiddleware);
+router.use(authMiddleware, requireFeature("tasks"));
 
 /////////////////////////////////////////////////
 // READ ROUTES (Allowed for everyone)

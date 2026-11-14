@@ -13,7 +13,7 @@ const getCompanyPlan = async (companyId) => {
     include: {
       subscriptions: {
         where: {
-          status: "ACTIVE",
+          status: { in: ["ACTIVE", "TRIAL"] },
         },
         orderBy: {
           createdAt: "desc",
@@ -113,7 +113,8 @@ console.log("======================================");
     const maxNewUsers = plan.maxUsers;
 
     // New-user limit reached
-    if (newUsers >= maxNewUsers) {
+    // -1 = unlimited (set in Super Admin)
+    if (maxNewUsers >= 0 && newUsers >= maxNewUsers) {
       return res.status(403).json({
         success: false,
         message: `Your ${plan.planName} plan allows ${maxNewUsers} new users. You have already added ${newUsers} users in this plan.`,
@@ -174,6 +175,7 @@ const checkCustomerLimit = async (req, res, next) => {
     if (
       maxCustomers !== null &&
       maxCustomers !== undefined &&
+      maxCustomers >= 0 && // -1 = unlimited (set in Super Admin)
       currentCustomers >= maxCustomers
     ) {
       return res.status(403).json({
@@ -233,6 +235,7 @@ const checkCampaignLimit = async (req, res, next) => {
     if (
       maxCampaigns !== null &&
       maxCampaigns !== undefined &&
+      maxCampaigns >= 0 && // -1 = unlimited (set in Super Admin)
       currentCampaigns >= maxCampaigns
     ) {
       return res.status(403).json({
@@ -296,6 +299,7 @@ const checkTemplateLimit = async (req, res, next) => {
     if (
       maxTemplates !== null &&
       maxTemplates !== undefined &&
+      maxTemplates >= 0 && // -1 = unlimited (set in Super Admin)
       currentTemplates >= maxTemplates
     ) {
       return res.status(403).json({

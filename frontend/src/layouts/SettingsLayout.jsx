@@ -8,18 +8,20 @@
 import { useEffect, useMemo, useRef } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
-import { settingsTabs, filterTabsByRole } from "../config/navigation";
+import { settingsTabs, filterTabsByRole, filterTabsByFeatures } from "../config/navigation";
+import usePlanFeatures from "../hooks/usePlanFeatures";
 
 export default function SettingsLayout() {
   const user = useAuthStore((state) => state.user);
+  const { can } = usePlanFeatures();
   const { pathname } = useLocation();
   const tabsRef = useRef(null);
 
   // Only show the tabs this role is allowed to open (Backup, Support,
   // Audit Logs and AI Auto-Reply are ADMIN only)
   const tabs = useMemo(
-    () => filterTabsByRole(settingsTabs, user?.role),
-    [user?.role]
+    () => filterTabsByFeatures(filterTabsByRole(settingsTabs, user?.role), can),
+    [user?.role, can]
   );
 
   // On small screens the tab bar scrolls sideways — keep the active tab in view

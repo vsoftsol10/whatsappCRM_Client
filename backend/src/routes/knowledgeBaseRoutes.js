@@ -1,5 +1,6 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
+const { requireFeature } = require("../middleware/requireFeature");
 const adminOnly = require("../middleware/adminOnly");
 const allowWriteAccess = require("../middleware/allowWriteAccess");
 const kbImportUpload = require("../middleware/kbImportUpload");
@@ -18,7 +19,7 @@ const router = express.Router();
 
 // Company knowledge base used by the AI auto-reply.
 // Company admins only. Every handler scopes by req.user.companyId.
-router.use(authMiddleware, adminOnly);
+router.use(authMiddleware, requireFeature("knowledgeBase"), adminOnly);
 
 router.get("/", listEntries);
 

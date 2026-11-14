@@ -12,6 +12,7 @@ const {
 } = require("../controllers/serviceController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requireFeature } = require("../middleware/requireFeature");
 const allowWriteAccess = require("../middleware/allowWriteAccess");
 const adminOnly = require("../middleware/adminOnly");
 
@@ -20,20 +21,20 @@ const adminOnly = require("../middleware/adminOnly");
 // ===============================
 router.get("/", authMiddleware, getServices);
 
-router.get("/:id/customers", authMiddleware, getServiceCustomers);
+router.get("/:id/customers", authMiddleware, requireFeature("services"), getServiceCustomers);
 
 // ===============================
 // WRITE
 // Only ACTIVE / TRIAL companies
 // Create / edit / delete a service = ADMIN only
 // ===============================
-router.post("/", authMiddleware, allowWriteAccess, adminOnly, createService);
+router.post("/", authMiddleware, requireFeature("services"), allowWriteAccess, adminOnly, createService);
 
-router.put("/:id", authMiddleware, allowWriteAccess, adminOnly, updateService);
+router.put("/:id", authMiddleware, requireFeature("services"), allowWriteAccess, adminOnly, updateService);
 
 router.delete(
   "/:id",
-  authMiddleware,
+  authMiddleware, requireFeature("services"),
   allowWriteAccess,
   adminOnly,
   deleteService
@@ -42,7 +43,7 @@ router.delete(
 // Assigning customers to a service = any user who can edit customers
 router.put(
   "/:id/customers",
-  authMiddleware,
+  authMiddleware, requireFeature("services"),
   allowWriteAccess,
   setServiceCustomers
 );

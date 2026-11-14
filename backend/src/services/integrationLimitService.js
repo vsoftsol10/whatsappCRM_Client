@@ -53,7 +53,7 @@ const getIntegrationLimitContext = async (companyId) => {
     where: { id: companyId },
     include: {
       subscriptions: {
-        where: { status: "ACTIVE" },
+        where: { status: { in: ["ACTIVE", "TRIAL"] } },
         orderBy: { createdAt: "desc" },
         take: 1,
         include: { plan: true },

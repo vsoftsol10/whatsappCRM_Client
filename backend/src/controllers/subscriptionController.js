@@ -1,6 +1,11 @@
 
 
 const prisma = require("../config/prisma");
+const {
+  getCompanyFeatureContext,
+  clearPlanFeatureCache,
+} = require("../services/planFeatureService");
+const { getIntegrationLimitContext } = require("../services/integrationLimitService");
 
 // ==============================
 // GET LOGGED-IN COMPANY SUBSCRIPTION
@@ -200,6 +205,9 @@ const upgradePlan = async (req, res) => {
       },
     });
 
+    // plan changed -> next feature check must read the new plan
+    clearPlanFeatureCache(companyId);
+
     return res.status(200).json({
       success: true,
       message: "Plan upgraded successfully.",
@@ -215,8 +223,65 @@ const upgradePlan = async (req, res) => {
   }
 };
 
+
+// ==============================
+// PLAN FEATURES + USAGE (Super Admin switches and limits)
+// ==============================
+const getMyFeatures = async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+
+    const ctx = await getCompanyFeatureContext(companyId, { fresh: true });
+
+    const [users, customers, campaigns, templates] = await Promise.all([
+      prisma.user.count({ where: { companyId } }),
+      prisma.customer.count({ where: { companyId } }),
+      prisma.campaign.count({ where: { companyId } }),
+      prisma.template.count({ where: { companyId } }),
+    ]);
+
+    let integrations = {};
+
+    try {
+      const limitCtx = await getIntegrationLimitContext(companyId);
+      if (limitCtx.ok) integrations = limitCtx.used;
+    } catch (error) {
+      console.error("Usage (integrations) error:", error.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        hasPlan: ctx.hasPlan,
+        planName: ctx.planName,
+        isTrial: ctx.isTrial,
+        isCustom: ctx.isCustom,
+        features: ctx.config,
+        usage: {
+          users,
+          customers,
+          campaigns,
+          templates,
+          facebook: integrations.facebook ?? 0,
+          instagram: integrations.instagram ?? 0,
+          websiteIntegration: integrations.website ?? 0,
+          appIntegration: integrations.app ?? 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("GET FEATURES ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load plan features.",
+    });
+  }
+};
+
 module.exports = {
   getMySubscription,
   getPlans,
   upgradePlan,
+  getMyFeatures,
 };

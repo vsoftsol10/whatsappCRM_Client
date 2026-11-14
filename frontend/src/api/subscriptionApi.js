@@ -5,6 +5,12 @@ export const getMySubscription = async () => {
   return response.data;
 };
 
+// Plan switches + limits + usage (managed in Super Admin)
+export const getMyFeatures = async () => {
+  const response = await apiClient.get("/api/subscriptions/features");
+  return response.data;
+};
+
 export const getPlans = async () => {
   const response = await apiClient.get("/api/subscriptions/plans");
   return response.data;
