@@ -245,9 +245,15 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 
-const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
+const BackupHistory = ({
+  backups = [],
+  onDownload,
+  downloadingId,
+  onRestore,
+}) => {
   const formatBytes = (bytes) => {
     if (!bytes || bytes === 0) return "—";
 
@@ -409,6 +415,8 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
                         ? "Manual"
                         : backup.backupType === "AUTOMATIC"
                         ? "Automatic"
+                        : backup.backupType === "PRE_RESTORE"
+                        ? "Safety copy (before a restore)"
                         : backup.backupType || "—"}
                     </span>
                   </td>
@@ -448,6 +456,23 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
                   </td>
 
                   <td className="px-5 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                    {onRestore && backup.status === "COMPLETED" && (
+                      <button
+                        type="button"
+                        onClick={() => onRestore(backup)}
+                        disabled={!backup.restorable}
+                        title={
+                          backup.restorable
+                            ? "Restore your CRM data from this backup"
+                            : "Older backups are Excel-only and cannot be restored. Create a new backup."
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Restore
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onDownload(backup)}
@@ -467,6 +492,7 @@ const BackupHistory = ({ backups = [], onDownload, downloadingId }) => {
                         ? "Downloading..."
                         : "Download Excel"}
                     </button>
+                    </div>
                   </td>
                 </tr>
               );

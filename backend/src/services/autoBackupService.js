@@ -634,13 +634,14 @@ const cleanupOldAutomaticBackups = async (companyId, keep) => {
       status: "COMPLETED",
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true, storagePath: true },
+    select: { id: true, storagePath: true, snapshotPath: true },
   });
 
   const old = completed.slice(keep);
 
   for (const backup of old) {
     await deleteBackupFile(backup.storagePath);
+    await deleteBackupFile(backup.snapshotPath);
     await prisma.backup.delete({ where: { id: backup.id } });
   }
 
