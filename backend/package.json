@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test tests/auth.test.js tests/permissions.test.js tests/isolation.test.js",
+    "test": "node --test tests/auth.test.js tests/permissions.test.js tests/isolation.test.js tests/backupRestore.test.js tests/backupRestoreRoutes.test.js",
     "test:kb": "node --test tests/kbIsolation.test.js",
     "test:kb:load": "node tests/kbLoadCheck.js",
     "kb:setup-search": "node scripts/setupKbSearch.js"

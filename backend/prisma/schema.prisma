@@ -1,11 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [pg_trgm]
 }
 
 //////////////////////////////////////////////////////
@@ -840,9 +842,24 @@ model Lead {
 
   workNotes LeadWorkNote[]
 
+  // ---- existing indexes ----
   @@index([companyId])
   @@index([assignedToId])
   @@index([companyId, conversationId])
+
+  // ---- NEW: list + pagination (admin) ----
+  @@index([companyId, isConverted, createdAt])
+
+  // ---- NEW: list + pagination (employee: only their assigned leads) ----
+  @@index([companyId, assignedToId, isConverted, createdAt])
+
+  // ---- NEW: stat cards (count by status) ----
+  @@index([companyId, status])
+
+  // ---- NEW: fast search (contains / ILIKE '%text%') ----
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 //////////////////////////////////////////////////////

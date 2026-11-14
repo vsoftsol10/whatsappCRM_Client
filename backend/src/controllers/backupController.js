@@ -315,13 +315,19 @@ const getBackups = async (req, res) => {
         completedAt: true,
         errorMessage: true,
         createdAt: true,
+        snapshotPath: true,
       },
     });
 
     return res.json({
       success: true,
-      backups: backups.map((backup) => ({
+      // `restorable` tells the page whether the Restore button can be used.
+      // (Older backups only have the readable Excel file.) The storage path
+      // itself is never sent to the browser.
+      backups: backups.map(({ snapshotPath, ...backup }) => ({
         ...backup,
+        restorable:
+          Boolean(snapshotPath) && backup.status === "COMPLETED",
         fileSize: backup.fileSize
           ? Number(backup.fileSize)
           : null,

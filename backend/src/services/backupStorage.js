@@ -40,13 +40,18 @@ const parseRemote = (storagePath) => {
 };
 
 // Returns the value to save in Backup.storagePath
-const saveBackupFile = async (companyKey, fileName, buffer) => {
+const saveBackupFile = async (
+  companyKey,
+  fileName,
+  buffer,
+  contentType = XLSX_TYPE
+) => {
   try {
     await ensureBucket();
     const objectPath = `${companyKey}/${fileName}`;
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(objectPath, buffer, { contentType: XLSX_TYPE, upsert: false });
+      .upload(objectPath, buffer, { contentType, upsert: false });
     if (error) throw new Error(error.message);
     return `${PREFIX}${BUCKET}/${objectPath}`;
   } catch (err) {

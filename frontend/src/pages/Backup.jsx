@@ -306,6 +306,7 @@ import BackupHeader from "../components/backup/BackupHeader";
 import BackupStats from "../components/backup/BackupStats";
 import BackupHistory from "../components/backup/BackupHistory";
 import BackupSchedule from "../components/backup/BackupSchedule";
+import RestoreBackupModal from "../components/backup/RestoreBackupModal";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -316,6 +317,7 @@ const Backup = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
   const [error, setError] = useState("");
 
   // =========================================================
@@ -590,8 +592,24 @@ const Backup = () => {
             backups={backups}
             onDownload={handleDownload}
             downloadingId={downloadingId}
+            onRestore={setRestoreTarget}
           />
         </>
+      )}
+
+      {/* RESTORE (preview + typed confirmation) */}
+      {restoreTarget && (
+        <RestoreBackupModal
+          backup={restoreTarget}
+          apiUrl={API_URL}
+          getToken={getToken}
+          onClose={() => setRestoreTarget(null)}
+          onRestored={() => {
+            setRestoreTarget(null);
+            toast.success("Your data was restored from the backup.");
+            fetchBackups(true);
+          }}
+        />
       )}
 
     </div>
