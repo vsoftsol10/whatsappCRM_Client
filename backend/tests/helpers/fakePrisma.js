@@ -9,7 +9,7 @@
 
 const crypto = require("crypto");
 
-const INT_ID_MODELS = new Set(["lead", "leadWorkNote", "company", "integration", "whatsAppAccount"]);
+const INT_ID_MODELS = new Set(["lead", "leadWorkNote", "company", "integration", "whatsAppAccount", "purchase"]);
 
 // Relation filters used by the code under test, e.g.
 //   prisma.message.findFirst({ where: { conversation: { companyId } } })
@@ -20,6 +20,68 @@ const RELATIONS = {
   ticket: { customer: { table: "customer", localKey: "customerId" } },
   ticketWorkNote: { ticket: { table: "ticket", localKey: "ticketId" } },
   campaignRecipient: { campaign: { table: "campaign", localKey: "campaignId" } },
+  // backup / restore
+  customerService: { customer: { table: "customer", localKey: "customerId" } },
+  templateRecipient: { template: { table: "template", localKey: "templateId" } },
+  dealActivity: { deal: { table: "deal", localKey: "dealId" } },
+  taskWorkNote: { task: { table: "task", localKey: "taskId" } },
+  userNotification: { user: { table: "user", localKey: "userId" } },
+};
+
+// ---- strict mode (opt-in: db.strict = true) --------------------------------
+// Makes the fake behave like Postgres for the backup/restore tests:
+//   ON_DELETE  -> foreign-key rules when a parent row is deleted
+//   FK_PARENTS -> createMany() fails when a row points to a missing parent
+//   UNIQUES    -> createMany() fails on duplicate keys
+// Off by default, so every other test behaves exactly as before.
+const ON_DELETE = {
+  customer: [
+    { child: "conversation", field: "customerId", action: "restrict" },
+    { child: "deal", field: "customerId", action: "restrict" },
+    { child: "ticket", field: "customerId", action: "restrict" },
+    { child: "campaignRecipient", field: "customerId", action: "delete" },
+    { child: "templateRecipient", field: "customerId", action: "delete" },
+    { child: "purchase", field: "customerId", action: "delete" },
+    { child: "customerService", field: "customerId", action: "delete" },
+    { child: "proposal", field: "customerId", action: "setNull" },
+  ],
+  conversation: [{ child: "message", field: "conversationId", action: "delete" }],
+  campaign: [{ child: "campaignRecipient", field: "campaignId", action: "delete" }],
+  template: [
+    { child: "templateRecipient", field: "templateId", action: "delete" },
+    { child: "campaign", field: "templateId", action: "setNull" },
+  ],
+  deal: [{ child: "dealActivity", field: "dealId", action: "delete" }],
+  task: [{ child: "taskWorkNote", field: "taskId", action: "delete" }],
+  ticket: [{ child: "ticketWorkNote", field: "ticketId", action: "delete" }],
+  lead: [{ child: "leadWorkNote", field: "leadId", action: "delete" }],
+};
+
+const FK_PARENTS = {
+  customer: [["userId", "user"]],
+  customerService: [["customerId", "customer"], ["serviceId", "service"]],
+  purchase: [["customerId", "customer"], ["integrationId", "integration"]],
+  conversation: [["customerId", "customer"], ["whatsappAccountId", "whatsAppAccount"], ["facebookPageId", "facebookPage"]],
+  message: [["conversationId", "conversation"]],
+  lead: [["assignedToId", "user"]],
+  leadWorkNote: [["leadId", "lead"], ["employeeId", "user"]],
+  campaign: [["createdById", "user"], ["whatsappAccountId", "whatsAppAccount"], ["templateId", "template"]],
+  campaignRecipient: [["campaignId", "campaign"], ["customerId", "customer"]],
+  templateRecipient: [["templateId", "template"], ["customerId", "customer"]],
+  deal: [["customerId", "customer"], ["createdById", "user"], ["assignedToId", "user"]],
+  dealActivity: [["dealId", "deal"], ["createdById", "user"]],
+  task: [["createdById", "user"], ["assignedToId", "user"]],
+  taskWorkNote: [["taskId", "task"], ["employeeId", "user"]],
+  ticket: [["customerId", "customer"], ["createdById", "user"], ["assignedToId", "user"]],
+  ticketWorkNote: [["ticketId", "ticket"], ["employeeId", "user"]],
+};
+
+const UNIQUES = {
+  customer: [["companyId", "phone"]],
+  conversation: [["customerId"]],
+  message: [["metaMessageId"]],
+  campaignRecipient: [["campaignId", "customerId"]],
+  templateRecipient: [["templateId", "customerId"]],
 };
 
 // To-one relations that controllers load with `include: { company: true }`.
@@ -96,6 +158,49 @@ function createDb() {
   const tables = {};
   const counters = {};
   const table = (name) => (tables[name] = tables[name] || []);
+  const state = { strict: false };
+
+  // strict mode: apply ON_DELETE rules, then physically remove the rows
+  const removeRows = (name, rows) => {
+    if (state.strict) {
+      const ids = new Set(rows.map((r) => r.id));
+      const rules = ON_DELETE[name] || [];
+      // restrict first: nothing may change if a restrict rule is violated
+      for (const rule of rules) {
+        if (rule.action !== "restrict") continue;
+        if (table(rule.child).some((c) => c[rule.field] != null && ids.has(c[rule.field]))) {
+          throw new Error(`FakePrisma FK violation: ${rule.child}.${rule.field} still references ${name}`);
+        }
+      }
+      for (const rule of rules) {
+        const children = table(rule.child).filter((c) => c[rule.field] != null && ids.has(c[rule.field]));
+        if (!children.length) continue;
+        if (rule.action === "setNull") children.forEach((c) => { c[rule.field] = null; });
+        if (rule.action === "delete") removeRows(rule.child, children);
+      }
+    }
+    const gone = new Set(rows);
+    tables[name] = table(name).filter((r) => !gone.has(r));
+  };
+
+  // strict mode: foreign keys + unique keys on createMany
+  const assertRowAllowed = (name, row, pending) => {
+    for (const [field, parent] of FK_PARENTS[name] || []) {
+      if (row[field] == null) continue;
+      if (!table(parent).some((p) => p.id === row[field])) {
+        throw new Error(`FakePrisma FK violation: ${name}.${field} -> missing ${parent} ${row[field]}`);
+      }
+    }
+    const keys = [["id"], ...(UNIQUES[name] || [])];
+    for (const cols of keys) {
+      if (name === "customerService" && cols[0] === "id") continue;
+      if (cols.some((c) => row[c] == null)) continue;
+      const clash = (r) => cols.every((c) => r[c] === row[c]);
+      if (table(name).some(clash) || pending.some(clash)) {
+        throw new Error(`FakePrisma unique violation on ${name}(${cols.join(",")})`);
+      }
+    }
+  };
 
   const matches = (model, row, where) => {
     if (!where) return true;
@@ -158,9 +263,11 @@ function createDb() {
     return crypto.randomUUID();
   };
 
+  // Json columns hold plain objects; everything else must be a scalar.
+  const JSON_COLUMNS = new Set(["buttons", "items", "summary", "changes", "bodyExamples"]);
   const assertScalarData = (name, data) => {
     for (const [k, v] of Object.entries(data)) {
-      if (isPlainObject(v)) {
+      if (isPlainObject(v) && !JSON_COLUMNS.has(k)) {
         throw new Error(`FakePrisma: nested write on ${name}.${k} is not supported by the fake`);
       }
     }
@@ -221,11 +328,16 @@ function createDb() {
     async createMany(args) {
       const now = new Date();
       const list = [].concat(args.data);
+      const built = [];
       list.forEach((d) => {
         assertScalarData(name, d);
-        table(name).push({ id: nextId(name), createdAt: now, updatedAt: now, ...clone(d) });
+        const row = { id: nextId(name), createdAt: now, updatedAt: now, ...clone(d) };
+        if (state.strict) assertRowAllowed(name, row, built);
+        built.push(row);
       });
-      return { count: list.length };
+      // all-or-nothing, like one INSERT statement
+      built.forEach((row) => table(name).push(row));
+      return { count: built.length };
     },
     async update(args) {
       const row = table(name).find((r) => matches(name, r, args.where));
@@ -241,11 +353,14 @@ function createDb() {
     async delete(args) {
       const i = table(name).findIndex((r) => matches(name, r, args.where));
       if (i === -1) throw Object.assign(new Error("Record to delete does not exist."), { code: "P2025" });
+      const row = table(name)[i];
+      if (state.strict) { removeRows(name, [row]); return row; }
       return table(name).splice(i, 1)[0];
     },
     async deleteMany(args = {}) {
       const keep = [], gone = [];
       table(name).forEach((r) => (matches(name, r, args.where) ? gone : keep).push(r));
+      if (state.strict) { removeRows(name, gone); return { count: gone.length }; }
       tables[name] = keep;
       return { count: gone.length };
     },
@@ -258,11 +373,27 @@ function createDb() {
     // added for the WhatsApp / lead / campaign / ticket tests
     "ticketWorkNote", "campaign", "campaignRecipient", "template", "integration",
     "subscriptionPlan", "aiSettings",
+    // added for the backup / restore tests
+    "dealActivity", "taskWorkNote", "templateRecipient", "purchase", "proposal",
+    "facebookPage", "crmAuditLog", "backup", "backupRestore",
   ];
 
   const db = {
     __isFake: true,
-    $transaction: async (arg) => (typeof arg === "function" ? arg(db) : Promise.all(arg)),
+    // Interactive transactions roll back when the callback throws, like Postgres.
+    $transaction: async (arg) => {
+      if (typeof arg !== "function") return Promise.all(arg);
+      const saved = structuredClone(tables);
+      try {
+        return await arg(db);
+      } catch (err) {
+        Object.keys(tables).forEach((k) => delete tables[k]);
+        Object.assign(tables, saved);
+        throw err;
+      }
+    },
+    get strict() { return state.strict; },
+    set strict(value) { state.strict = Boolean(value); },
     // ---- test helpers ----
     reset() { Object.keys(tables).forEach((k) => delete tables[k]); Object.keys(counters).forEach((k) => delete counters[k]); },
     rows: (name) => table(name),
