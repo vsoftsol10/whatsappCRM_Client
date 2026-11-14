@@ -84,6 +84,7 @@ model Company {
   purchases    Purchase[]
 
   backups Backup[]
+  backupRestores BackupRestore[]
 
   // AI auto-reply configuration (one row per company)
   aiSettings AiSettings?
@@ -1517,6 +1518,7 @@ enum CrmAuditAction {
   DELETE
   STATUS_CHANGE
   ASSIGN
+  RESTORE
 
   @@map("CrmAuditAction")
 }
@@ -1532,6 +1534,7 @@ enum CrmAuditModule {
   TEMPLATE
   USER
   COMPANY
+  BACKUP
 
   @@map("CrmAuditModule")
 }
@@ -1645,6 +1648,11 @@ model Backup {
   fileName    String?
   storagePath String?
 
+  // Machine-readable snapshot (gzipped JSON) used by "Restore".
+  // The Excel file above is only for people to read - it cannot be restored.
+  // NULL for backups made before the restore feature existed.
+  snapshotPath String?
+
   // Size of generated ZIP file in bytes
   fileSize BigInt?
 
@@ -1663,6 +1671,8 @@ model Backup {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
+  restores BackupRestore[]
+
   ///////////////////////////////////////
   // INDEXES
   ///////////////////////////////////////
@@ -1675,10 +1685,53 @@ model Backup {
 enum BackupType {
   MANUAL
   AUTOMATIC
+  // Safety copy taken automatically right before a restore (lets the admin undo it)
+  PRE_RESTORE
 }
 
 enum BackupStatus {
   PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+//////////////////////////////////////////////////////
+// BACKUP RESTORE HISTORY (one row per restore attempt)
+//////////////////////////////////////////////////////
+
+model BackupRestore {
+  id String @id @default(uuid())
+
+  companyId Int
+
+  // Backup that was restored. SetNull so history survives backup clean-up.
+  backupId String?
+
+  // Admin who confirmed the restore
+  requestedById String?
+
+  // Safety backup taken just before this restore (use it to undo)
+  safetyBackupId String?
+
+  status RestoreStatus @default(IN_PROGRESS)
+
+  // Rows restored per table, plus anything skipped / re-assigned
+  summary Json?
+
+  errorMessage String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  backup  Backup? @relation(fields: [backupId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, startedAt])
+  @@index([backupId])
+}
+
+enum RestoreStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
