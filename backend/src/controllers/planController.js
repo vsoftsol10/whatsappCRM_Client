@@ -1,5 +1,3 @@
-
-
 const prisma = require("../config/prisma");
 
 // ========================================
@@ -26,6 +24,7 @@ exports.getPlans = async (req, res) => {
         maxTemplates: true,
         features: true,
         isTrial: true,
+        isCustom: true,
         status: true,
       },
     });

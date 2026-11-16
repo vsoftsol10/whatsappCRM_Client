@@ -246,7 +246,7 @@ function BillingSubscriptionCard() {
               <InfoCard
                 icon={<CreditCard size={18} />}
                 title="Price"
-                value={`₹${plan?.price ?? 0}/month`}
+                value={plan?.isCustom ? "Custom Plan" : `₹${plan?.price ?? 0}/month`}
               />
 
               <InfoCard

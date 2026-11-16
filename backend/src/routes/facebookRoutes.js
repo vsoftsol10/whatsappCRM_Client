@@ -4,6 +4,7 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 const adminOnly = require("../middleware/adminOnly");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   getFacebookPages,
@@ -25,9 +26,9 @@ router.get("/pages", getFacebookPages);
 // ---------------------------------------------
 
 // Connect Pages after the Facebook login popup
-router.post("/connect", adminOnly, connectFacebookPages);
+router.post("/connect", adminOnly, allowWriteAccess, connectFacebookPages);
 
 // Disconnect a Page
-router.put("/pages/:id/disconnect", adminOnly, disconnectFacebookPage);
+router.put("/pages/:id/disconnect", adminOnly, allowWriteAccess, disconnectFacebookPage);
 
 module.exports = router;

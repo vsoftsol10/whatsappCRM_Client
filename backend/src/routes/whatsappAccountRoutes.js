@@ -1,46 +1,3 @@
-// const express = require("express");
-
-// const router = express.Router();
-
-// const authMiddleware = require("../middleware/authMiddleware");
-
-// const {
-//   getWhatsAppAccounts,
-//   getWhatsAppAccountById,
-//   createWhatsAppAccount,
-//   disconnectWhatsAppAccount,
-//   testWhatsAppConnection,
-//   embeddedSignup,
-//   getCoexistenceStatus,
-// } = require("../controllers/whatsappAccountController");
-
-// router.use(authMiddleware);
-
-// // IMPORTANT:
-// // Specific routes must come before /:id
-
-// // Get all WhatsApp accounts
-// router.get("/", getWhatsAppAccounts);
-
-// // Test WhatsApp connection
-// router.get("/test-connection", testWhatsAppConnection);
-
-// // Meta Embedded Signup (handles standard signup AND Coexistence)
-// router.post("/embedded-signup", embeddedSignup);
-
-// // Coexistence sync status (contacts + chat history sync progress)
-// router.get("/:id/coexistence-status", getCoexistenceStatus);
-
-// // Get WhatsApp account by ID
-// router.get("/:id", getWhatsAppAccountById);
-
-// // Create WhatsApp account
-// router.post("/", createWhatsAppAccount);
-
-// // Disconnect WhatsApp account
-// router.put("/:id/disconnect", disconnectWhatsAppAccount);
-
-// module.exports = router;
 
 const express = require("express");
 
@@ -48,6 +5,7 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 const adminOnly = require("../middleware/adminOnly");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   getWhatsAppAccounts,
@@ -85,12 +43,12 @@ router.get("/:id", getWhatsAppAccountById);
 // ---------------------------------------------
 
 // Meta Embedded Signup (handles standard signup AND Coexistence)
-router.post("/embedded-signup", adminOnly, embeddedSignup);
+router.post("/embedded-signup", adminOnly, allowWriteAccess, embeddedSignup);
 
 // Create WhatsApp account (manual)
-router.post("/", adminOnly, createWhatsAppAccount);
+router.post("/", adminOnly, allowWriteAccess, createWhatsAppAccount);
 
 // Disconnect WhatsApp account
-router.put("/:id/disconnect", adminOnly, disconnectWhatsAppAccount);
+router.put("/:id/disconnect", adminOnly, allowWriteAccess, disconnectWhatsAppAccount);
 
 module.exports = router;

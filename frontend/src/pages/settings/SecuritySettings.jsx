@@ -1,6 +1,6 @@
-
 // import { useEffect, useState } from "react";
 // import axios from "axios";
+// import toast from "react-hot-toast";
 // import {
 //   Lock,
 //   MessageCircle,
@@ -8,6 +8,7 @@
 
 // import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 // import FacebookMessengerCard from "../../components/facebook/FacebookMessengerCard";
+// import InstagramCard from "../../components/instagram/InstagramCard";
 // import { useAuthStore } from "../../store/authStore";
 // import ChangePasswordModal from "../../components/common/ChangePasswordModal";
 // import ConfirmModal from "../../components/common/ConfirmModal";
@@ -70,7 +71,7 @@
 //         "Failed to disconnect WhatsApp:",
 //         error.response?.data || error.message
 //       );
-//       alert(
+//       toast.error(
 //         error.response?.data?.message ||
 //           "Failed to disconnect WhatsApp. Please try again."
 //       );
@@ -214,6 +215,9 @@
 //       {/* Facebook Messenger Card */}
 //       <FacebookMessengerCard isAdmin={isAdmin} />
 
+//       {/* Instagram Card (connected separately from Facebook) */}
+//       <InstagramCard isAdmin={isAdmin} />
+
 //       <ChangePasswordModal
 //         isOpen={showChangePassword}
 //         onClose={() => setShowChangePassword(false)}
@@ -242,7 +246,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -255,11 +258,13 @@ import ConnectWhatsApp from "../../components/whatsapp/ConnectWhatsApp";
 import FacebookMessengerCard from "../../components/facebook/FacebookMessengerCard";
 import InstagramCard from "../../components/instagram/InstagramCard";
 import { useAuthStore } from "../../store/authStore";
+import usePlanFeatures from "../../hooks/usePlanFeatures";
 import ChangePasswordModal from "../../components/common/ChangePasswordModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
 
 function SecuritySettings() {
   const { user } = useAuthStore();
+  const { can } = usePlanFeatures();
   const isAdmin = user?.role === "ADMIN";
 
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -461,7 +466,8 @@ function SecuritySettings() {
       <FacebookMessengerCard isAdmin={isAdmin} />
 
       {/* Instagram Card (connected separately from Facebook) */}
-      <InstagramCard isAdmin={isAdmin} />
+      {/* Hidden when Instagram is switched off in the company's plan (Super Admin) */}
+      {can("instagram") && <InstagramCard isAdmin={isAdmin} />}
 
       <ChangePasswordModal
         isOpen={showChangePassword}

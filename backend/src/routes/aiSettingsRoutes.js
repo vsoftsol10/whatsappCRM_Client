@@ -20,6 +20,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const { requireFeature } = require("../middleware/requireFeature");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   getAiSettings,
@@ -31,7 +32,7 @@ const router = express.Router();
 
 // Per-company AI auto-reply configuration (ADMIN only, checked in controller)
 router.get("/", authMiddleware, requireFeature("aiAutoReply"), getAiSettings);
-router.patch("/", authMiddleware, requireFeature("aiAutoReply"), updateAiSettings);
-router.post("/test", authMiddleware, requireFeature("aiAutoReply"), testAiSettings);
+router.patch("/", authMiddleware, requireFeature("aiAutoReply"), allowWriteAccess, updateAiSettings);
+router.post("/test", authMiddleware, requireFeature("aiAutoReply"), allowWriteAccess, testAiSettings);
 
 module.exports = router;

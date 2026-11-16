@@ -10,6 +10,11 @@ import PaymentConfirmModal from "./PaymentConfirmModal";
 // ==========================================
 // Helpers
 // ==========================================
+// Where the "Contact Sales" button for custom plans goes.
+// Set VITE_SALES_CONTACT_LINK in frontend/.env (mailto:..., https://wa.me/..., or a page URL).
+const SALES_CONTACT_LINK =
+  import.meta.env.VITE_SALES_CONTACT_LINK || "mailto:sales@yourcompany.com";
+
 const formatPrice = (price) =>
   `₹${Number(price || 0).toLocaleString("en-IN")}`;
 
@@ -266,14 +271,22 @@ function Plans() {
                 </div>
 
                 <div className="mt-3 flex items-baseline gap-1.5">
-                  <span className="text-3xl font-bold text-slate-900">
-                    {formatPrice(plan.price)}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {plan.isTrial || Number(plan.price) === 0
-                      ? `Free trial · ${plan.durationDays} days`
-                      : formatPeriod(plan.durationDays)}
-                  </span>
+                  {plan.isCustom ? (
+                    <span className="text-3xl font-bold text-slate-900">
+                      Custom Plan
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-bold text-slate-900">
+                        {formatPrice(plan.price)}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {plan.isTrial || Number(plan.price) === 0
+                          ? `Free trial · ${plan.durationDays} days`
+                          : formatPeriod(plan.durationDays)}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 <p className="mt-3 text-sm text-slate-500">
@@ -306,6 +319,15 @@ function Plans() {
                   <button type="button" disabled className={`${base} ${disabledCls}`}>
                     Trial Only
                   </button>
+                ) : plan.isCustom ? (
+                  <a
+                    href={SALES_CONTACT_LINK}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${base} bg-[#25D366] text-center text-white hover:bg-[#128C7E]`}
+                  >
+                    Contact Sales
+                  </a>
                 ) : (
                   <button
                     type="button"

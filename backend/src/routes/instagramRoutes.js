@@ -3,6 +3,8 @@ const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
 const adminOnly = require("../middleware/adminOnly");
+const { requireFeature } = require("../middleware/requireFeature");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 const {
   getInstagramAuthUrl,
   instagramCallback,
@@ -14,6 +16,13 @@ const {
 router.get("/callback", instagramCallback);
 
 // ADMIN: get the Instagram login URL to open
-router.get("/auth-url", authMiddleware, adminOnly, getInstagramAuthUrl);
+router.get(
+  "/auth-url",
+  authMiddleware,
+  requireFeature("instagram"),
+  adminOnly,
+  allowWriteAccess,
+  getInstagramAuthUrl
+);
 
 module.exports = router;

@@ -13,10 +13,11 @@ const {
 const authMiddleware = require("../middleware/authMiddleware");
 const { requireFeature } = require("../middleware/requireFeature");
 const adminOnly = require("../middleware/adminOnly");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const router = express.Router();
 
 router.get("/", authMiddleware, requireFeature("autoBackup"), adminOnly, getBackupSetting);
-router.put("/", authMiddleware, requireFeature("autoBackup"), adminOnly, saveBackupSetting);
+router.put("/", authMiddleware, requireFeature("autoBackup"), adminOnly, allowWriteAccess, saveBackupSetting);
 
 module.exports = router;

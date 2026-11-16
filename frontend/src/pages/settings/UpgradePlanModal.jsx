@@ -60,12 +60,18 @@ function UpgradePlanModal({
 
               <div className="text-right">
                 <p className="text-sm text-slate-500">
-                  Monthly Price
+                  {plan.isCustom ? "Pricing" : "Monthly Price"}
                 </p>
 
                 <div className="mt-1 flex items-center justify-end gap-1 text-3xl font-bold text-[#25D366]">
-                  <IndianRupee size={28} />
-                  {plan.price}
+                  {plan.isCustom ? (
+                    "Custom Plan"
+                  ) : (
+                    <>
+                      <IndianRupee size={28} />
+                      {plan.price}
+                    </>
+                  )}
                 </div>
               </div>
 

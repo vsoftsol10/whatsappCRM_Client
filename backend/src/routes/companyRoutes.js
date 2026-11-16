@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/uploadMiddleware");
+const allowWriteAccess = require("../middleware/allowWriteAccess");
 
 const {
   getCompanySettings,
@@ -40,6 +41,7 @@ router.get("/settings", authMiddleware, getCompanySettings);
 router.put(
   "/settings",
   authMiddleware,
+  allowWriteAccess,
   handleLogoUpload,
   updateCompanySettings
 );
