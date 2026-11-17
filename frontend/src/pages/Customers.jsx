@@ -1,5 +1,3 @@
-
-
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,6 +25,7 @@ import ConfirmModal from "../components/common/ConfirmModal";
 import Pagination from "../components/common/Pagination";
 import ViewCustomerModal from "../components/customers/ViewCustomerModal";
 import { getServices } from "../api/serviceApi";
+import ServiceMultiSelect from "../components/services/ServiceMultiSelect";
 
 function Customers() {
   const customers =
@@ -89,6 +88,9 @@ function Customers() {
 
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Optional: services to attach to every imported customer
+  const [importServiceIds, setImportServiceIds] = useState([]);
 
   // =========================
   // CLOSE MENU WHEN CLICKING OUTSIDE
@@ -673,6 +675,7 @@ function Customers() {
 
     setSelectedImportFile(file);
     setImportPreview(null);
+    setImportServiceIds([]);
     setShowImportModal(true);
     setIsPreviewLoading(true);
 
@@ -722,6 +725,7 @@ function Customers() {
     setShowImportModal(false);
     setSelectedImportFile(null);
     setImportPreview(null);
+    setImportServiceIds([]);
   };
 
   // =========================
@@ -752,7 +756,8 @@ function Customers() {
     try {
       const result =
         await importCustomers(
-          importPreview.rows
+          importPreview.rows,
+          importServiceIds
         );
 
       if (!result?.success) {
@@ -767,6 +772,7 @@ function Customers() {
       setShowImportModal(false);
       setSelectedImportFile(null);
       setImportPreview(null);
+      setImportServiceIds([]);
 
       // Success message (shown AFTER the popup is closed)
       toast.success(
@@ -1524,6 +1530,29 @@ function Customers() {
                     </div>
 
                   </div>
+
+                  {/* ================= SERVICES (OPTIONAL) ================= */}
+
+                  {importPreview.rows?.length > 0 && (
+                    <div className="mb-6 rounded-xl border border-green-200 bg-[#F0FBE8] p-4">
+
+                      <ServiceMultiSelect
+                        value={importServiceIds}
+                        onChange={setImportServiceIds}
+                        disabled={isImporting}
+                      />
+
+                      <p className="mt-2 text-xs text-gray-600">
+                        Selected services will be added to all{" "}
+                        <span className="font-semibold">
+                          {importPreview.rows.length}
+                        </span>{" "}
+                        new customers. Customers that already exist are not
+                        changed.
+                      </p>
+
+                    </div>
+                  )}
 
                   {/* ================= EXISTING CUSTOMERS ================= */}
 
