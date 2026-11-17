@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, Loader2, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 // 👈 NEW: buttons (call / website / quick reply / copy code)
@@ -7,6 +7,26 @@ import TemplateButtonsEditor, {
 } from "./TemplateButtonsEditor";
 
 import useTemplateStore from "../../store/templateStore";
+
+// Variable numbers used in a body text, e.g. "Hi {{1}}, order {{2}}" -> ["1","2"]
+const getVariableNumbers = (text) => {
+  const matches = [...String(text || "").matchAll(/\{\{(\d+)\}\}/g)];
+  const unique = [...new Set(matches.map((m) => m[1]))];
+  return unique.sort((a, b) => Number(a) - Number(b));
+};
+
+// Saved sample values are stored as an array in the same order as the
+// variable numbers of the saved body. Turn them back into { "1": "...", ... }.
+const buildSamplesFromTemplate = (template) => {
+  const saved = Array.isArray(template?.bodyExamples)
+    ? template.bodyExamples
+    : [];
+  const samples = {};
+  getVariableNumbers(template?.content).forEach((varNum, index) => {
+    samples[varNum] = saved[index] != null ? String(saved[index]) : "";
+  });
+  return samples;
+};
 
 export default function EditTemplateModal({
   isOpen,
@@ -30,6 +50,7 @@ export default function EditTemplateModal({
     content: "",
  footerContent: "",
  buttons: [], // 👈 NEW
+    variableSamples: {}, // sample value for each {{n}} in the body
  });
  const [errors, setErrors] = useState({});
   const [updating, setUpdating] = useState(false);
@@ -51,11 +72,18 @@ export default function EditTemplateModal({
         content: template.content || "",
         footerContent: template.footerContent || "",
  buttons: Array.isArray(template.buttons) ? template.buttons : [], // 👈 NEW
+        variableSamples: buildSamplesFromTemplate(template),
  });
 
       setErrors({});
     }
   }, [template]);
+
+  // Variables found in the body text right now
+  const detectedVariables = useMemo(
+    () => getVariableNumbers(formData.content),
+    [formData.content]
+  );
 
   if (!isOpen || !template) {
     return null;
@@ -115,6 +143,14 @@ export default function EditTemplateModal({
         "Template content must be at least 10 characters";
     }
 
+    // Meta needs a sample value for every variable in the body
+    detectedVariables.forEach((varNum) => {
+      const sample = formData.variableSamples[varNum];
+      if (!sample || !sample.trim()) {
+        newErrors[`sample_${varNum}`] = `Sample value for {{${varNum}}} is required`;
+      }
+    });
+
     setErrors(newErrors);
 
     return Object.keys(newErrors).length === 0;
@@ -135,6 +171,21 @@ export default function EditTemplateModal({
     setErrors((prev) => ({
       ...prev,
       [name]: "",
+    }));
+  };
+
+  const handleSampleChange = (varNum, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      variableSamples: {
+        ...prev.variableSamples,
+        [varNum]: value,
+      },
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [`sample_${varNum}`]: "",
     }));
   };
 
@@ -208,6 +259,10 @@ export default function EditTemplateModal({
         content: formData.content.trim(),
         footerContent: formData.footerContent.trim() || null,
  buttons: formData.buttons, // 👈 NEW
+        // sample values, in the same order as the variable numbers
+        bodyExamples: detectedVariables.map((varNum) =>
+          (formData.variableSamples[varNum] || "").trim()
+        ),
  });
 
       setErrors({});
@@ -660,6 +715,57 @@ Thank you for shopping with us.`}
                 </p>
               )}
             </div>
+
+            {/* ==================================================
+                VARIABLE SAMPLES
+            ================================================== */}
+
+            {detectedVariables.length > 0 && (
+              <div className="border-t pt-5">
+                <h3 className="mb-2 text-lg font-semibold text-gray-800">
+                  Variable Samples
+                </h3>
+
+                <p className="mb-3 text-sm text-gray-500">
+                  Meta requires a realistic example value for every variable
+                  in your body text before it will review the template.
+                </p>
+
+                <div className="space-y-3">
+                  {detectedVariables.map((varNum) => (
+                    <div key={varNum}>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Sample value for {`{{${varNum}}}`}{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+
+                      <input
+                        type="text"
+                        value={formData.variableSamples[varNum] || ""}
+                        onChange={(e) =>
+                          handleSampleChange(varNum, e.target.value)
+                        }
+                        disabled={updating || !isEditable}
+                        placeholder={
+                          varNum === "1" ? "e.g. Rahul" : "e.g. ORD1234"
+                        }
+                        className={`w-full rounded-lg border px-4 py-2 outline-none ${
+                          errors[`sample_${varNum}`]
+                            ? "border-red-500"
+                            : "border-gray-300 focus:border-[#25D366]"
+                        } disabled:cursor-not-allowed disabled:bg-gray-100`}
+                      />
+
+                      {errors[`sample_${varNum}`] && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {errors[`sample_${varNum}`]}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* ==================================================
                 FOOTER

@@ -91,6 +91,15 @@ function Plans() {
     });
   }, [plans]);
 
+  // The trial plan is not shown in the plans list
+  const displayPlans = useMemo(
+    () =>
+      visiblePlans.filter(
+        (p) => !p.isTrial && !/trial/i.test(String(p.planName || ""))
+      ),
+    [visiblePlans]
+  );
+
   // Only paid plans can be bought
   const paidPlans = useMemo(
     () => visiblePlans.filter((p) => !p.isTrial && Number(p.price) > 0),
@@ -240,13 +249,13 @@ function Plans() {
 
       {plansLoading ? (
         <div className="py-16 text-center text-slate-500">Loading plans...</div>
-      ) : visiblePlans.length === 0 ? (
+      ) : displayPlans.length === 0 ? (
         <div className="py-16 text-center text-slate-500">
           No plans available right now.
         </div>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          {visiblePlans.map((plan) => {
+          {displayPlans.map((plan) => {
             const isCurrent = currentPlanId === plan.id;
             const features = getFeatures(plan.features);
 
