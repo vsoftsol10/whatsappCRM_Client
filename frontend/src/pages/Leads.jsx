@@ -50,9 +50,9 @@ export default function Lead() {
   const [selectedStatus, setSelectedStatus] =
     useState("ALL");
 
-  // "grid" = card view, "list" = table view
+  // "grid" = card view, "list" = table view (table is the default)
   const [viewMode, setViewMode] =
-    useState("grid");
+    useState("list");
 
   const [showAddModal, setShowAddModal] =
     useState(false);

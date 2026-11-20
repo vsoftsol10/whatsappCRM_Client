@@ -163,42 +163,45 @@ function ServiceFormModal({ mode, service, onClose, onSaved, onEdit }) {
           />
         </div>
 
-        <div>
-          <label
-            htmlFor={`${uid}-status`}
-            className="mb-1.5 block text-sm font-medium text-slate-800"
-          >
-            Status
-            {!isView && <span className="ml-0.5 text-red-500">*</span>}
-          </label>
-
-          <div className="relative">
-            <select
-              id={`${uid}-status`}
-              value={isActive ? "ACTIVE" : "INACTIVE"}
-              disabled={saving || isView}
-              onChange={(e) => setIsActive(e.target.value === "ACTIVE")}
-              className={`${fieldClass(false)} h-11 appearance-none pr-10 disabled:opacity-100 ${
-                isView ? "disabled:text-slate-900" : ""
-              }`}
+        {/* Status is only shown when viewing or editing; a new service always starts Active */}
+        {(isView || isEdit) && (
+          <div>
+            <label
+              htmlFor={`${uid}-status`}
+              className="mb-1.5 block text-sm font-medium text-slate-800"
             >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </select>
+              Status
+              {!isView && <span className="ml-0.5 text-red-500">*</span>}
+            </label>
 
-            <ChevronDown
-              size={18}
-              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-            />
+            <div className="relative">
+              <select
+                id={`${uid}-status`}
+                value={isActive ? "ACTIVE" : "INACTIVE"}
+                disabled={saving || isView}
+                onChange={(e) => setIsActive(e.target.value === "ACTIVE")}
+                className={`${fieldClass(false)} h-11 appearance-none pr-10 disabled:opacity-100 ${
+                  isView ? "disabled:text-slate-900" : ""
+                }`}
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+
+              <ChevronDown
+                size={18}
+                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+              />
+            </div>
+
+            {!isView && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                Inactive services are hidden from new customer forms and campaign
+                filters, but existing customers keep the tag.
+              </p>
+            )}
           </div>
-
-          {!isView && (
-            <p className="mt-1.5 text-xs text-slate-500">
-              Inactive services are hidden from new customer forms and campaign
-              filters, but existing customers keep the tag.
-            </p>
-          )}
-        </div>
+        )}
       </div>
 
       <CustomerModalFooter>

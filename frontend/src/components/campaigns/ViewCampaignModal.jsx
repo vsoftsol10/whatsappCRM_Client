@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import toast from "react-hot-toast";
 
-import {
-  resendCampaign,
-  getCampaignRecipients,
-} from "../../api/campaignApi";
+import { getCampaignRecipients } from "../../api/campaignApi";
 import { getCampaignMessageText } from "../../utils/campaignMessage";
 import CampaignFormDrawer from "./CampaignFormDrawer";
 import { canEditCampaign } from "./campaignHelpers";
@@ -27,10 +23,7 @@ export default function ViewCampaignModal({
   onClose,
   campaign,
   onRequestEdit, // opens the Edit drawer for this campaign
-  onResendSuccess, // optional callback so the parent list/page can refresh
 }) {
-  const [resending, setResending] = useState(false);
-
   // The people this campaign was created for
   const [audience, setAudience] = useState([]);
   const [loadingAudience, setLoadingAudience] = useState(false);
@@ -101,44 +94,6 @@ export default function ViewCampaignModal({
   if (!isOpen || !campaign) return null;
 
   // ==================================================
-  // RESEND CAMPAIGN
-  // ==================================================
-  // Only meaningful for a campaign that already finished — the
-  // backend itself blocks resending anything still SENDING, or
-  // anything that was never sent at all (DRAFT/SCHEDULED should
-  // use the normal "Send" flow instead).
-
-  const canResend =
-    campaign.status === "COMPLETED" || campaign.status === "FAILED";
-
-  const handleResend = async () => {
-    if (resending) return;
-
-    try {
-      setResending(true);
-
-      const response = await resendCampaign(campaign.id);
-
-      if (onResendSuccess) {
-        onResendSuccess(response?.data);
-      }
-
-      onClose();
-
-      // Success message (shown AFTER the drawer is closed)
-      toast.success("Campaign resent successfully!");
-    } catch (error) {
-      console.error("Failed to resend campaign:", error);
-
-      toast.error(
-        error?.response?.data?.message || "Failed to resend campaign."
-      );
-    } finally {
-      setResending(false);
-    }
-  };
-
-  // ==================================================
   // READ-ONLY FORM VALUES
   // ==================================================
 
@@ -168,10 +123,6 @@ export default function ViewCampaignModal({
       selectedCustomers={selectedIds}
       // media
       imagePreview={campaign.imageUrl || ""}
-      // resend
-      canResend={canResend}
-      onResend={handleResend}
-      resending={resending}
     />
   );
 }

@@ -1,6 +1,7 @@
-import { useEffect, useId, useState } from "react";
-import { X, ChevronDown } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { X, ChevronDown, Check } from "lucide-react";
 import { getServices } from "../../api/serviceApi";
+import { STANDARD_SOURCES } from "../leads/leadHelpers";
 
 // Suggestions only: Source stays a free text box, so imported or
 // AI-captured values (e.g. "Instagram AI") are never lost.
@@ -232,6 +233,244 @@ function ServiceChips({ value = [], onChange, disabled, readOnly }) {
 }
 
 // =========================
+// SOURCE DROPDOWN (Add Customer only)
+// Same sources as Leads, plus "Other" which reveals a text box.
+// =========================
+
+const OTHER_SOURCE = "Other";
+
+function SourceDropdown({ id, value = "", onChange, disabled, hasError }) {
+  const [otherMode, setOtherMode] = useState(false);
+
+  const selectValue = otherMode
+    ? OTHER_SOURCE
+    : value === ""
+      ? ""
+      : STANDARD_SOURCES.includes(value)
+        ? value
+        : OTHER_SOURCE;
+
+  const showOtherInput = selectValue === OTHER_SOURCE;
+
+  const emit = (next) => onChange({ target: { name: "source", value: next } });
+
+  const handleSelect = (e) => {
+    const next = e.target.value;
+
+    if (next === OTHER_SOURCE) {
+      setOtherMode(true);
+      emit("");
+      return;
+    }
+
+    setOtherMode(false);
+    emit(next);
+  };
+
+  // Returns TWO grid cells: the Source select, and (for "Other") a second
+  // cell right beside it for typing the source.
+  return (
+    <>
+      <Field label="Source" htmlFor={id}>
+        <div className="relative">
+          <select
+            id={id}
+            name="source-select"
+            value={selectValue}
+            onChange={handleSelect}
+            disabled={disabled}
+            className={`${inputClass(hasError, false)} appearance-none pr-10`}
+          >
+            <option value="">Select source</option>
+
+            {STANDARD_SOURCES.map((source) => (
+              <option key={source} value={source}>
+                {source}
+              </option>
+            ))}
+
+            <option value={OTHER_SOURCE}>Other</option>
+          </select>
+
+          <ChevronDown
+            size={18}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+          />
+        </div>
+      </Field>
+
+      {showOtherInput && (
+        <Field label="Other Source" htmlFor={`${id}-other`}>
+          <input
+            id={`${id}-other`}
+            type="text"
+            name="source"
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+            placeholder="Enter source"
+            className={inputClass(false, false)}
+          />
+        </Field>
+      )}
+    </>
+  );
+}
+
+// =========================
+// SERVICE DROPDOWN (Add Customer only) - multi-select list
+// =========================
+
+function ServiceDropdown({ value = [], onChange, disabled }) {
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const data = await getServices();
+
+        if (!cancelled) {
+          setServices(data.services || []);
+        }
+      } catch (error) {
+        console.error("Failed to load services:", error);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handleOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [open]);
+
+  const visibleServices = services.filter(
+    (service) => service.isActive || value.includes(service.id)
+  );
+
+  const toggle = (id) => {
+    onChange(
+      value.includes(id)
+        ? value.filter((serviceId) => serviceId !== id)
+        : [...value, id]
+    );
+  };
+
+  const selectedNames = visibleServices
+    .filter((service) => value.includes(service.id))
+    .map((service) => service.name);
+
+  const summary =
+    selectedNames.length > 0 ? selectedNames.join(", ") : "Select services";
+
+  return (
+    <div className="mt-6" ref={wrapperRef}>
+      <p className="mb-2 text-sm font-medium text-slate-800">
+        Services (optional)
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-slate-500">Loading services...</p>
+      ) : visibleServices.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
+          No services created yet. You can add services from the Services page.
+        </p>
+      ) : (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => !disabled && setOpen((prev) => !prev)}
+            disabled={disabled}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            className="flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm outline-none transition hover:border-green-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+          >
+            <span
+              className={`truncate ${
+                selectedNames.length > 0 ? "text-slate-900" : "text-slate-400"
+              }`}
+            >
+              {summary}
+            </span>
+
+            <ChevronDown
+              size={18}
+              className={`shrink-0 text-slate-500 transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {open && (
+            <div
+              role="listbox"
+              aria-multiselectable="true"
+              className="absolute bottom-full left-0 right-0 z-30 mb-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+            >
+              {visibleServices.map((service) => {
+                const selected = value.includes(service.id);
+
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => toggle(service.id)}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition hover:bg-slate-50 ${
+                      selected
+                        ? "font-semibold text-slate-900"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        selected
+                          ? "border-green-500 bg-green-500 text-white"
+                          : "border-slate-300 bg-white text-transparent"
+                      }`}
+                    >
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+
+                    {service.name}
+                    {!service.isActive ? " (inactive)" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =========================
 // ALL FIELDS (2-column grid)
 // =========================
 
@@ -242,6 +481,7 @@ export function CustomerFields({
   onServicesChange,
   disabled = false,
   readOnly = false,
+  addMode = false, // Add Customer: source + services dropdowns, no Status field
 }) {
   const uid = useId();
   const id = (name) => `${uid}-${name}`;
@@ -332,55 +572,67 @@ export function CustomerFields({
           />
         </Field>
 
-        <Field label="Source" htmlFor={id("source")}>
-          <input
+        {addMode ? (
+          <SourceDropdown
             id={id("source")}
-            type="text"
-            name="source"
-            list={readOnly ? undefined : id("source-list")}
             value={values.source}
             onChange={onChange}
             disabled={disabled}
-            readOnly={readOnly}
-            placeholder="Enter source (e.g. WhatsApp, Instagram)"
-            className={inputClass(false, readOnly)}
+            hasError={false}
           />
-
-          <datalist id={id("source-list")}>
-            {SOURCE_SUGGESTIONS.map((source) => (
-              <option key={source} value={source} />
-            ))}
-          </datalist>
-        </Field>
-
-        <Field
-          label="Status"
-          htmlFor={id("status")}
-          required
-          showRequired={showRequired}
-          error={errors.status}
-        >
-          <div className="relative">
-            <select
-              id={id("status")}
-              name="status"
-              value={values.status}
+        ) : (
+          <Field label="Source" htmlFor={id("source")}>
+            <input
+              id={id("source")}
+              type="text"
+              name="source"
+              list={readOnly ? undefined : id("source-list")}
+              value={values.source}
               onChange={onChange}
-              disabled={locked}
-              className={`${inputClass(!!errors.status, readOnly)} appearance-none pr-10 disabled:opacity-100 ${
-                readOnly ? "disabled:text-slate-900" : ""
-              }`}
-            >
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </select>
-
-            <ChevronDown
-              size={18}
-              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+              disabled={disabled}
+              readOnly={readOnly}
+              placeholder="Enter source (e.g. WhatsApp, Instagram)"
+              className={inputClass(false, readOnly)}
             />
-          </div>
-        </Field>
+
+            <datalist id={id("source-list")}>
+              {SOURCE_SUGGESTIONS.map((source) => (
+                <option key={source} value={source} />
+              ))}
+            </datalist>
+          </Field>
+        )}
+
+        {!addMode && (
+          <Field
+            label="Status"
+            htmlFor={id("status")}
+            required
+            showRequired={showRequired}
+            error={errors.status}
+          >
+            <div className="relative">
+              <select
+                id={id("status")}
+                name="status"
+                value={values.status}
+                onChange={onChange}
+                disabled={locked}
+                className={`${inputClass(!!errors.status, readOnly)} appearance-none pr-10 disabled:opacity-100 ${
+                  readOnly ? "disabled:text-slate-900" : ""
+                }`}
+              >
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+
+              <ChevronDown
+                size={18}
+                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+              />
+            </div>
+          </Field>
+        )}
 
         <Field
           label="Requirements"
@@ -401,12 +653,20 @@ export function CustomerFields({
         </Field>
       </div>
 
-      <ServiceChips
-        value={values.serviceIds}
-        onChange={onServicesChange}
-        disabled={disabled}
-        readOnly={readOnly}
-      />
+      {addMode ? (
+        <ServiceDropdown
+          value={values.serviceIds}
+          onChange={onServicesChange}
+          disabled={disabled}
+        />
+      ) : (
+        <ServiceChips
+          value={values.serviceIds}
+          onChange={onServicesChange}
+          disabled={disabled}
+          readOnly={readOnly}
+        />
+      )}
     </>
   );
 }

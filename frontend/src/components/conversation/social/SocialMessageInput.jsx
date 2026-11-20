@@ -1,3 +1,4 @@
+
 // import { useRef, useState, useEffect } from "react";
 // import { toast } from "react-hot-toast";
 // import {
@@ -9,6 +10,7 @@
 //   FaVideo,
 //   FaMicrophone,
 // } from "react-icons/fa";
+// import VoiceRecorder from "../VoiceRecorder";
 
 // const MB = 1024 * 1024;
 // const MAX_SIZE_MB = { image: 5, audio: 16, video: 16, document: 25 };
@@ -32,6 +34,7 @@
 //   onSendMessage,
 //   onSendMedia,
 //   disabled = false,
+//   conversationKey,
 // }) {
 //   const [message, setMessage] = useState("");
 //   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -167,6 +170,20 @@
 //     </div>
 //   );
 
+//   // Voice message button (records, then sends through onSendMedia)
+//   const voiceButton = (
+//     <VoiceRecorder
+//       format="social"
+//       variant="plain"
+//       accentClass={theme.accentText}
+//       sendButtonClass={`${theme.accentBg} ${theme.accentHover}`}
+//       waveColor={isFacebook ? "#0084FF" : "#0095F6"}
+//       disabled={disabled || !onSendMedia}
+//       resetKey={conversationKey}
+//       onSend={(file) => onSendMedia(file, "")}
+//     />
+//   );
+
 //   const emojiButton = (
 //     <div ref={emojiPickerRef} className="relative">
 //       <button
@@ -228,14 +245,18 @@
 //             {emojiButton}
 //           </div>
 
-//           <button
-//             onClick={handleSend}
-//             disabled={disabled || !hasText}
-//             title="Send"
-//             className={`transition disabled:cursor-not-allowed disabled:opacity-40 ${theme.accentText}`}
-//           >
-//             <FaPaperPlane size={20} />
-//           </button>
+//           {hasText ? (
+//             <button
+//               onClick={handleSend}
+//               disabled={disabled}
+//               title="Send"
+//               className={`transition disabled:cursor-not-allowed disabled:opacity-40 ${theme.accentText}`}
+//             >
+//               <FaPaperPlane size={20} />
+//             </button>
+//           ) : (
+//             voiceButton
+//           )}
 //         </div>
 //       ) : (
 //         /* ---------- Instagram style ---------- */
@@ -252,7 +273,10 @@
 //               Send
 //             </button>
 //           ) : (
-//             attachButton
+//             <>
+//               {voiceButton}
+//               {attachButton}
+//             </>
 //           )}
 //         </div>
 //       )}
@@ -359,12 +383,15 @@
 
 
 
+
+
 import { useRef, useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import {
   FaPaperPlane,
   FaSmile,
   FaPlusCircle,
+  FaCamera,
   FaImage,
   FaFileAlt,
   FaVideo,
@@ -503,9 +530,11 @@ function SocialMessageInput({
         onClick={() => !disabled && setShowAttachmentMenu((prev) => !prev)}
         disabled={disabled}
         title="Attach"
-        className={`transition disabled:cursor-not-allowed disabled:opacity-40 ${theme.accentText}`}
+        className={`transition disabled:cursor-not-allowed disabled:opacity-40 ${
+          isFacebook ? theme.accentText : "text-[#262626]"
+        }`}
       >
-        {isFacebook ? <FaPlusCircle size={22} /> : <FaImage size={22} />}
+        {isFacebook ? <FaPlusCircle size={22} /> : <FaCamera size={22} />}
       </button>
 
       {showAttachmentMenu && (
@@ -535,7 +564,7 @@ function SocialMessageInput({
     <VoiceRecorder
       format="social"
       variant="plain"
-      accentClass={theme.accentText}
+      accentClass={isFacebook ? theme.accentText : "text-[#262626]"}
       sendButtonClass={`${theme.accentBg} ${theme.accentHover}`}
       waveColor={isFacebook ? "#0084FF" : "#0095F6"}
       disabled={disabled || !onSendMedia}
@@ -560,7 +589,7 @@ function SocialMessageInput({
       {showEmojiPicker && (
         <div
           className={`absolute bottom-10 z-50 w-64 rounded-xl border border-gray-200 bg-white p-3 shadow-xl ${
-            isFacebook ? "right-0" : "left-0"
+            "right-0"
           }`}
         >
           <div className="grid grid-cols-8 gap-1">
@@ -587,7 +616,11 @@ function SocialMessageInput({
       onKeyDown={handleKeyDown}
       disabled={disabled}
       placeholder={
-        disabled ? "Select a conversation to start typing" : theme.inputPlaceholder
+        disabled
+          ? "Select a conversation to start typing"
+          : isFacebook
+            ? theme.inputPlaceholder
+            : "Type a message"
       }
       className="min-w-0 flex-1 bg-transparent text-[15px] text-[#050505] outline-none placeholder:text-[#65676B] disabled:cursor-not-allowed disabled:opacity-60"
     />
@@ -620,9 +653,10 @@ function SocialMessageInput({
         </div>
       ) : (
         /* ---------- Instagram style ---------- */
-        <div className="flex items-center gap-3 rounded-full border border-[#DBDBDB] px-4 py-2">
-          {emojiButton}
+        <div className="flex items-center gap-3 rounded-full bg-[#F0F0F0] px-4 py-2.5">
+          {attachButton}
           {textField}
+          {emojiButton}
 
           {hasText ? (
             <button
@@ -633,10 +667,7 @@ function SocialMessageInput({
               Send
             </button>
           ) : (
-            <>
-              {voiceButton}
-              {attachButton}
-            </>
+            voiceButton
           )}
         </div>
       )}

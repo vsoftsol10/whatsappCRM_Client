@@ -1,4 +1,4 @@
-// frontend/src/components/backup/BackupSchedule.jsx  (NEW FILE)
+// frontend/src/components/backup/BackupSchedule.jsx
 //
 // "Automatic Backup" card shown on the Backup page.
 // Fully self-contained: it loads and saves its own settings, so the Backup
@@ -6,10 +6,13 @@
 //
 // GET /api/backup-settings   -> current schedule
 // PUT /api/backup-settings   -> save schedule
+//
+// NOTE: only the markup / classNames were redesigned. All state, API calls,
+// validation and payloads are exactly the same as before.
 
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { CalendarClock, Loader2 } from "lucide-react";
+import { CalendarClock, ChevronDown, Loader2 } from "lucide-react";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -43,6 +46,30 @@ const formatDateTime = (date) => {
     minute: "2-digit",
   });
 };
+
+// ---------------------------------------------------------------------------
+// Small UI helpers (presentation only)
+// ---------------------------------------------------------------------------
+
+const labelClass =
+  "mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500";
+
+const fieldClass =
+  "h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3.5 pr-10 text-sm text-slate-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+
+const SelectField = ({ label, children, ...props }) => (
+  <div>
+    <label className={labelClass}>{label}</label>
+
+    <div className="relative">
+      <select {...props} className={fieldClass}>
+        {children}
+      </select>
+
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+    </div>
+  </div>
+);
 
 const BackupSchedule = () => {
   const [setting, setSetting] = useState(null);
@@ -138,8 +165,8 @@ const BackupSchedule = () => {
 
   if (loading) {
     return (
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center gap-3 text-sm text-gray-500">
+      <div className="mb-6 rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading automatic backup settings...
         </div>
@@ -167,198 +194,161 @@ const BackupSchedule = () => {
     Number(form.dayOfMonth) !== setting.dayOfMonth ||
     Number(form.retentionCount) !== setting.retentionCount;
 
-  const inputClass =
-    "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400";
-
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="mb-6 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
       {/* TITLE + ON/OFF */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
-            <CalendarClock className="h-5 w-5 text-green-600" />
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-100">
+            <CalendarClock className="h-5 w-5 text-green-700" />
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-base font-semibold text-slate-900">
               Automatic Backup
             </h2>
 
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-500">
               Your CRM data is backed up automatically at night (about 2 AM
               IST) as the same Excel file as a manual backup.
             </p>
           </div>
         </div>
 
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-3">
-          <span className="text-sm font-medium text-gray-700">
-            {form.enabled ? "On" : "Off"}
-          </span>
-
-          <button
-            type="button"
-            role="switch"
-            aria-checked={form.enabled}
-            onClick={() =>
-              setForm((prev) => ({ ...prev, enabled: !prev.enabled }))
-            }
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-              form.enabled ? "bg-green-600" : "bg-gray-300"
+        <button
+          type="button"
+          role="switch"
+          aria-checked={form.enabled}
+          aria-label={`Automatic backup is ${form.enabled ? "on" : "off"}`}
+          title={form.enabled ? "On" : "Off"}
+          onClick={() =>
+            setForm((prev) => ({ ...prev, enabled: !prev.enabled }))
+          }
+          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
+            form.enabled ? "bg-green-500" : "bg-slate-300"
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+              form.enabled ? "translate-x-6" : "translate-x-1"
             }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-                form.enabled ? "translate-x-5" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-        </label>
+          />
+        </button>
       </div>
 
       {/* OPTIONS */}
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Frequency
-          </label>
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <SelectField
+          label="Frequency"
+          value={form.frequency}
+          disabled={!form.enabled}
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, frequency: e.target.value }))
+          }
+        >
+          <option value="DAILY">Daily</option>
+          <option value="WEEKLY">Weekly</option>
+          <option value="MONTHLY">Monthly</option>
+        </SelectField>
 
-          <select
-            value={form.frequency}
+        {form.frequency === "WEEKLY" && (
+          <SelectField
+            label="Day of the week"
+            value={form.dayOfWeek}
             disabled={!form.enabled}
             onChange={(e) =>
-              setForm((prev) => ({ ...prev, frequency: e.target.value }))
+              setForm((prev) => ({ ...prev, dayOfWeek: e.target.value }))
             }
-            className={inputClass}
           >
-            <option value="DAILY">Daily</option>
-            <option value="WEEKLY">Weekly</option>
-            <option value="MONTHLY">Monthly</option>
-          </select>
-        </div>
-
-        <div>
-          {form.frequency === "WEEKLY" && (
-            <>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Day of the week
-              </label>
-
-              <select
-                value={form.dayOfWeek}
-                disabled={!form.enabled}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, dayOfWeek: e.target.value }))
-                }
-                className={inputClass}
-              >
-                {DAYS_OF_WEEK.map((day) => (
-                  <option key={day.value} value={day.value}>
-                    {day.label}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-
-          {form.frequency === "MONTHLY" && (
-            <>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Day of the month
-              </label>
-
-              <select
-                value={form.dayOfMonth}
-                disabled={!form.enabled}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, dayOfMonth: e.target.value }))
-                }
-                className={inputClass}
-              >
-                {DAYS_OF_MONTH.map((day) => (
-                  <option key={day} value={day}>
-                    {day}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-
-          {form.frequency === "DAILY" && (
-            <>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Runs
-              </label>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
-                Every night
-              </div>
-            </>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Keep last
-          </label>
-
-          <select
-            value={form.retentionCount}
-            disabled={!form.enabled}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                retentionCount: e.target.value,
-              }))
-            }
-            className={inputClass}
-          >
-            {KEEP_OPTIONS.map((count) => (
-              <option key={count} value={count}>
-                {count} automatic backups
+            {DAYS_OF_WEEK.map((day) => (
+              <option key={day.value} value={day.value}>
+                {day.label}
               </option>
             ))}
-          </select>
-        </div>
+          </SelectField>
+        )}
+
+        {form.frequency === "MONTHLY" && (
+          <SelectField
+            label="Day of the month"
+            value={form.dayOfMonth}
+            disabled={!form.enabled}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, dayOfMonth: e.target.value }))
+            }
+          >
+            {DAYS_OF_MONTH.map((day) => (
+              <option key={day} value={day}>
+                {day}
+              </option>
+            ))}
+          </SelectField>
+        )}
+
+        {form.frequency === "DAILY" && (
+          <div>
+            <label className={labelClass}>Runs</label>
+
+            <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-white px-3.5 text-sm text-slate-700">
+              Every night
+            </div>
+          </div>
+        )}
+
+        <SelectField
+          label="Keep last"
+          value={form.retentionCount}
+          disabled={!form.enabled}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              retentionCount: e.target.value,
+            }))
+          }
+        >
+          {KEEP_OPTIONS.map((count) => (
+            <option key={count} value={count}>
+              {count} automatic backups
+            </option>
+          ))}
+        </SelectField>
       </div>
 
-      {/* STATUS + SAVE */}
-      <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-xs text-gray-500">
-          <p>
+      {/* STATUS NOTES + SAVE */}
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <ul className="list-disc space-y-1.5 pl-4 text-xs text-slate-600 marker:text-slate-400">
+          <li>
             Last automatic backup:{" "}
-            <span className="font-medium text-gray-700">
+            <span className="font-semibold text-slate-800">
               {formatDateTime(setting.lastRunAt)}
             </span>
-          </p>
+          </li>
 
-          <p className="mt-1">
+          <li>
             Next automatic backup:{" "}
-            <span className="font-medium text-gray-700">
+            <span className="font-semibold text-slate-800">
               {setting.enabled ? formatDateTime(setting.nextRunAt) : "Off"}
             </span>
-          </p>
+          </li>
 
-          <p className="mt-1">
+          <li>
             Older automatic backups are deleted. Manual backups are never
             deleted.
-          </p>
-        </div>
+          </li>
+        </ul>
 
         <button
           type="button"
           onClick={handleSave}
           disabled={saving || !hasChanges}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-green-500 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           {saving ? "Saving..." : "Save Settings"}
         </button>
       </div>
 
-      {error && (
-        <p className="mt-3 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </div>
   );
 };

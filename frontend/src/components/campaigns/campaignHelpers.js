@@ -61,9 +61,9 @@ export const getSentCount = (campaign) => campaign?.sentCount || 0;
 export const formatDateTime = (value) =>
   value ? new Date(value).toLocaleString() : "";
 
-// The backend refuses to edit a campaign that is sending or finished
-export const canEditCampaign = (campaign) =>
-  campaign?.status !== "COMPLETED" && campaign?.status !== "SENDING";
+// Only a campaign that is sending right now is locked. Completed campaigns
+// can be edited (parameters changed) and then sent again.
+export const canEditCampaign = (campaign) => campaign?.status !== "SENDING";
 
 export const canSendCampaign = (campaign) => campaign?.status !== "SENDING";
 
@@ -102,7 +102,7 @@ export function getCampaignActions(
       disabled: !editable,
       title: editable
         ? undefined
-        : "Completed or currently sending campaigns cannot be edited",
+        : "A campaign that is currently sending cannot be edited",
       onClick: () => onEdit?.(campaign),
     },
     {

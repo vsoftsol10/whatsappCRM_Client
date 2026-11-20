@@ -9,7 +9,7 @@ import TemplateCard from "../components/templates/TemplateCard";
 import TemplateTable from "../components/templates/TemplateTable";
 import TemplatePagination from "../components/templates/TemplatePagination";
 import TemplateDrawer from "../components/templates/TemplateDrawer";
-import SendTemplateModal from "../components/templates/SendTemplateModal";
+import SendTemplateDrawer from "../components/templates/SendTemplateDrawer";
 import ConfirmModal from "../components/common/ConfirmModal";
 
 // Each view has its own sensible page sizes
@@ -283,7 +283,7 @@ export default function Templates() {
         />
       )}
 
-      <SendTemplateModal
+      <SendTemplateDrawer
         isOpen={!!sendTarget}
         onClose={() => setSendTarget(null)}
         template={sendTarget}

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
-  CreditCard,
   CalendarDays,
   Users,
   UsersRound,
@@ -14,8 +14,15 @@ import {
 } from "lucide-react";
 
 import { useSubscriptionStore } from "../../store/subscriptionStore";
+import { useAuthStore } from "../../store/authStore";
+
+const formatDate = (date) =>
+  date ? new Date(date).toLocaleDateString() : "-";
 
 function BillingSubscriptionCard() {
+  const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+
   const {
     subscription,
     fetchMySubscription,
@@ -42,7 +49,7 @@ function BillingSubscriptionCard() {
   // ==========================================
   if (isLoading || upgradeRequestLoading) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <p className="text-slate-500">
           Loading subscription details...
         </p>
@@ -55,7 +62,7 @@ function BillingSubscriptionCard() {
   // ==========================================
   if (error) {
     return (
-      <div className="rounded-3xl border border-red-200 bg-red-50 p-6">
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
         <p className="font-medium text-red-600">
           {error}
         </p>
@@ -68,7 +75,7 @@ function BillingSubscriptionCard() {
   // ==========================================
   if (!subscription) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <p className="text-slate-500">
           No active subscription found.
         </p>
@@ -97,6 +104,10 @@ function BillingSubscriptionCard() {
   const isRejected =
     requestStatus === "REJECTED";
 
+  const priceText = plan?.isCustom
+    ? "Custom Plan"
+    : `₹${plan?.price ?? 0}/month`;
+
   return (
     <div className="space-y-6">
 
@@ -113,144 +124,126 @@ function BillingSubscriptionCard() {
         />
       )}
 
-      {/* ======================================
-          HEADER CARD
-      ====================================== */}
-
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
 
         {/* HEADER */}
 
-        <div className="bg-gradient-to-r from-[#25D366] to-[#128C7E] p-6 text-white">
+        <div className="border-b border-slate-200 pb-5">
+          <h2 className="text-lg font-bold leading-tight text-slate-900">
+            Billing & Subscription
+          </h2>
 
-          <div className="flex items-center gap-3">
-
-            <div className="rounded-2xl bg-white/20 p-3">
-              <CreditCard size={28} />
-            </div>
-
-            <div>
-
-              <h2 className="text-2xl font-bold">
-                Billing & Subscription
-              </h2>
-
-              <p className="text-sm text-white/80">
-                Manage your WhatsApp CRM plan
-              </p>
-
-            </div>
-
-          </div>
-
+          <p className="mt-0.5 text-xs text-slate-500">
+            Manage your WhatsApp CRM plan
+          </p>
         </div>
 
-        {/* BODY */}
+        {/* ==================================
+            CURRENT PLAN + PLAN DETAILS
+        ================================== */}
 
-        <div className="p-6">
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-5">
 
-          {/* ==================================
-              COMPANY
-          ================================== */}
+          {/* CURRENT PLAN */}
 
-          <div className="mb-6 rounded-2xl bg-slate-50 p-5">
+          <div className="relative flex flex-col justify-between gap-6 rounded-2xl bg-gradient-to-br from-green-100 via-green-50 to-emerald-50 p-6 lg:col-span-3">
 
-            <h3 className="mb-3 text-lg font-bold text-slate-900">
-              Company Details
-            </h3>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex items-start justify-between gap-4">
 
               <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-green-800">
+                    Current Plan
+                  </p>
 
-                <p className="text-sm text-slate-500">
-                  Company Name
-                </p>
+                  {planDetails?.status && (
+                    <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-[11px] font-semibold text-green-700">
+                      {planDetails.status}
+                    </span>
+                  )}
+                </div>
 
-                <p className="font-semibold text-slate-800">
-                  {company?.companyName || "-"}
-                </p>
-
-              </div>
-
-              <div>
-
-                <p className="text-sm text-slate-500">
-                  Owner
-                </p>
-
-                <p className="font-semibold text-slate-800">
-                  {company?.ownerName || "-"}
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* ==================================
-              CURRENT PLAN
-          ================================== */}
-
-          <div className="mb-6 rounded-2xl border border-[#DCF8C6] bg-[#F6FFF8] p-5">
-
-            <div className="flex items-center justify-between">
-
-              <div>
-
-                <p className="text-sm text-slate-500">
-                  Current Plan
-                </p>
-
-                <h3 className="text-2xl font-bold text-[#128C7E]">
+                <h3 className="mt-2 text-2xl font-bold text-green-700">
                   {plan?.planName}
                 </h3>
 
+                <div className="mt-4 flex items-center gap-3">
+                  <CalendarDays size={16} className="text-green-700" />
+
+                  <div>
+                    <p className="text-[11px] text-slate-500">
+                      Next billing date
+                    </p>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {formatDate(planDetails?.expiryDate)}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="rounded-full bg-[#DCF8C6] px-4 py-2 text-sm font-semibold text-[#128C7E]">
-
-                {planDetails?.status}
-
+              <div className="shrink-0 rounded-xl bg-white px-4 py-2.5 shadow-sm">
+                {plan?.isCustom ? (
+                  <span className="text-base font-bold text-slate-900">
+                    Custom Plan
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-xl font-bold text-slate-900">
+                      ₹{plan?.price ?? 0}
+                    </span>
+                    <span className="ml-1 text-[11px] text-slate-500">
+                      /month
+                    </span>
+                  </>
+                )}
               </div>
 
             </div>
 
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {user?.role === "ADMIN" && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => navigate("/plans")}
+                  className="rounded-lg bg-green-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-600"
+                >
+                  Upgrade Plan
+                </button>
+              </div>
+            )}
+
+          </div>
+
+          {/* PLAN DETAILS */}
+
+          <div className="rounded-2xl border border-slate-200 p-6 lg:col-span-2">
+
+            <h3 className="mb-5 text-sm font-semibold text-slate-900">
+              Plan Details
+            </h3>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
 
               <InfoCard
-                icon={<CalendarDays size={18} />}
+                icon={<CalendarDays size={16} />}
                 title="Start Date"
-                value={
-                  planDetails?.startDate
-                    ? new Date(
-                        planDetails.startDate
-                      ).toLocaleDateString()
-                    : "-"
-                }
+                value={formatDate(planDetails?.startDate)}
               />
 
               <InfoCard
-                icon={<Clock size={18} />}
+                icon={<Clock size={16} />}
                 title="Expiry Date"
-                value={
-                  planDetails?.expiryDate
-                    ? new Date(
-                        planDetails.expiryDate
-                      ).toLocaleDateString()
-                    : "-"
-                }
+                value={formatDate(planDetails?.expiryDate)}
               />
 
               <InfoCard
-                icon={<CreditCard size={18} />}
+                icon={<span className="text-sm font-bold leading-none">₹</span>}
                 title="Price"
-                value={plan?.isCustom ? "Custom Plan" : `₹${plan?.price ?? 0}/month`}
+                value={priceText}
               />
 
               <InfoCard
-                icon={<CheckCircle size={18} />}
+                icon={<CheckCircle size={16} />}
                 title="Remaining Days"
                 value={`${planDetails?.remainingDays ?? 0} Days`}
               />
@@ -259,42 +252,86 @@ function BillingSubscriptionCard() {
 
           </div>
 
-          {/* ==================================
-              LIMITS
-          ================================== */}
+        </div>
 
-          <div className="rounded-2xl bg-slate-50 p-5">
+        {/* ==================================
+            PLAN LIMITS
+        ================================== */}
 
-            <h3 className="mb-4 text-lg font-bold text-slate-900">
-              Plan Limits
-            </h3>
+        <div className="mt-4 rounded-2xl border border-slate-200 p-6">
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <h3 className="mb-4 text-sm font-semibold text-slate-900">
+            Plan Limits
+          </h3>
 
-              <LimitCard
-                icon={<Users />}
-                title="Users"
-                value={plan?.maxUsers ?? 0}
-              />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-              <LimitCard
-                icon={<UsersRound />}
-                title="Customers"
-                value={plan?.maxCustomers ?? 0}
-              />
+            <LimitCard
+              icon={<Users size={18} />}
+              iconClass="bg-blue-100 text-blue-600"
+              boxClass="border-blue-100"
+              title="Users"
+              value={plan?.maxUsers ?? 0}
+            />
 
-              <LimitCard
-                icon={<Megaphone />}
-                title="Campaigns"
-                value={plan?.maxCampaigns ?? 0}
-              />
+            <LimitCard
+              icon={<UsersRound size={18} />}
+              iconClass="bg-green-100 text-green-600"
+              boxClass="border-green-100"
+              title="Customers"
+              value={plan?.maxCustomers ?? 0}
+            />
 
-              <LimitCard
-                icon={<FileText />}
-                title="Templates"
-                value={plan?.maxTemplates ?? 0}
-              />
+            <LimitCard
+              icon={<Megaphone size={18} />}
+              iconClass="bg-orange-100 text-orange-600"
+              boxClass="border-orange-100"
+              title="Campaigns"
+              value={plan?.maxCampaigns ?? 0}
+            />
 
+            <LimitCard
+              icon={<FileText size={18} />}
+              iconClass="bg-purple-100 text-purple-600"
+              boxClass="border-purple-100"
+              title="Templates"
+              value={plan?.maxTemplates ?? 0}
+            />
+
+          </div>
+
+        </div>
+
+        {/* ==================================
+            COMPANY DETAILS
+        ================================== */}
+
+        <div className="mt-4 rounded-2xl border border-slate-200 p-6">
+
+          <h3 className="mb-4 text-sm font-semibold text-slate-900">
+            Company Details
+          </h3>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                Company Name
+              </p>
+
+              <p className="text-sm font-semibold text-slate-800">
+                {company?.companyName || "-"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                Owner
+              </p>
+
+              <p className="text-sm font-semibold text-slate-800">
+                {company?.ownerName || "-"}
+              </p>
             </div>
 
           </div>
@@ -475,19 +512,19 @@ function InfoCard({
   value,
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-3">
 
-      <div className="rounded-xl bg-[#DCF8C6] p-2 text-[#128C7E]">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600">
         {icon}
       </div>
 
-      <div>
+      <div className="min-w-0">
 
-        <p className="text-xs text-slate-500">
+        <p className="text-[11px] text-slate-500">
           {title}
         </p>
 
-        <p className="font-semibold text-slate-800">
+        <p className="truncate text-sm font-semibold text-slate-800">
           {value}
         </p>
 
@@ -504,23 +541,29 @@ function InfoCard({
 
 function LimitCard({
   icon,
+  iconClass,
+  boxClass,
   title,
   value,
 }) {
   return (
-    <div className="rounded-xl bg-white p-4 shadow-sm">
+    <div className={`flex items-center gap-3 rounded-xl border bg-white p-4 ${boxClass}`}>
 
-      <div className="mb-2 text-[#25D366]">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconClass}`}>
         {icon}
       </div>
 
-      <p className="text-sm text-slate-500">
-        {title}
-      </p>
+      <div>
 
-      <p className="text-xl font-bold text-slate-900">
-        {value}
-      </p>
+        <p className="text-xs text-slate-500">
+          {title}
+        </p>
+
+        <p className="text-xl font-bold text-slate-900">
+          {value}
+        </p>
+
+      </div>
 
     </div>
   );

@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -11,6 +10,10 @@ import RestoreBackupModal from "../components/backup/RestoreBackupModal";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+// The new design does not show the 3 summary cards (Total / Completed / Latest).
+// Set to true if you want them back between the Automatic Backup card and the table.
+const SHOW_STATS = false;
 
 const Backup = () => {
   const { can } = usePlanFeatures();
@@ -241,7 +244,7 @@ const Backup = () => {
   // =========================================================
 
   return (
-    <div className="min-h-full bg-gray-50 p-4 md:p-6 lg:p-8">
+    <div className="min-h-full bg-slate-50 p-4 md:p-6 lg:p-8">
 
       {/* HEADER */}
       <BackupHeader
@@ -274,9 +277,9 @@ const Backup = () => {
 
       {/* LOADING */}
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+        <div className="rounded-xl border border-slate-100 bg-white p-10 text-center shadow-sm">
 
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-green-600" />
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-green-500" />
 
           <p className="mt-4 text-sm text-gray-500">
             Loading backup history...
@@ -285,10 +288,12 @@ const Backup = () => {
         </div>
       ) : (
         <>
-          {/* STATS */}
-          <BackupStats
-            backups={backups}
-          />
+          {/* STATS (hidden in the new design - see SHOW_STATS) */}
+          {SHOW_STATS && (
+            <BackupStats
+              backups={backups}
+            />
+          )}
 
           {/* HISTORY */}
           <BackupHistory

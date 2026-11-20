@@ -157,6 +157,7 @@ function AddCustomer({ onClose, onSuccess }) {
             setFormData((prev) => ({ ...prev, serviceIds: ids }))
           }
           disabled={loading}
+          addMode
         />
 
         <CustomerModalFooter>
