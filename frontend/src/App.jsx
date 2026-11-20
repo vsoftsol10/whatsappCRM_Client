@@ -1,58 +1,59 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom"; // CHANGED (added useSearchParams)
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 
 import { useAuthStore } from "./store/authStore";
 
-import AppLayout from "./layouts/AppLayout";
-import SettingsLayout from "./layouts/SettingsLayout";
-import SaasSupportPage from "./pages/settings/SaasSupportPage";
-import UserGuide from "./pages/settings/UserGuide";
-import Integrations from "./pages/settings/Integrations";
+// Pages that are needed straight away (login screen + route guards)
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import ManageEmployees from "./pages/ManageEmployees";
-import Customers from "./pages/Customers";
-import Leads from "./pages/Leads";
-import Campaigns from "./pages/Campaigns";
-import TicketsPage from "./pages/TicketsPage";
-import Conversations from "./pages/Conversations";
-import FacebookConversations from "./pages/FacebookConversations";
-import InstagramConversations from "./pages/InstagramConversations";
-import Tasks from "./pages/Task";
-//import Products from "./pages/Products";
-//import DealsPage from "./pages/DealsPage";
-import Settings from "./pages/settings/Settings";
-import CustomerProfile from "./pages/CustomerProfile";
-import CampaignDetails from "./pages/CampaignDetails";
-import Templates from "./pages/Templates";
-import Services from "./pages/Services";
-import Proposals from "./pages/Proposals";
-import ProposalBuilder from "./pages/ProposalBuilder";
-
-import AuditLogs from "./pages/settings/AuditLogs";
-import AiAutoReply from "./pages/settings/AiAutoReply";
-import KnowledgeBase from "./pages/settings/KnowledgeBase";
-import AddCustomer from "./pages/AddCustomer";
-// import EditCustomer from "./pages/EditCustomer";
-
-import EditEmployee from "./pages/EditEmployee";
-import ViewEmployee from "./pages/ViewEmployee";
-
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import FeatureRoute from "./components/FeatureRoute";
 import ModuleGuideGate from "./components/guide/ModuleGuideGate";
 
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ChangePassword from "./pages/settings/ChangePassword";
+// ======================================================
+// LAZY LOADING
+// ------------------------------------------------------
+// Every page below is downloaded only when it is opened,
+// so the first load (login screen) is much smaller.
+// Used in the routes exactly like before:  <Dashboard />
+// See src/utils/lazyWithRetry.js
+// ======================================================
+import { lazyPage } from "./utils/lazyWithRetry";
 
-import ProfileSettings from "./pages/settings/ProfileSettings";
-import SecuritySettings from "./pages/settings/SecuritySettings";
-import Plans from "./pages/settings/Plans";
-
-// BACKUP
-import Backup from "./pages/Backup";
+const AppLayout = lazyPage(() => import("./layouts/AppLayout"), { fullScreen: true });
+const SettingsLayout = lazyPage(() => import("./layouts/SettingsLayout"));
+const SaasSupportPage = lazyPage(() => import("./pages/settings/SaasSupportPage"));
+const UserGuide = lazyPage(() => import("./pages/settings/UserGuide"));
+const Integrations = lazyPage(() => import("./pages/settings/Integrations"));
+const Dashboard = lazyPage(() => import("./pages/Dashboard"));
+const ManageEmployees = lazyPage(() => import("./pages/ManageEmployees"));
+const Customers = lazyPage(() => import("./pages/Customers"));
+const Leads = lazyPage(() => import("./pages/Leads"));
+const Campaigns = lazyPage(() => import("./pages/Campaigns"));
+const TicketsPage = lazyPage(() => import("./pages/TicketsPage"));
+const Conversations = lazyPage(() => import("./pages/Conversations"));
+const FacebookConversations = lazyPage(() => import("./pages/FacebookConversations"));
+const InstagramConversations = lazyPage(() => import("./pages/InstagramConversations"));
+const Tasks = lazyPage(() => import("./pages/Task"));
+const CustomerProfile = lazyPage(() => import("./pages/CustomerProfile"));
+const CampaignDetails = lazyPage(() => import("./pages/CampaignDetails"));
+const Templates = lazyPage(() => import("./pages/Templates"));
+const Services = lazyPage(() => import("./pages/Services"));
+const Proposals = lazyPage(() => import("./pages/Proposals"));
+const ProposalBuilder = lazyPage(() => import("./pages/ProposalBuilder"));
+const AuditLogs = lazyPage(() => import("./pages/settings/AuditLogs"));
+const AiAutoReply = lazyPage(() => import("./pages/settings/AiAutoReply"));
+const KnowledgeBase = lazyPage(() => import("./pages/settings/KnowledgeBase"));
+const AddCustomer = lazyPage(() => import("./pages/AddCustomer"));
+const EditEmployee = lazyPage(() => import("./pages/EditEmployee"));
+const ViewEmployee = lazyPage(() => import("./pages/ViewEmployee"));
+const ForgotPassword = lazyPage(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
+const ChangePassword = lazyPage(() => import("./pages/settings/ChangePassword"));
+const ProfileSettings = lazyPage(() => import("./pages/settings/ProfileSettings"));
+const SecuritySettings = lazyPage(() => import("./pages/settings/SecuritySettings"));
+const Plans = lazyPage(() => import("./pages/settings/Plans"));
+const Backup = lazyPage(() => import("./pages/Backup"));
 
 
 // ======================================================

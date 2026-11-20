@@ -1,6 +1,7 @@
 const XLSX = require("xlsx");
 const prisma = require("../config/prisma");
 const { normalizeIndianPhone } = require("../utils/phoneUtils");
+const { resolveServiceIds } = require("../utils/serviceHelper");
 
 /**
  * Normalize Excel column names
@@ -433,7 +434,8 @@ const previewImport = async (file, user) => {
  */
 const importCustomers = async (
   rows,
-  user
+  user,
+  serviceIds = []
 ) => {
   const {
     companyId,
@@ -536,6 +538,16 @@ const importCustomers = async (
   }
 
   const plan = subscription.plan;
+
+  /**
+   * Optional: services to attach to every imported customer.
+   * Checked first so a bad service stops the import before
+   * any customer is created.
+   */
+  const validServiceIds = await resolveServiceIds(
+    companyId,
+    serviceIds
+  );
 
   /**
    * Normalize and validate rows
@@ -725,10 +737,60 @@ const importCustomers = async (
   /**
    * Create customers
    */
-  const result =
-    await prisma.customer.createMany({
-      data: finalCustomers,
-    });
+  let result;
+
+  if (validServiceIds.length === 0) {
+    // No services selected: same behaviour as before.
+    result =
+      await prisma.customer.createMany({
+        data: finalCustomers,
+      });
+  } else {
+    // Services selected: create customers and link the
+    // services in ONE transaction (all or nothing).
+    result = await prisma.$transaction(
+      async (tx) => {
+        const created =
+          await tx.customer.createMany({
+            data: finalCustomers,
+          });
+
+        // Duplicates were removed above, so these phones
+        // belong to the customers created just now.
+        const createdCustomers =
+          await tx.customer.findMany({
+            where: {
+              companyId,
+              phone: {
+                in: finalCustomers.map(
+                  (customer) => customer.phone
+                ),
+              },
+            },
+            select: { id: true },
+          });
+
+        const links = [];
+
+        for (const customer of createdCustomers) {
+          for (const serviceId of validServiceIds) {
+            links.push({
+              customerId: customer.id,
+              serviceId,
+            });
+          }
+        }
+
+        await tx.customerService.createMany({
+          data: links,
+          skipDuplicates: true,
+        });
+
+        return created;
+      },
+      { maxWait: 10000, timeout: 60000 }
+    );
+  }
 
   /**
    * Calculate skipped rows
@@ -749,6 +811,9 @@ const importCustomers = async (
 
     importedCount:
       result.count,
+
+    servicesAssigned:
+      validServiceIds.length,
 
     skippedCount,
   };
