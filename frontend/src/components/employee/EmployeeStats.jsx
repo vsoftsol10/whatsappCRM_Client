@@ -35,45 +35,28 @@ export default function EmployeeStats({
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {stats.map((stat) => {
         const Icon = stat.icon;
 
         return (
           <div
             key={stat.title}
-            className="
-              bg-white
-              rounded-2xl
-              border
-              border-gray-200
-              p-5
-              shadow-sm
-              transition-all
-              duration-200
-              hover:border-[#25D366]
-              hover:bg-[#DCF8C6]
-              hover:shadow-lg
-            "
+            className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  {stat.title}
-                </p>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">
+                {stat.title}
+              </p>
 
-                <h2 className="mt-3 text-3xl font-bold text-gray-900">
-                  {stat.value}
-                </h2>
-              </div>
-
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#DCF8C6]">
-                <Icon
-                  size={24}
-                  className="text-[#25D366]"
-                />
-              </div>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {stat.value}
+              </p>
             </div>
+
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600">
+              <Icon size={22} />
+            </span>
           </div>
         );
       })}

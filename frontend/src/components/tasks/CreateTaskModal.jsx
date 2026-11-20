@@ -1,8 +1,23 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import useTaskStore from "../../store/taskStore";
 import useEmployeeStore from "../../store/employeeStore";
+import {
+  TaskModalShell,
+  TaskFormFields,
+} from "./taskUi";
+import {
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "./taskHelpers";
+
+const EMPTY_FORM = {
+  title: "",
+  description: "",
+  priority: "MEDIUM",
+  dueDate: "",
+  assignedToId: "",
+};
 
 export default function CreateTaskModal({
   isOpen,
@@ -10,24 +25,11 @@ export default function CreateTaskModal({
 }) {
   const { addTask } = useTaskStore();
 
-  const {
-    employees,
-    fetchEmployees,
-  } = useEmployeeStore();
+  const { employees, fetchEmployees } = useEmployeeStore();
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "MEDIUM",
-    dueDate: "",
-    assignedToId: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   const [errors, setErrors] = useState({});
-
-  // ============================
-  // SUBMITTING STATE
-  // ============================
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,8 +58,7 @@ export default function CreateTaskModal({
     }
 
     if (!formData.description.trim()) {
-      newErrors.description =
-        "Description is required";
+      newErrors.description = "Description is required";
     }
 
     if (!formData.priority) {
@@ -69,8 +70,7 @@ export default function CreateTaskModal({
     }
 
     if (!formData.assignedToId) {
-      newErrors.assignedToId =
-        "Please select an employee";
+      newErrors.assignedToId = "Please select an employee";
     }
 
     setErrors(newErrors);
@@ -100,57 +100,46 @@ export default function CreateTaskModal({
   // HANDLE SUBMIT
   // ============================
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (isSubmitting) return;
+    if (isSubmitting) return;
 
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  try {
-    setIsSubmitting(true);
+    try {
+      setIsSubmitting(true);
 
-    await addTask(formData);
+      await addTask(formData);
 
-    setFormData({
-      title: "",
-      description: "",
-      priority: "MEDIUM",
-      dueDate: "",
-      assignedToId: "",
-    });
+      setFormData(EMPTY_FORM);
 
-    setErrors({});
+      setErrors({});
 
-    // Close after successful creation
-    onClose();
-
-    // Success message (shown AFTER the popup is closed)
-    toast.success("Task created successfully!");
-
-  } catch (error) {
-    console.error(
-      "Failed to create task:",
-      error
-    );
-
-    // Inactive company
-    if (error?.response?.status === 403) {
-      // apiClient already showed the toast
+      // Close after successful creation
       onClose();
-      return;
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success("Task created successfully!");
+    } catch (error) {
+      console.error("Failed to create task:", error);
+
+      // Inactive company
+      if (error?.response?.status === 403) {
+        // apiClient already showed the toast
+        onClose();
+        return;
+      }
+
+      // Other errors
+      toast.error(
+        error?.response?.data?.message ||
+          "Failed to create task"
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // Other errors
-    toast.error(
-      error?.response?.data?.message ||
-        "Failed to create task"
-    );
-
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   // ============================
   // CLOSE MODAL
@@ -166,272 +155,46 @@ const handleSubmit = async (e) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
-
-      <div className="min-h-screen flex items-center justify-center p-4">
-
-        <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-
-          {/* ================= HEADER ================= */}
-
-          <div className="bg-[#25D366] px-6 py-5 flex justify-between items-center">
-
-            <h2 className="text-2xl font-bold text-gray-800">
-              Create Task
-            </h2>
-
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isSubmitting}
-              className={`p-2 rounded-full transition ${isSubmitting
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-[#128C7E]"
-                }`}
-            >
-              <X size={22} />
-            </button>
-
-          </div>
-
-          {/* ================= FORM ================= */}
-
-          <form
-            onSubmit={handleSubmit}
-            className="p-6 space-y-5 max-h-[75vh] overflow-y-auto"
+    <TaskModalShell
+      title="Add Task"
+      onClose={handleClose}
+      closeDisabled={isSubmitting}
+      onSubmit={handleSubmit}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            className={secondaryButtonClass}
           >
+            Cancel
+          </button>
 
-            {/* ================= TITLE ================= */}
-
-            <div>
-
-              <label className="block mb-2 font-medium text-gray-700">
-                Task Title{" "}
-                <span className="text-red-500">*</span>
-              </label>
-
-              <input
-                name="title"
-                placeholder="Enter task title"
-                value={formData.title}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.title
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                  } ${isSubmitting
-                    ? "bg-gray-100 cursor-not-allowed"
-                    : ""
-                  }`}
-              />
-
-              {errors.title && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.title}
-                </p>
-              )}
-
-            </div>
-
-            {/* ================= DESCRIPTION ================= */}
-
-            <div>
-
-              <label className="block mb-2 font-medium text-gray-700">
-                Description{" "}
-                <span className="text-red-500">*</span>
-              </label>
-
-              <textarea
-                name="description"
-                placeholder="Enter description"
-                value={formData.description}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.description
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                  } ${isSubmitting
-                    ? "bg-gray-100 cursor-not-allowed"
-                    : ""
-                  }`}
-              />
-
-              {errors.description && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.description}
-                </p>
-              )}
-
-            </div>
-
-            {/* ================= PRIORITY ================= */}
-
-            <div>
-
-              <label className="block mb-2 font-medium text-gray-700">
-                Priority{" "}
-                <span className="text-red-500">*</span>
-              </label>
-
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.priority
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                  } ${isSubmitting
-                    ? "bg-gray-100 cursor-not-allowed"
-                    : ""
-                  }`}
-              >
-                <option value="LOW">
-                  Low
-                </option>
-
-                <option value="MEDIUM">
-                  Medium
-                </option>
-
-                <option value="HIGH">
-                  High
-                </option>
-
-              </select>
-
-              {errors.priority && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.priority}
-                </p>
-              )}
-
-            </div>
-
-            {/* ================= DUE DATE ================= */}
-
-            <div>
-
-              <label className="block mb-2 font-medium text-gray-700">
-                Due Date{" "}
-                <span className="text-red-500">*</span>
-              </label>
-
-              <input
-                type="date"
-                name="dueDate"
-                value={formData.dueDate}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.dueDate
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                  } ${isSubmitting
-                    ? "bg-gray-100 cursor-not-allowed"
-                    : ""
-                  }`}
-              />
-
-              {errors.dueDate && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.dueDate}
-                </p>
-              )}
-
-            </div>
-
-            {/* ================= ASSIGNED TO ================= */}
-
-            <div>
-
-              <label className="block mb-2 font-medium text-gray-700">
-                Assign Employee{" "}
-                <span className="text-red-500">*</span>
-              </label>
-
-              <select
-                name="assignedToId"
-                value={formData.assignedToId}
-                onChange={handleChange}
-                disabled={isSubmitting}
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${errors.assignedToId
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                  } ${isSubmitting
-                    ? "bg-gray-100 cursor-not-allowed"
-                    : ""
-                  }`}
-              >
-
-                <option value="">
-                  Select Employee
-                </option>
-
-                {(employees ?? []).map((emp) => (
-                  <option
-                    key={emp.id}
-                    value={emp.id}
-                  >
-                    {emp.name}
-                  </option>
-                ))}
-
-              </select>
-
-              {errors.assignedToId && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.assignedToId}
-                </p>
-              )}
-
-            </div>
-
-            {/* ================= BUTTONS ================= */}
-
-            <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-
-              {/* CANCEL */}
-
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg border border-gray-300 text-gray-700 transition ${isSubmitting
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-gray-100"
-                  }`}
-              >
-                Cancel
-              </button>
-
-              {/* CREATE */}
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`px-6 py-3 rounded-lg text-gray-800 font-semibold transition flex items-center justify-center gap-2 ${isSubmitting
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-[#25D366] hover:bg-[#128C7E]"
-                  }`}
-              >
-
-                {isSubmitting ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin"></span>
-                    Creating...
-                  </>
-                ) : (
-                  "Create Task"
-                )}
-
-              </button>
-
-            </div>
-
-          </form>
-        </div>
-      </div>
-    </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={primaryButtonClass}
+          >
+            {isSubmitting ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Saving...
+              </>
+            ) : (
+              "Save Task"
+            )}
+          </button>
+        </>
+      }
+    >
+      <TaskFormFields
+        formData={formData}
+        errors={errors}
+        onChange={handleChange}
+        employees={employees}
+        disabled={isSubmitting}
+      />
+    </TaskModalShell>
   );
 }

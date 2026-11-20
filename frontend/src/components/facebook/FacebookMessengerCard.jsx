@@ -167,42 +167,36 @@ function FacebookMessengerCard({ isAdmin = false }) {
     info: "border-slate-200 bg-slate-50 text-slate-600",
   };
 
+  // This component returns TWO things for the 3-column grid in SecuritySettings:
+  //   1. the channel card (one grid cell)
+  //   2. notices + connected Pages (full-width row under the cards, via `order-2`)
   return (
-    <div
-      data-tour="facebook-instagram-card"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-    >
-      {/* Header: icon + text on the left, action on the right */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#E7F0FF]">
-            <FaFacebookMessenger size={26} className="text-[#1877F2]" />
+    <>
+      <div
+        data-tour="facebook-instagram-card"
+        className="order-1 flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E7F0FF]">
+            <FaFacebookMessenger size={22} className="text-[#1877F2]" />
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-slate-900">
-              Facebook Messenger
-            </h2>
-
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-              {isAdmin
-                ? "Connect your Facebook Page to receive and reply to Messenger messages. Instagram is connected separately in the Instagram section below."
-                : "Facebook Pages connected to this CRM. Only an admin can connect or change them."}
-            </p>
+            <h2 className="font-semibold text-slate-900">Facebook Messenger</h2>
 
             <div
-              className={`mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 loadingPages
                   ? "bg-slate-100 text-slate-600"
                   : needsReconnect
-                  ? "bg-amber-50 text-amber-700"
+                  ? "bg-amber-100 text-amber-700"
                   : hasPages
-                  ? "bg-blue-50 text-blue-700"
+                  ? "bg-blue-100 text-blue-700"
                   : "bg-slate-100 text-slate-600"
               }`}
             >
               <span
-                className={`h-2 w-2 rounded-full ${
+                className={`h-1.5 w-1.5 rounded-full ${
                   loadingPages
                     ? "bg-slate-300"
                     : needsReconnect
@@ -220,32 +214,42 @@ function FacebookMessengerCard({ isAdmin = false }) {
                 ? `Connected (${pages.length} Page${pages.length > 1 ? "s" : ""})`
                 : "Not Connected"}
             </div>
-
-            {!isAdmin && !loadingPages && !hasPages && (
-              <p className="mt-3 text-sm text-slate-500">
-                No Facebook Page is connected yet. Please ask your admin to
-                connect one.
-              </p>
-            )}
           </div>
         </div>
 
+        <p className="mt-4 text-sm leading-relaxed text-slate-500">
+          {isAdmin
+            ? "Connect your Facebook Page to receive and reply to Messenger messages. Instagram is connected separately in the Instagram section below."
+            : "Facebook Pages connected to this CRM. Only an admin can connect or change them."}
+        </p>
+
+        {!isAdmin && !loadingPages && !hasPages && (
+          <p className="mt-3 text-sm text-slate-500">
+            No Facebook Page is connected yet. Please ask your admin to
+            connect one.
+          </p>
+        )}
+
         {/* Connect button: ADMIN only */}
         {isAdmin && (
-          <div className="flex w-full shrink-0 flex-col gap-3 lg:w-72">
+          <div className="mt-auto pt-5">
             <button
               type="button"
               onClick={handleConnect}
               disabled={connecting || !sdkReady}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1877F2] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#145DBF] disabled:cursor-not-allowed disabled:opacity-60"
+              className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                hasPages && !needsReconnect
+                  ? "border border-slate-900 bg-white text-slate-900 hover:bg-slate-50"
+                  : "bg-[#1877F2] text-white shadow-sm hover:bg-[#145DBF]"
+              }`}
             >
-              <FaFacebookMessenger size={16} />
+              {!(hasPages && !needsReconnect) && <FaFacebookMessenger size={16} />}
               {connecting
                 ? "Connecting..."
                 : needsReconnect
                 ? "Reconnect Facebook"
                 : hasPages
-                ? "Add / Update Pages"
+                ? "Add / update page"
                 : "Connect Facebook"}
             </button>
           </div>
@@ -255,7 +259,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
       {/* Result message */}
       {notice && (
         <div
-          className={`mt-5 rounded-xl border px-4 py-3 text-sm ${
+          className={`order-2 col-span-full rounded-xl border px-4 py-3 text-sm ${
             noticeStyles[notice.type] || noticeStyles.info
           }`}
         >
@@ -265,7 +269,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
 
       {/* Pages that could not be connected */}
       {skippedPages.length > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="order-2 col-span-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <p className="font-semibold">Some Pages could not be connected:</p>
           <ul className="mt-1 list-disc pl-5">
             {skippedPages.map((p) => (
@@ -279,61 +283,64 @@ function FacebookMessengerCard({ isAdmin = false }) {
 
       {/* Connected Pages */}
       {hasPages && (
-        <div className="mt-6 border-t border-slate-100 pt-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <div className="order-2 col-span-full rounded-2xl border border-slate-200 bg-slate-50/70 px-6 py-5 shadow-sm">
+          <p className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">
             Connected Pages
           </p>
 
-          <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+          <div className="divide-y divide-slate-200">
             {pages.map((page) => {
               const needsReconnectRow = page.status === "RECONNECT_NEEDED";
 
               return (
                 <div
                   key={page.id}
-                  className="flex flex-col gap-3 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E7F0FF]">
-                      <FaFacebookMessenger
-                        size={18}
-                        className="text-[#1877F2]"
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate font-semibold text-slate-800">
-                          {page.pageName || `Page ${page.pageId}`}
-                        </p>
-
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            needsReconnectRow
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-green-50 text-green-700"
-                          }`}
-                        >
-                          {needsReconnectRow
-                            ? "Reconnect needed — access was removed or expired"
-                            : "Connected"}
-                        </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#E7F0FF]">
+                        <FaFacebookMessenger
+                          size={16}
+                          className="text-[#1877F2]"
+                        />
                       </div>
 
-                      {/* Older connections only: an Instagram account was linked
-                          through this Page before the two were separated. */}
-                      {page.hasInstagram && (
-                        <p className="mt-1 max-w-xl text-xs leading-relaxed text-amber-700">
-                          An older Instagram link
-                          {page.instagramUsername
-                            ? ` (@${page.instagramUsername})`
-                            : ""}{" "}
-                          is still attached to this Page. Click “Add / Update
-                          Pages” to remove it, then connect Instagram in the
-                          Instagram section.
-                        </p>
-                      )}
+                      <p className="truncate font-medium text-slate-800">
+                        {page.pageName || `Page ${page.pageId}`}
+                      </p>
+
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          needsReconnectRow
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            needsReconnectRow ? "bg-amber-400" : "bg-green-500"
+                          }`}
+                        />
+                        {needsReconnectRow
+                          ? "Reconnect needed — access was removed or expired"
+                          : "Connected"}
+                      </span>
                     </div>
+
+                    {/* Older connections only: an Instagram account was linked
+                        through this Page before the two were separated. */}
+                    {page.hasInstagram && (
+                      <p className="mt-1 max-w-xl text-xs leading-relaxed text-amber-700">
+                        An older Instagram link
+                        {page.instagramUsername
+                          ? ` (@${page.instagramUsername})`
+                          : ""}{" "}
+                        is still attached to this Page. Click “Add / update
+                        page” to remove it, then connect Instagram in the
+                        Instagram section.
+                      </p>
+                    )}
                   </div>
 
                   {isAdmin && (
@@ -341,7 +348,7 @@ function FacebookMessengerCard({ isAdmin = false }) {
                       <button
                         type="button"
                         onClick={() => setPageToDisconnect(page)}
-                        className="h-9 rounded-xl border border-red-300 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        className="h-9 rounded-lg border border-red-200 bg-white px-4 text-xs font-medium text-red-600 transition hover:bg-red-50"
                       >
                         Disconnect
                       </button>
@@ -366,8 +373,9 @@ function FacebookMessengerCard({ isAdmin = false }) {
         onConfirm={handleDisconnect}
         onCancel={() => setPageToDisconnect(null)}
       />
-    </div>
+    </>
   );
 }
+
 
 export default FacebookMessengerCard;

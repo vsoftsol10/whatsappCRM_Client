@@ -305,39 +305,39 @@
 
 
 
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useNavigate } from "react-router-dom";
-
-import {
-  FiUserPlus,
-  FiSearch,
-} from "react-icons/fi";
+import { Plus } from "lucide-react";
 
 import apiClient from "../api/apiClient";
+import { updateEmployee } from "../api/employeeApi";
 import useEmployeeStore from "../store/employeeStore";
+import { useAuthStore } from "../store/authStore";
 
 import EmployeeTable from "../components/employee/EmployeeTable";
 import EmployeeStats from "../components/employee/EmployeeStats";
 import EmployeeFilters from "../components/employee/EmployeeFilters";
 
 import toast from "react-hot-toast";
-import Pagination from "../components/common/Pagination";
+import CustomerPagination from "../components/customers/CustomerPagination";
 import ConfirmModal from "../components/common/ConfirmModal";
 import EditEmployee from "../pages/EditEmployee";
 import AddEmployeeModal from "../components/employee/AddEmployeeModal";
+import ViewEmployeeModal from "../components/employee/ViewEmployeeModal";
 
 const ManageEmployees = () => {
-  const navigate = useNavigate();
+  const currentUser = useAuthStore((state) => state.user);
+  const currentUserId = currentUser?.id || currentUser?.userId;
 
   const [searchTerm, setSearchTerm] =
     useState("");
 
+  // Status dropdown: ALL / ACTIVE / INACTIVE
   const [statusFilter, setStatusFilter] =
+    useState("ALL");
+
+  // Role chips: ALL / USER / ADMIN
+  const [roleFilter, setRoleFilter] =
     useState("ALL");
 
   const [currentPage, setCurrentPage] =
@@ -346,18 +346,26 @@ const ManageEmployees = () => {
   const [deleteTargetId, setDeleteTargetId] =
     useState(null);
 
+  const [viewingEmployeeId, setViewingEmployeeId] =
+    useState(null);
+
   const [editingEmployeeId, setEditingEmployeeId] =
     useState(null);
 
   const [showAddEmployeeModal, setShowAddEmployeeModal] =
     useState(false);
 
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // Employee whose status switch is being saved
+  const [togglingId, setTogglingId] =
+    useState(null);
+
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   const {
     employees,
     loading,
     fetchEmployees: fetchEmployeesBase,
+    setEmployees,
   } = useEmployeeStore();
 
   // Manage Employees also lists admins that were created as employees
@@ -370,7 +378,7 @@ const ManageEmployees = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, roleFilter]);
 
   // =========================
   // SEARCH + FILTER
@@ -378,49 +386,56 @@ const ManageEmployees = () => {
 
   const filteredEmployees =
     useMemo(() => {
+      const term = searchTerm.toLowerCase();
+
       return employees.filter((emp) => {
         const matchesSearch =
           emp.name
             ?.toLowerCase()
-            .includes(
-              searchTerm.toLowerCase()
-            ) ||
+            .includes(term) ||
           emp.email
             ?.toLowerCase()
-            .includes(
-              searchTerm.toLowerCase()
-            );
+            .includes(term);
 
         const matchesStatus =
-          statusFilter === "ALL"
-            ? true
-            : statusFilter === "ACTIVE"
-              ? emp.status === "ACTIVE"
-              : statusFilter === "INACTIVE"
-                ? emp.status === "INACTIVE"
-                : emp.role === "ADMIN";
+          statusFilter === "ALL" ||
+          emp.status === statusFilter;
+
+        const matchesRole =
+          roleFilter === "ALL" ||
+          emp.role === roleFilter;
 
         return (
           matchesSearch &&
-          matchesStatus
+          matchesStatus &&
+          matchesRole
         );
       });
     }, [
       employees,
       searchTerm,
       statusFilter,
+      roleFilter,
     ]);
 
   // =========================
   // PAGINATION
   // =========================
 
-  const totalPages = Math.ceil(
-    filteredEmployees.length / itemsPerPage
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      filteredEmployees.length / itemsPerPage
+    )
+  );
+
+  const safePage = Math.min(
+    currentPage,
+    totalPages
   );
 
   const startIndex =
-    (currentPage - 1) * itemsPerPage;
+    (safePage - 1) * itemsPerPage;
 
   const paginatedEmployees =
     filteredEmployees.slice(
@@ -454,6 +469,61 @@ const ManageEmployees = () => {
     ).length;
 
   // =========================
+  // STATUS SWITCH
+  // =========================
+
+  // The update API needs the whole employee (it checks the e-mail for
+  // duplicates), so send everything and only change the status.
+  const handleToggleStatus = async (employee, makeActive) => {
+    if (togglingId) return;
+
+    const nextStatus = makeActive ? "ACTIVE" : "INACTIVE";
+    const previousEmployees = employees;
+
+    setTogglingId(employee.id);
+
+    // show the new position of the switch straight away
+    setEmployees(
+      employees.map((emp) =>
+        emp.id === employee.id
+          ? { ...emp, status: nextStatus }
+          : emp
+      )
+    );
+
+    try {
+      await updateEmployee(employee.id, {
+        name: employee.name,
+        email: employee.email,
+        phone: employee.phone,
+        department: employee.department,
+        designation: employee.designation,
+        address: employee.address,
+        role: employee.role,
+        status: nextStatus,
+      });
+
+      toast.success(
+        makeActive
+          ? "Employee activated"
+          : "Employee deactivated"
+      );
+    } catch (error) {
+      console.error(error);
+
+      // put the switch back
+      setEmployees(previousEmployees);
+
+      toast.error(
+        error?.response?.data?.message ||
+        "Failed to update status"
+      );
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  // =========================
   // DELETE
   // =========================
 
@@ -482,6 +552,11 @@ const ManageEmployees = () => {
     }
   };
 
+  const closeView = useCallback(
+    () => setViewingEmployeeId(null),
+    []
+  );
+
   return (
     <div className="crm-page space-y-6">
 
@@ -500,10 +575,11 @@ const ManageEmployees = () => {
         </div>
 
         <button
+          type="button"
           onClick={() => setShowAddEmployeeModal(true)}
-          className="crm-primary-button w-full sm:w-auto"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
         >
-          <FiUserPlus />
+          <Plus size={16} />
           Add Employee
         </button>
 
@@ -521,26 +597,14 @@ const ManageEmployees = () => {
 
       {/* ================= SEARCH + FILTERS ================= */}
 
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        {/* Search */}
-        <div className="relative w-full lg:max-w-md">
-          <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
-
-          <input
-            type="text"
-            placeholder="Search employee by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="crm-input pl-11"
-          />
-        </div>
-
-        {/* Filter Chips */}
-        <EmployeeFilters
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-        />
-      </div>
+      <EmployeeFilters
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        roleFilter={roleFilter}
+        setRoleFilter={setRoleFilter}
+      />
 
       {/* ================= CONTENT ================= */}
 
@@ -564,17 +628,27 @@ const ManageEmployees = () => {
         <>
           <EmployeeTable
             employees={paginatedEmployees}
-            handleDelete={handleDelete}
+            handleView={(id) => setViewingEmployeeId(id)}
             handleEdit={(id) => setEditingEmployeeId(id)}
+            handleDelete={handleDelete}
+            onToggleStatus={handleToggleStatus}
+            togglingId={togglingId}
+            currentUserId={currentUserId}
           />
 
-          <Pagination
-            currentPage={currentPage}
+          <CustomerPagination
+            currentPage={safePage}
             totalPages={totalPages}
-            totalItems={filteredEmployees.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+            pageSize={itemsPerPage}
+            onPageChange={(page) =>
+              setCurrentPage(
+                Math.min(Math.max(1, page), totalPages)
+              )
+            }
+            onPageSizeChange={(size) => {
+              setItemsPerPage(size);
+              setCurrentPage(1);
+            }}
           />
         </>
       )}
@@ -589,6 +663,17 @@ const ManageEmployees = () => {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTargetId(null)}
       />
+
+      {viewingEmployeeId && (
+        <ViewEmployeeModal
+          employeeId={viewingEmployeeId}
+          onClose={closeView}
+          onEdit={(id) => {
+            setViewingEmployeeId(null);
+            setEditingEmployeeId(id);
+          }}
+        />
+      )}
 
       {editingEmployeeId && (
         <EditEmployee

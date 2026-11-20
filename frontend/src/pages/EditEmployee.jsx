@@ -1,16 +1,29 @@
 
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
 import {
   getEmployeeById,
   updateEmployee,
 } from "../api/employeeApi";
 import toast from "react-hot-toast";
+import {
+  EmployeeModalShell,
+  FormActions,
+  FormField,
+  FormSection,
+  ROLE_OPTIONS,
+  SelectInput,
+  cancelButtonClass,
+  fieldInputClass,
+  fieldTextareaClass,
+  primaryButtonClass,
+} from "../components/employee/EmployeeFormParts";
 
 function EditEmployee({ employeeId, onClose, onSuccess }) {
   const id = employeeId;
 
+  // "status" is not shown in this form any more (it is switched from the
+  // table), but it is still sent so saving never changes it by accident.
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -185,11 +198,6 @@ function EditEmployee({ employeeId, onClose, onSuccess }) {
         "Employee updated successfully!"
       );
     } catch (error) {
-      console.log(
-        "Backend response:",
-        error.response?.data
-      );
-
       console.error(
         "Update employee error:",
         error
@@ -210,419 +218,146 @@ function EditEmployee({ employeeId, onClose, onSuccess }) {
   // ============================
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4">
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl">
+    <EmployeeModalShell
+      title="Edit Employee"
+      onClose={onClose}
+      closeDisabled={isSubmitting}
+    >
+      {loading ? (
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-green-500" />
 
-        {/* ================= HEADER ================= */}
-
-        <div className="flex items-center justify-between bg-[#25D366] px-5 py-5 sm:px-8 sm:py-6">
-
-          <div>
-            <h1 className="text-2xl font-bold text-black sm:text-3xl">
-              Edit Employee
-            </h1>
-
-            <p className="mt-1 text-gray-800">
-              Update employee information
+            <p className="text-slate-500">
+              Loading employee...
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-full bg-white p-2 shadow transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <X size={22} />
-          </button>
-
         </div>
-
-        {/* ================= LOADING EMPLOYEE ================= */}
-
-        {loading ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <div className="text-center">
-
-              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-[#25D366]" />
-
-              <p className="text-gray-500">
-                Loading employee...
-              </p>
-
-            </div>
-          </div>
-        ) : (
-
-          /* ================= FORM ================= */
-
-          <form
-            className="space-y-8 p-5 sm:p-8"
-            onSubmit={handleSubmit}
-          >
-
-            {/* ================= PERSONAL INFORMATION ================= */}
-
-            <div>
-
-              <h2 className="mb-5 border-b-2 border-[#25D366] pb-2 text-xl font-bold text-black">
-                Personal Information
-              </h2>
-
-              <div className="space-y-5">
-
-                {/* NAME */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Full Name{" "}
-                    <span className="text-red-500">
-                      *
-                    </span>
-                  </label>
-
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="Full Name"
-                    disabled={isSubmitting}
-                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                      errors.name
-                        ? "border-red-500"
-                        : "border-gray-300 focus:border-[#25D366]"
-                    }`}
-                  />
-
-                  {errors.name && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.name}
-                    </p>
-                  )}
-                </div>
-
-                {/* EMAIL */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Email Address{" "}
-                    <span className="text-red-500">
-                      *
-                    </span>
-                  </label>
-
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="Email Address"
-                    disabled={isSubmitting}
-                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                      errors.email
-                        ? "border-red-500"
-                        : "border-gray-300 focus:border-[#25D366]"
-                    }`}
-                  />
-
-                  {errors.email && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.email}
-                    </p>
-                  )}
-                </div>
-
-                {/* PHONE */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Phone Number{" "}
-                    <span className="text-red-500">
-                      *
-                    </span>
-                  </label>
-
-                  <input
-                    type="text"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="Phone Number"
-                    disabled={isSubmitting}
-                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                      errors.phone
-                        ? "border-red-500"
-                        : "border-gray-300 focus:border-[#25D366]"
-                    }`}
-                  />
-
-                  {errors.phone && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.phone}
-                    </p>
-                  )}
-                </div>
-
-              </div>
-            </div>
-
-            {/* ================= WORK INFORMATION ================= */}
-
-            <div>
-
-              <h2 className="mb-5 border-b-2 border-[#25D366] pb-2 text-xl font-bold text-black">
-                Work Information
-              </h2>
-
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-                {/* DEPARTMENT */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Department{" "}
-                    <span className="text-red-500">
-                      *
-                    </span>
-                  </label>
-
-                  <input
-                    type="text"
-                    name="department"
-                    value={formData.department}
-                    onChange={handleChange}
-                    placeholder="Department"
-                    disabled={isSubmitting}
-                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                      errors.department
-                        ? "border-red-500"
-                        : "border-gray-300 focus:border-[#25D366]"
-                    }`}
-                  />
-
-                  {errors.department && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.department}
-                    </p>
-                  )}
-                </div>
-
-                {/* DESIGNATION */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Designation{" "}
-                    <span className="text-red-500">
-                      *
-                    </span>
-                  </label>
-
-                  <select
-                    name="designation"
-                    value={formData.designation}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                      errors.designation
-                        ? "border-red-500"
-                        : "border-gray-300 focus:border-[#25D366]"
-                    }`}
-                  >
-                    <option value="">
-                      Select Designation
-                    </option>
-
-                    <option value="Sales Agent">
-                      Sales Agent
-                    </option>
-
-                    <option value="Support Agent">
-                      Support Agent
-                    </option>
-
-                    <option value="Technical">
-                      Technical
-                    </option>
-
-                    <option value="Marketing">
-                      Marketing
-                    </option>
-
-                    <option value="Manager">
-                      Manager
-                    </option>
-
-                    <option value="HR">
-                      HR
-                    </option>
-
-                    <option value="Finance">
-                      Finance
-                    </option>
-
-                    <option value="Other">
-                      Other
-                    </option>
-
-                    {/* Older employees may have a designation that was typed manually */}
-                    {formData.designation &&
-                      ![
-                        "Sales Agent",
-                        "Support Agent",
-                        "Technical",
-                        "Marketing",
-                        "Manager",
-                        "HR",
-                        "Finance",
-                        "Other",
-                      ].includes(formData.designation) && (
-                        <option value={formData.designation}>
-                          {formData.designation}
-                        </option>
-                      )}
-                  </select>
-
-                  {errors.designation && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {errors.designation}
-                    </p>
-                  )}
-                </div>
-
-                {/* ROLE */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Role
-                  </label>
-
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className="w-full rounded-xl border-2 border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] disabled:cursor-not-allowed disabled:bg-gray-100"
-                  >
-                    <option value="USER">
-                      USER
-                    </option>
-
-                    <option value="ADMIN">
-                      ADMIN
-                    </option>
-                  </select>
-                </div>
-
-                {/* STATUS */}
-
-                <div>
-                  <label className="mb-2 block font-semibold text-black">
-                    Status
-                  </label>
-
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    disabled={isSubmitting}
-                    className="w-full rounded-xl border-2 border-gray-300 px-4 py-3 outline-none focus:border-[#25D366] disabled:cursor-not-allowed disabled:bg-gray-100"
-                  >
-                    <option value="ACTIVE">
-                      Active
-                    </option>
-
-                    <option value="INACTIVE">
-                      Inactive
-                    </option>
-                  </select>
-                </div>
-
-              </div>
-            </div>
-
-            {/* ================= ADDRESS ================= */}
-
-            <div>
-
-              <h2 className="mb-5 border-b-2 border-[#25D366] pb-2 text-xl font-bold text-black">
-                Address
-              </h2>
-
-              <div>
-
-                <label className="mb-2 block font-semibold text-black">
-                  Address{" "}
-                  <span className="text-red-500">
-                    *
-                  </span>
-                </label>
-
-                <textarea
-                  name="address"
-                  value={formData.address}
+      ) : (
+        <form className="space-y-9" onSubmit={handleSubmit}>
+          {/* ================= PERSONAL INFORMATION ================= */}
+          <FormSection title="Personal Information">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <FormField label="Full Name" required error={errors.name}>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
                   onChange={handleChange}
-                  rows="4"
-                  placeholder="Address"
+                  placeholder="Full Name"
                   disabled={isSubmitting}
-                  className={`w-full resize-none rounded-xl border-2 px-4 py-3 outline-none transition disabled:cursor-not-allowed disabled:bg-gray-100 ${
-                    errors.address
-                      ? "border-red-500"
-                      : "border-gray-300 focus:border-[#25D366]"
-                  }`}
+                  className={fieldInputClass(!!errors.name)}
                 />
+              </FormField>
 
-                {errors.address && (
-                  <p className="mt-1 text-sm text-red-500">
-                    {errors.address}
-                  </p>
-                )}
+              <FormField label="Email Address" required error={errors.email}>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="Email Address"
+                  disabled={isSubmitting}
+                  className={fieldInputClass(!!errors.email)}
+                />
+              </FormField>
 
-              </div>
+              <FormField label="Phone Number" required error={errors.phone}>
+                <input
+                  type="text"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Phone Number"
+                  maxLength={10}
+                  disabled={isSubmitting}
+                  className={fieldInputClass(!!errors.phone)}
+                />
+              </FormField>
             </div>
+          </FormSection>
 
-            {/* ================= BUTTONS ================= */}
+          {/* ================= WORK INFORMATION ================= */}
+          <FormSection title="Work Information">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <FormField label="Department" required error={errors.department}>
+                <input
+                  type="text"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  placeholder="Department"
+                  disabled={isSubmitting}
+                  className={fieldInputClass(!!errors.department)}
+                />
+              </FormField>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end sm:gap-4">
+              <FormField label="Designation" required error={errors.designation}>
+                <input
+                  type="text"
+                  name="designation"
+                  value={formData.designation}
+                  onChange={handleChange}
+                  placeholder="Designation (e.g. Sales Executive)"
+                  disabled={isSubmitting}
+                  className={fieldInputClass(!!errors.designation)}
+                />
+              </FormField>
 
-              {/* CANCEL */}
-
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="crm-secondary-button disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-
-              {/* UPDATE */}
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="crm-primary-button flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-
-                {isSubmitting ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-700 border-t-transparent" />
-
-                    Updating...
-                  </>
-                ) : (
-                  "Update Employee"
-                )}
-
-              </button>
-
+              <FormField label="Role" required>
+                <SelectInput
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                >
+                  {ROLE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </SelectInput>
+              </FormField>
             </div>
+          </FormSection>
 
-          </form>
-        )}
+          {/* ================= ADDRESS ================= */}
+          <FormSection title="Address">
+            <FormField label="Address" required error={errors.address}>
+              <textarea
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                rows="5"
+                placeholder="Address"
+                disabled={isSubmitting}
+                className={fieldTextareaClass(!!errors.address)}
+              />
+            </FormField>
+          </FormSection>
 
-      </div>
-    </div>
+          {/* ================= BUTTONS ================= */}
+          <FormActions>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className={cancelButtonClass}
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={primaryButtonClass}
+            >
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </button>
+          </FormActions>
+        </form>
+      )}
+    </EmployeeModalShell>
   );
 }
 

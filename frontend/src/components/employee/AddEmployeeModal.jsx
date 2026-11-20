@@ -1,9 +1,20 @@
 
 
 import { useState } from "react";
-import { FiArrowLeft } from "react-icons/fi";
 import { createEmployee } from "../../api/employeeApi";
 import toast from "react-hot-toast";
+import {
+  EmployeeModalShell,
+  FormActions,
+  FormField,
+  FormSection,
+  ROLE_OPTIONS,
+  SelectInput,
+  cancelButtonClass,
+  fieldInputClass,
+  fieldTextareaClass,
+  primaryButtonClass,
+} from "./EmployeeFormParts";
 
 function AddEmployeeModal({ onClose, onSuccess }) {
     const [formData, setFormData] = useState({
@@ -81,7 +92,7 @@ function AddEmployeeModal({ onClose, onSuccess }) {
             newErrors.department = "Department is required";
         }
 
-        // Designation (selected from dropdown)
+        // Designation
         if (!formData.designation.trim()) {
             newErrors.designation = "Designation is required";
         }
@@ -121,13 +132,7 @@ function AddEmployeeModal({ onClose, onSuccess }) {
         try {
             setIsSubmitting(true);
 
-            console.log("========== ADD EMPLOYEE ==========");
-            console.log("Sending employee data:", formData);
-
             const response = await createEmployee(formData);
-
-            console.log("========== CREATE SUCCESS ==========");
-            console.log("Response:", response);
 
             // Refresh employee list
             onSuccess?.();
@@ -141,10 +146,7 @@ function AddEmployeeModal({ onClose, onSuccess }) {
             );
 
         } catch (error) {
-            console.error("========== CREATE FAILED ==========");
-            console.error("Error:", error);
-            console.error("Status:", error?.response?.status);
-            console.error("Response:", error?.response?.data);
+            console.error("Create employee failed:", error);
 
             // 403 errors are already handled by apiClient interceptor
             if (error?.response?.status === 403) {
@@ -162,340 +164,136 @@ function AddEmployeeModal({ onClose, onSuccess }) {
     };
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onMouseDown={(e) => {
-                if (e.target === e.currentTarget) {
-                    onClose();
-                }
-            }}
+        <EmployeeModalShell
+            title="Add Employee"
+            onClose={onClose}
+            onBackdropClick={onClose}
         >
-            {/* ===========================
-                MODAL
-            =========================== */}
-            <div
-                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
-                onMouseDown={(e) => e.stopPropagation()}
-            >
+            <form className="space-y-9" onSubmit={handleSubmit}>
                 {/* ===========================
-                    HEADER
+                    PERSONAL INFORMATION
                 =========================== */}
-                <div className="sticky top-0 z-10 flex items-center gap-4 bg-[#25D366] px-5 py-5 sm:px-8 sm:py-6">
+                <FormSection title="Personal Information">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <FormField label="Full Name" required error={errors.name}>
+                            <input
+                                type="text"
+                                name="name"
+                                value={formData.name}
+                                onChange={handleChange}
+                                placeholder="Full Name"
+                                className={fieldInputClass(!!errors.name)}
+                            />
+                        </FormField>
+
+                        <FormField label="Email Address" required error={errors.email}>
+                            <input
+                                type="email"
+                                name="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                placeholder="Email Address"
+                                className={fieldInputClass(!!errors.email)}
+                            />
+                        </FormField>
+
+                        <FormField label="Phone Number" required error={errors.phone}>
+                            <input
+                                type="text"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                placeholder="Phone Number"
+                                maxLength={10}
+                                className={fieldInputClass(!!errors.phone)}
+                            />
+                        </FormField>
+                    </div>
+                </FormSection>
+
+                {/* ===========================
+                    WORK INFORMATION
+                =========================== */}
+                <FormSection title="Work Information">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <FormField label="Department" required error={errors.department}>
+                            <input
+                                type="text"
+                                name="department"
+                                value={formData.department}
+                                onChange={handleChange}
+                                placeholder="Department"
+                                className={fieldInputClass(!!errors.department)}
+                            />
+                        </FormField>
+
+                        <FormField label="Designation" required error={errors.designation}>
+                            <input
+                                type="text"
+                                name="designation"
+                                value={formData.designation}
+                                onChange={handleChange}
+                                placeholder="Designation (e.g. Sales Executive)"
+                                className={fieldInputClass(!!errors.designation)}
+                            />
+                        </FormField>
+
+                        <FormField label="Role" required error={errors.role}>
+                            <SelectInput
+                                name="role"
+                                value={formData.role}
+                                onChange={handleChange}
+                                hasError={!!errors.role}
+                            >
+                                {ROLE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </SelectInput>
+                        </FormField>
+                    </div>
+                </FormSection>
+
+                {/* ===========================
+                    ADDRESS
+                =========================== */}
+                <FormSection title="Address">
+                    <FormField label="Address" required error={errors.address}>
+                        <textarea
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            rows="5"
+                            placeholder="Address"
+                            className={fieldTextareaClass(!!errors.address)}
+                        />
+                    </FormField>
+                </FormSection>
+
+                {/* ===========================
+                    ACTION BUTTONS
+                =========================== */}
+                <FormActions>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow transition hover:bg-gray-100"
+                        disabled={isSubmitting}
+                        className={cancelButtonClass}
                     >
-                        <FiArrowLeft size={20} />
+                        Cancel
                     </button>
 
-                    <div className="min-w-0">
-                        <h1 className="text-2xl font-bold text-black sm:text-3xl">
-                            Add Employee
-                        </h1>
-
-                        <p className="mt-1 text-sm text-gray-800 sm:text-base">
-                            Create a new employee account
-                        </p>
-                    </div>
-                </div>
-
-                {/* ===========================
-                    FORM
-                =========================== */}
-                <form
-                    className="space-y-8 p-5 sm:p-8"
-                    onSubmit={handleSubmit}
-                >
-                    {/* ===========================
-                        PERSONAL INFORMATION
-                    =========================== */}
-                    <div>
-                        <h2 className="mb-5 border-b-2 border-[#25D366] pb-2 text-xl font-bold text-black">
-                            Personal Information
-                        </h2>
-
-                        <div className="space-y-5">
-
-                            {/* Name */}
-                            <div>
-                                <label className="mb-2 block font-semibold text-black">
-                                    Full Name{" "}
-                                    <span className="text-red-500">*</span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    placeholder="Full Name"
-                                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                        errors.name
-                                            ? "border-red-500"
-                                            : "border-gray-300 focus:border-[#25D366]"
-                                    }`}
-                                />
-
-                                {errors.name && (
-                                    <p className="mt-1 text-sm text-red-500">
-                                        {errors.name}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Email */}
-                            <div>
-                                <label className="mb-2 block font-semibold text-black">
-                                    Email Address{" "}
-                                    <span className="text-red-500">*</span>
-                                </label>
-
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                    placeholder="Email Address"
-                                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                        errors.email
-                                            ? "border-red-500"
-                                            : "border-gray-300 focus:border-[#25D366]"
-                                    }`}
-                                />
-
-                                {errors.email && (
-                                    <p className="mt-1 text-sm text-red-500">
-                                        {errors.email}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Phone */}
-                            <div>
-                                <label className="mb-2 block font-semibold text-black">
-                                    Phone Number{" "}
-                                    <span className="text-red-500">*</span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    placeholder="Phone Number"
-                                    maxLength={10}
-                                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                        errors.phone
-                                            ? "border-red-500"
-                                            : "border-gray-300 focus:border-[#25D366]"
-                                    }`}
-                                />
-
-                                {errors.phone && (
-                                    <p className="mt-1 text-sm text-red-500">
-                                        {errors.phone}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ===========================
-                        WORK INFORMATION
-                    =========================== */}
-                    <div>
-                        <h2 className="mb-5 border-b-2 border-[#25D366] pb-2 text-xl font-bold text-black">
-                            Work Information
-                        </h2>
-
-                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-
-                            {/* Department */}
-                            <div>
-                                <label className="mb-2 block font-semibold text-black">
-                                    Department{" "}
-                                    <span className="text-red-500">*</span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    name="department"
-                                    value={formData.department}
-                                    onChange={handleChange}
-                                    placeholder="Department"
-                                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                        errors.department
-                                            ? "border-red-500"
-                                            : "border-gray-300 focus:border-[#25D366]"
-                                    }`}
-                                />
-
-                                {errors.department && (
-                                    <p className="mt-1 text-sm text-red-500">
-                                        {errors.department}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Designation (dropdown) */}
-                            <div>
-                                <label className="mb-2 block font-semibold text-black">
-                                    Designation{" "}
-                                    <span className="text-red-500">*</span>
-                                </label>
-
-                                <select
-                                    name="designation"
-                                    value={formData.designation}
-                                    onChange={handleChange}
-                                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                        errors.designation
-                                            ? "border-red-500"
-                                            : "border-gray-300 focus:border-[#25D366]"
-                                    }`}
-                                >
-                                    <option value="">
-                                        Select Designation
-                                    </option>
-
-                                    <option value="Sales Agent">
-                                        Sales Agent
-                                    </option>
-
-                                    <option value="Support Agent">
-                                        Support Agent
-                                    </option>
-
-                                    <option value="Technical">
-                                        Technical
-                                    </option>
-
-                                    <option value="Marketing">
-                                        Marketing
-                                    </option>
-
-                                    <option value="Manager">
-                                        Manager
-                                    </option>
-
-                                    <option value="HR">
-                                        HR
-                                    </option>
-
-                                    <option value="Finance">
-                                        Finance
-                                    </option>
-
-                                    <option value="Other">
-                                        Other
-                                    </option>
-                                </select>
-
-                                {errors.designation && (
-                                    <p className="mt-1 text-sm text-red-500">
-                                        {errors.designation}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Role */}
-                            <div className="md:col-span-2">
-                                <label className="mb-2 block font-semibold text-black">
-                                    Role{" "}
-                                    <span className="text-red-500">*</span>
-                                </label>
-
-                                <select
-                                    name="role"
-                                    value={formData.role}
-                                    onChange={handleChange}
-                                    className={`w-full rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                        errors.role
-                                            ? "border-red-500"
-                                            : "border-gray-300 focus:border-[#25D366]"
-                                    }`}
-                                >
-                                    <option value="USER">
-                                        USER
-                                    </option>
-
-                                    <option value="ADMIN">
-                                        ADMIN
-                                    </option>
-                                </select>
-
-                                {errors.role && (
-                                    <p className="mt-1 text-sm text-red-500">
-                                        {errors.role}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ===========================
-                        ADDRESS
-                    =========================== */}
-                    <div>
-                        <h2 className="mb-5 border-b-2 border-[#25D366] pb-2 text-xl font-bold text-black">
-                            Address
-                        </h2>
-
-                        <div>
-                            <label className="mb-2 block font-semibold text-black">
-                                Address{" "}
-                                <span className="text-red-500">*</span>
-                            </label>
-
-                            <textarea
-                                name="address"
-                                value={formData.address}
-                                onChange={handleChange}
-                                rows="4"
-                                placeholder="Address"
-                                className={`w-full resize-none rounded-xl border-2 px-4 py-3 outline-none transition ${
-                                    errors.address
-                                        ? "border-red-500"
-                                        : "border-gray-300 focus:border-[#25D366]"
-                                }`}
-                            />
-
-                            {errors.address && (
-                                <p className="mt-1 text-sm text-red-500">
-                                    {errors.address}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ===========================
-                        ACTION BUTTONS
-                    =========================== */}
-                    <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:justify-end sm:gap-4">
-
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={isSubmitting}
-                            className="crm-secondary-button"
-                        >
-                            Cancel
-                        </button>
-
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="crm-primary-button"
-                        >
-                            {isSubmitting
-                                ? "Creating..."
-                                : "Create Employee"}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className={primaryButtonClass}
+                    >
+                        {isSubmitting ? "Creating..." : "Create Employee"}
+                    </button>
+                </FormActions>
+            </form>
+        </EmployeeModalShell>
     );
 }
 

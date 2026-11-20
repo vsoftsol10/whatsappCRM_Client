@@ -9,6 +9,8 @@ import {
   X,
   Loader2,
   Trash2,
+  Filter,
+  ChevronDown,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -19,12 +21,15 @@ import {
   getCustomers,
   deleteCustomer,
   bulkDeleteCustomers,
+  updateCustomer,
   previewCustomerImport,
   importCustomers,
 } from "../api/customerApi";
 import CustomerStatCard from "../components/customers/CustomerStatCard";
 import ConfirmModal from "../components/common/ConfirmModal";
-import Pagination from "../components/common/Pagination";
+import CustomerPagination from "../components/customers/CustomerPagination";
+import StatusToggle from "../components/customers/StatusToggle";
+import { formatPhone } from "../utils/customerFormat";
 import ViewCustomerModal from "../components/customers/ViewCustomerModal";
 import { getServices } from "../api/serviceApi";
 
@@ -69,7 +74,10 @@ function Customers() {
   const [isBulkDeleting, setIsBulkDeleting] =
     useState(false);
 
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
+  // Customer whose status switch is being saved
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
   const ROWS_PER_PAGE = rowsPerPage;
 
@@ -243,17 +251,16 @@ function Customers() {
 
   const totalCustomers = allCustomers.length;
 
-  const activeCustomers =
-    allCustomers.filter(
-      (customer) =>
-        customer.status === "ACTIVE"
+  // Channel counts come from the free-text "source" field
+  // (so "Instagram AI" still counts as Instagram)
+  const countBySource = (name) =>
+    allCustomers.filter((customer) =>
+      (customer.source || "").toLowerCase().includes(name)
     ).length;
 
-  const inactiveCustomers =
-    allCustomers.filter(
-      (customer) =>
-        customer.status === "INACTIVE"
-    ).length;
+  const whatsappCustomers = countBySource("whatsapp");
+  const instagramCustomers = countBySource("instagram");
+  const facebookCustomers = countBySource("facebook");
 
   // =========================
   // PAGINATION
@@ -605,6 +612,59 @@ function Customers() {
   };
 
   // =========================
+  // TOGGLE STATUS (Active / Inactive switch in the table)
+  // =========================
+
+  const handleToggleStatus = async (customer, makeActive) => {
+    if (statusUpdatingId) return;
+
+    const previousStatus = customer.status;
+    const nextStatus = makeActive ? "ACTIVE" : "INACTIVE";
+
+    const applyStatus = (status) => {
+      const apply = (list) =>
+        list.map((item) =>
+          item.id === customer.id ? { ...item, status } : item
+        );
+
+      setCustomers(apply(useCustomerStore.getState().customers || []));
+      setAllCustomers((prev) => apply(prev));
+    };
+
+    // Show the change straight away, undo it if saving fails
+    applyStatus(nextStatus);
+    setStatusUpdatingId(customer.id);
+
+    try {
+      // Only name, phone and status are sent, everything else stays as it is
+      await updateCustomer(customer.id, {
+        name: customer.name,
+        phone: customer.phone,
+        status: nextStatus,
+      });
+
+      toast.success(
+        `${customer.name} is now ${nextStatus === "ACTIVE" ? "active" : "inactive"}`
+      );
+    } catch (error) {
+      console.error(error);
+
+      applyStatus(previousStatus);
+
+      // 403 is already handled by apiClient interceptor
+      if (error?.response?.status === 403) {
+        return;
+      }
+
+      toast.error(
+        error?.response?.data?.message || "Failed to update status"
+      );
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  };
+
+  // =========================
   // VIEW CUSTOMER
   // =========================
 
@@ -841,7 +901,7 @@ function Customers() {
 
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
 
           {/* ================= IMPORT CUSTOMER ================= */}
 
@@ -856,7 +916,7 @@ function Customers() {
           <button
             type="button"
             onClick={handleOpenImport}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[#25D366] hover:bg-[#DCF8C6] sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-500 bg-white px-6 text-sm font-semibold text-green-600 transition hover:bg-green-50 sm:w-auto"
           >
             <Upload size={18} />
             Import Customers
@@ -865,10 +925,11 @@ function Customers() {
           {/* ================= ADD CUSTOMER ================= */}
 
           <button
+            type="button"
             onClick={() =>
               setShowAddCustomer(true)
             }
-            className="crm-primary-button w-full sm:w-auto"
+            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
           >
             + Add Customer
           </button>
@@ -881,41 +942,37 @@ function Customers() {
 
       <CustomerStatCard
         totalCustomers={totalCustomers}
-        activeCustomers={activeCustomers}
-        inactiveCustomers={inactiveCustomers}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
+        whatsappCustomers={whatsappCustomers}
+        instagramCustomers={instagramCustomers}
+        facebookCustomers={facebookCustomers}
       />
 
       {/* ================= SEARCH + FILTER ================= */}
 
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
 
         {/* Search */}
 
-        <div className="w-full lg:max-w-md">
+        <input
+          type="text"
+          aria-label="Search customers"
+          placeholder="Search customers..."
+          value={searchTerm}
+          onChange={(e) =>
+            setSearchTerm(e.target.value)
+          }
+          className="h-12 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+        />
 
-          <input
-            type="text"
-            placeholder="Search customers..."
-            value={searchTerm}
-            onChange={(e) =>
-              setSearchTerm(e.target.value)
-            }
-            className="crm-input"
-          />
+        {/* Service filter (only shown when the company has services) */}
 
-        </div>
-
-        {/* Filter Chips */}
-
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          {/* Service filter (only shown when the company has services) */}
-          {serviceOptions.length > 0 && (
+        {serviceOptions.length > 0 && (
+          <div className="relative sm:w-48">
             <select
+              aria-label="Filter by service"
               value={serviceFilter}
               onChange={(e) => setServiceFilter(e.target.value)}
-              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#25D366]"
+              className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm text-slate-800 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
             >
               <option value="ALL">All Services</option>
 
@@ -927,45 +984,39 @@ function Customers() {
 
               <option value="NONE">No Service</option>
             </select>
-          )}
 
+            <ChevronDown
+              size={18}
+              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+            />
+          </div>
+        )}
 
-          {[
-            {
-              key: "ALL",
-              label: "All",
-            },
-            {
-              key: "ACTIVE",
-              label: "Active",
-            },
-            {
-              key: "INACTIVE",
-              label: "Inactive",
-            },
-          ].map((item) => {
+        {/* Status filter */}
 
-            const isActive =
-              statusFilter === item.key;
+        <div className="relative sm:w-52">
+          <Filter
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+          />
 
-            return (
-              <button
-                key={item.key}
-                onClick={() =>
-                  setStatusFilter(
-                    item.key
-                  )
-                }
-                className={`rounded-xl border px-5 py-2.5 text-sm font-semibold transition ${isActive
-                  ? "border-[#25D366] bg-[#25D366] text-black shadow-md"
-                  : "border-gray-300 bg-white text-slate-700 hover:border-[#25D366] hover:bg-[#DCF8C6]"
-                  }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
+          <select
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+            className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-12 pr-10 text-sm text-slate-800 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          >
+            <option value="ALL">All Status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+          </select>
 
+          <ChevronDown
+            size={18}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+          />
         </div>
 
       </div>
@@ -1035,17 +1086,17 @@ function Customers() {
 
       {/* ================= TABLE ================= */}
 
-      <div className="crm-table-shell overflow-visible">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
-        <div className="crm-table-scroll overflow-visible">
+        <div className="overflow-x-auto">
 
-          <table className="w-full min-w-[1000px]">
+          <table className="w-full min-w-[900px]">
 
-            <thead className="bg-[#25D366] text-black">
+            <thead className="bg-green-100">
 
               <tr>
 
-                <th className="crm-th w-12">
+                <th className="w-12 px-5 py-4 text-left">
                   <input
                     type="checkbox"
                     aria-label="Select all customers on this page"
@@ -1057,31 +1108,31 @@ function Customers() {
                       }
                     }}
                     onChange={handleToggleSelectPage}
-                    className="h-4 w-4 cursor-pointer accent-black"
+                    className="h-4 w-4 cursor-pointer accent-green-600"
                   />
                 </th>
 
-                <th className="crm-th">
+                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-green-900">
                   Name
                 </th>
 
-                <th className="crm-th">
+                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-green-900">
                   Phone
                 </th>
 
-                <th className="crm-th">
+                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-green-900">
                   Company
                 </th>
 
-                <th className="crm-th">
+                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-green-900">
                   Services
                 </th>
 
-                <th className="crm-th">
+                <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-wide text-green-900">
                   Status
                 </th>
 
-                <th className="crm-th text-center">
+                <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-wide text-green-900">
                   Actions
                 </th>
 
@@ -1109,9 +1160,9 @@ function Customers() {
                           }
                         )
                       }
-                      className={`cursor-pointer border-b border-gray-100 transition hover:bg-gray-50 ${
+                      className={`cursor-pointer border-t border-slate-100 transition hover:bg-slate-50 ${
                         selectedSet.has(customer.id)
-                          ? "bg-[#F0FBE8]"
+                          ? "bg-green-50"
                           : ""
                       }`}
                     >
@@ -1119,7 +1170,7 @@ function Customers() {
                       {/* ================= SELECT ================= */}
 
                       <td
-                        className="crm-td w-12"
+                        className="w-12 px-5 py-4"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
@@ -1129,31 +1180,31 @@ function Customers() {
                           onChange={() =>
                             handleToggleSelect(customer.id)
                           }
-                          className="h-4 w-4 cursor-pointer accent-[#25D366]"
+                          className="h-4 w-4 cursor-pointer accent-green-600"
                         />
                       </td>
 
-                      <td className="crm-td font-medium">
+                      <td className="px-5 py-4 text-sm font-semibold text-slate-900">
                         {customer.name}
                       </td>
 
-                      <td className="crm-td">
-                        {customer.phone}
+                      <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-700">
+                        {formatPhone(customer.phone)}
                       </td>
 
-                      <td className="crm-td">
+                      <td className="px-5 py-4 text-sm text-slate-700">
                         {customer.companyName ||
                           "-"}
                       </td>
 
-                      <td className="crm-td">
+                      <td className="px-5 py-4 text-sm text-slate-700">
                         {customer.services &&
                         customer.services.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1.5">
                             {customer.services.map((service) => (
                               <span
                                 key={service.id}
-                                className="rounded-full bg-[#DCF8C6] px-2.5 py-0.5 text-xs font-semibold text-[#128C7E]"
+                                className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
                               >
                                 {service.name}
                               </span>
@@ -1164,35 +1215,41 @@ function Customers() {
                         )}
                       </td>
 
-                      <td className="crm-td">
+                      {/* ================= STATUS SWITCH ================= */}
 
-                        <span
-                          className={`crm-badge ${customer.status ===
-                            "ACTIVE"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                      <td className="px-5 py-4">
+                        <div className="flex justify-center">
+                          <StatusToggle
+                            checked={customer.status === "ACTIVE"}
+                            disabled={statusUpdatingId === customer.id}
+                            label={`${customer.name} is ${
+                              customer.status === "ACTIVE"
+                                ? "active"
+                                : "inactive"
                             }`}
-                        >
-                          {customer.status}
-                        </span>
-
+                            onChange={(makeActive) =>
+                              handleToggleStatus(customer, makeActive)
+                            }
+                          />
+                        </div>
                       </td>
 
                       {/* ================= ACTION MENU ================= */}
 
-                      <td className="crm-td">
+                      <td className="px-5 py-4">
 
                         <div className="relative flex justify-center">
 
                           <button
                             type="button"
+                            aria-label={`Actions for ${customer.name}`}
                             onClick={(e) =>
                               handleMenuClick(
                                 e,
                                 customer.id
                               )
                             }
-                            className="rounded-full p-2 hover:bg-gray-100"
+                            className="rounded-full p-2 text-slate-600 transition hover:bg-slate-100"
                           >
                             <MoreVertical
                               size={20}
@@ -1214,7 +1271,7 @@ function Customers() {
 
                   <td
                     colSpan="7"
-                    className="p-8 text-center text-gray-500"
+                    className="p-10 text-center text-slate-500"
                   >
                     No customers found
                   </td>
@@ -1241,7 +1298,7 @@ function Customers() {
             onClick={(e) =>
               e.stopPropagation()
             }
-            className="fixed z-[99999] w-36 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+            className="fixed z-[99999] w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
             style={{
               top: `${menuPosition.top}px`,
               left: `${menuPosition.left}px`,
@@ -1285,13 +1342,15 @@ function Customers() {
       {/* ================= PAGINATION ================= */}
 
       {customers.length > 0 && (
-        <Pagination
+        <CustomerPagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={customers.length}
-          itemsPerPage={ROWS_PER_PAGE}
+          pageSize={ROWS_PER_PAGE}
           onPageChange={setCurrentPage}
-          onPageSizeChange={(size) => { setRowsPerPage(size); setCurrentPage(1); }}
+          onPageSizeChange={(size) => {
+            setRowsPerPage(size);
+            setCurrentPage(1);
+          }}
         />
       )}
 
@@ -1331,6 +1390,12 @@ function Customers() {
           onClose={() =>
             setViewCustomerId(null)
           }
+          onEdit={() => {
+            const id = viewCustomerId;
+
+            setViewCustomerId(null);
+            setEditCustomerId(id);
+          }}
         />
       )}
 

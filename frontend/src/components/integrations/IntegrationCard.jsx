@@ -1,59 +1,77 @@
-import React from "react";
 import {
-  Eye,
-  Trash2,
-  Power,
-  CreditCard,
-  ShoppingCart,
-  Store,
   Building2,
-  Wallet,
-  Plug,
+  Calendar,
   Clock,
+  CreditCard,
+  Diamond,
+  Globe,
+  Plug,
+  ShoppingBag,
+  ShoppingCart,
+  Webhook,
 } from "lucide-react";
 
-const typeConfig = {
-  BILLING: {
-    label: "Billing",
-    icon: CreditCard,
-  },
-  ECOMMERCE: {
-    label: "E-commerce",
-    icon: ShoppingCart,
-  },
-  POS: {
-    label: "POS",
-    icon: Store,
-  },
-  ERP: {
-    label: "ERP",
-    icon: Building2,
-  },
-  PAYMENT: {
-    label: "Payment",
-    icon: Wallet,
-  },
-  CUSTOM: {
-    label: "Custom",
-    icon: Plug,
-  },
+import IntegrationActionsMenu from "./IntegrationActionsMenu";
+import { TYPE_LABELS, formatDate } from "./integrationUtils";
+
+const PROVIDER_ICONS = {
+  WEBSITE: Building2,
+  SHOPIFY: ShoppingBag,
+  WOOCOMMERCE: ShoppingCart,
+  STRIPE: CreditCard,
+  RAZORPAY: CreditCard,
+  SQUARE: CreditCard,
+  GENERIC: Webhook,
 };
 
-const formatDate = (date) => {
-  if (!date) return "Never";
-
-  try {
-    return new Date(date).toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "Never";
-  }
+const TYPE_ICONS = {
+  BILLING: CreditCard,
+  ECOMMERCE: ShoppingCart,
+  POS: Globe,
+  ERP: Building2,
+  PAYMENT: CreditCard,
+  CUSTOM: Plug,
 };
+
+export function StatusSwitch({ checked, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange();
+      }}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+        checked ? "bg-[#25D366]" : "bg-slate-300"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+          checked ? "left-[22px]" : "left-0.5"
+        }`}
+      />
+    </button>
+  );
+}
+
+function InfoRow({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-start gap-3 py-3">
+      <Icon className="mt-1 h-4 w-4 shrink-0 text-blue-600" />
+
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          {label}
+        </p>
+        <p className="mt-0.5 text-sm text-slate-800">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 const IntegrationCard = ({
   integration,
@@ -61,110 +79,84 @@ const IntegrationCard = ({
   onToggleStatus,
   onDelete,
 }) => {
-  const config =
-    typeConfig[integration.type] || typeConfig.CUSTOM;
-
-  const TypeIcon = config.icon;
-
   const isActive = integration.status === "ACTIVE";
 
+  const Icon =
+    PROVIDER_ICONS[integration.provider] ||
+    TYPE_ICONS[integration.type] ||
+    Plug;
+
+  const typeLabel = TYPE_LABELS[integration.type] || integration.type;
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onView(integration.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && e.target === e.currentTarget) {
+          onView(integration.id);
+        }
+      }}
+      className="cursor-pointer rounded-xl border border-slate-200 bg-white shadow-sm outline-none transition hover:shadow-md focus-visible:ring-2 focus-visible:ring-[#25D366]"
+    >
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-lg bg-green-50 flex items-center justify-center flex-shrink-0">
-            <TypeIcon className="w-5 h-5 text-green-600" />
+      <div className="flex items-center justify-between gap-3 px-4 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600">
+            <Icon className="h-5 w-5" />
           </div>
 
           <div className="min-w-0">
-            <h3 className="font-semibold text-gray-900 truncate">
+            <h3 className="truncate font-semibold text-slate-900">
               {integration.name}
             </h3>
-
-            <p className="text-sm text-gray-500">
-              {integration.provider || config.label}
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              {integration.provider || typeLabel}
             </p>
           </div>
         </div>
 
-        {/* Status */}
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-            isActive
-              ? "bg-green-100 text-green-700"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              isActive ? "bg-green-500" : "bg-gray-400"
-            }`}
+        <div className="flex shrink-0 items-center gap-2">
+          <StatusSwitch
+            checked={isActive}
+            onChange={() => onToggleStatus(integration)}
+            label={isActive ? "Deactivate integration" : "Activate integration"}
           />
 
-          {isActive ? "Active" : "Inactive"}
-        </span>
-      </div>
-
-      {/* Integration information */}
-      <div className="mt-5 space-y-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Type</span>
-
-          <span className="font-medium text-gray-700">
-            {config.label}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            Last Event
-          </span>
-
-          <span className="font-medium text-gray-700">
-            {formatDate(integration.lastEventAt)}
-          </span>
+          <IntegrationActionsMenu
+            integration={integration}
+            onView={onView}
+            onToggleStatus={onToggleStatus}
+            onDelete={onDelete}
+          />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => onView(integration.id)}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-        >
-          <Eye className="w-4 h-4" />
-          View Details
-        </button>
+      {/* Details */}
+      <div className="mx-4 divide-y divide-slate-200 border-t border-slate-200">
+        <InfoRow icon={Diamond} label="Type" value={typeLabel} />
 
-        <div className="flex items-center gap-2">
-          {/* Toggle status */}
-          <button
-            type="button"
-            onClick={() => onToggleStatus(integration)}
-            title={isActive ? "Deactivate" : "Activate"}
-            className={`p-2 rounded-lg transition-colors ${
-              isActive
-                ? "text-green-600 bg-green-50 hover:bg-green-100"
-                : "text-gray-500 bg-gray-100 hover:bg-gray-200"
-            }`}
-          >
-            <Power className="w-4 h-4" />
-          </button>
+        <InfoRow
+          icon={Calendar}
+          label="Last event"
+          value={
+            integration.lastEventAt ? (
+              formatDate(integration.lastEventAt)
+            ) : (
+              <span className="text-slate-500">No events yet</span>
+            )
+          }
+        />
 
-          {/* Delete */}
-          <button
-            type="button"
-            onClick={() => onDelete(integration)}
-            title="Delete integration"
-            className="p-2 rounded-lg text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        <InfoRow
+          icon={Clock}
+          label="Created"
+          value={formatDate(integration.createdAt)}
+        />
       </div>
+
+      <div className="h-2" />
     </div>
   );
 };

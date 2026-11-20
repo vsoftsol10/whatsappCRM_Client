@@ -4,7 +4,7 @@
 // 2. TemplateButtonsPreview -> shows buttons the way WhatsApp displays them
 // 3. validateTemplateButtons -> same rules as the backend, to warn early
 
-import { Phone, ExternalLink, Reply, Copy, Plus, Trash2 } from "lucide-react";
+import { Phone, ExternalLink, Reply, Copy, Trash2 } from "lucide-react";
 
 const MAX_BUTTONS = 10;
 const MAX_TEXT = 25;
@@ -175,23 +175,23 @@ export default function TemplateButtonsEditor({
   };
 
   const inputClass =
-    "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#25D366] disabled:cursor-not-allowed disabled:bg-gray-100";
+    "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:cursor-not-allowed disabled:bg-slate-50";
 
   return (
     <div>
-      <h3 className="mb-2 text-lg font-semibold text-gray-800">
-        Buttons <span className="text-sm font-normal text-gray-500">(optional)</span>
-      </h3>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-slate-900">Buttons</h3>
+        <span className="text-xs text-slate-400">Optional</span>
+      </div>
 
-      <p className="mb-3 text-sm text-gray-500">
-        Add buttons under the message: call, open a website or payment link,
-        quick replies, or copy an offer code.
+      <p className="mb-3 text-xs text-slate-500">
+        Add buttons users can tap: call-to-action buttons (visit website,
+        call) or quick-reply buttons.
       </p>
 
       {/* ADD BUTTONS */}
       <div className="mb-4 flex flex-wrap gap-2">
         {Object.entries(TYPE_INFO).map(([type, info]) => {
-          const Icon = info.icon;
           const allowed = canAdd(type);
 
           return (
@@ -205,14 +205,12 @@ export default function TemplateButtonsEditor({
                   ? "Copy code works only in MARKETING templates"
                   : undefined
               }
-              className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition ${
+              className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                 allowed
-                  ? "border-gray-300 bg-white hover:bg-green-50"
-                  : "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
+                  ? "border-slate-300 bg-white text-slate-800 hover:border-green-500 hover:bg-green-50"
+                  : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
               }`}
             >
-              <Plus size={14} />
-              <Icon size={15} />
               {info.label}
             </button>
           );
@@ -314,7 +312,7 @@ export default function TemplateButtonsEditor({
         </div>
       )}
 
-      <p className="mt-3 text-xs text-gray-500">
+      <p className="mt-3 text-xs text-slate-500">
         Tip: for a <b>Pay Now</b> button, choose “Visit website”, name it
         “Pay Now” and paste your payment link (Razorpay, PayU, UPI page...).
         Up to 1 call button, 2 website buttons and 1 copy code button; quick

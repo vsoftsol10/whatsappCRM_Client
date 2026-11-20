@@ -1,69 +1,27 @@
-import { useMemo } from "react";
-import KanbanColumn from "./KanbanColumn";
+import KanbanTaskCard from "./KanbanTaskCard";
 
+// Card view: a responsive grid of task cards.
 export default function KanbanBoard({
-  tasks,
+  tasks = [],
+  onView,
   onEdit,
   onDelete,
   onStatusChange,
+  onPriorityChange,
 }) {
-  const columns = useMemo(() => {
-    return {
-      TODO: tasks.filter((task) => task.status === "TODO"),
-
-      IN_PROGRESS: tasks.filter(
-        (task) => task.status === "IN_PROGRESS"
-      ),
-
-      REVIEW: tasks.filter(
-        (task) => task.status === "REVIEW"
-      ),
-
-      COMPLETED: tasks.filter(
-        (task) => task.status === "COMPLETED"
-      ),
-    };
-  }, [tasks]);
-
   return (
-    <div className="mt-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <KanbanColumn
-          title="Todo"
-          status="TODO"
-          tasks={columns.TODO}
+    <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {tasks.map((task) => (
+        <KanbanTaskCard
+          key={task.id}
+          task={task}
+          onView={onView}
           onEdit={onEdit}
           onDelete={onDelete}
           onStatusChange={onStatusChange}
+          onPriorityChange={onPriorityChange}
         />
-
-        <KanbanColumn
-          title="In Progress"
-          status="IN_PROGRESS"
-          tasks={columns.IN_PROGRESS}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-        />
-
-        <KanbanColumn
-          title="Review"
-          status="REVIEW"
-          tasks={columns.REVIEW}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-        />
-
-        <KanbanColumn
-          title="Completed"
-          status="COMPLETED"
-          tasks={columns.COMPLETED}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-        />
-      </div>
+      ))}
     </div>
   );
 }

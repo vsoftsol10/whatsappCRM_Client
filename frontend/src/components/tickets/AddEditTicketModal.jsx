@@ -1,345 +1,172 @@
-
-
 import { useState } from "react";
-import { X } from "lucide-react";
+import toast from "react-hot-toast";
+import TicketFields from "./TicketFields";
+import {
+  CustomerModal,
+  CustomerModalFooter,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from "../customers/CustomerForm";
 
-import { addTicketWorkNote } from "../../api/ticketApi";
-import AddWorkNote from "../common/AddWorkNote";
-
+// Create / edit a ticket.
+//   mode     : "add" | "edit"
+//   ticket   : the ticket being edited (edit only)
+//   onSubmit : (payload) => Promise, throws when saving fails
 function AddEditTicketModal({
-  form,
-  setForm,
+  mode,
+  ticket,
   customers,
   employees,
-  loading,
-  isEditing,
-  setShowForm,
-  handleSubmit,
+  onClose,
+  onSubmit,
 }) {
-  const [errors, setErrors] = useState({});
+  const isEdit = mode === "edit";
 
-  const validateForm = () => {
-    const newErrors = {};
+  const [form, setForm] = useState({
+    customerId: ticket?.customer?.id || ticket?.customerId || "",
+    assignedToId: ticket?.assignedToId || "",
+    title: ticket?.title || "",
+    priority: ticket?.priority || "MEDIUM",
+    description: ticket?.description || "",
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  // The saved customer / employee must stay selectable even when they
+  // are missing from the lists (e.g. an employee who is now inactive).
+  const customerOptions =
+    ticket?.customer && !customers.some((c) => c.id === ticket.customer.id)
+      ? [ticket.customer, ...customers]
+      : customers;
+
+  const employeeOptions =
+    ticket?.assignedTo && !employees.some((e) => e.id === ticket.assignedTo.id)
+      ? [ticket.assignedTo, ...employees]
+      : employees;
+
+  const handleChange = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const validate = () => {
+    const next = {};
 
     if (!form.customerId) {
-      newErrors.customerId = "Please select a customer";
-    }
-
-    if (!form.title.trim()) {
-      newErrors.title = "Ticket title is required";
-    } else if (form.title.trim().length < 3) {
-      newErrors.title =
-        "Ticket title must be at least 3 characters";
-    }
-
-    if (!form.description.trim()) {
-      newErrors.description = "Description is required";
-    }
-
-    if (!form.priority) {
-      newErrors.priority = "Priority is required";
+      next.customerId = "Please select a customer";
     }
 
     if (!form.assignedToId) {
-      newErrors.assignedToId =
-        "Please assign an employee";
+      next.assignedToId = "Please assign an employee";
     }
 
-    if (isEditing && !form.status) {
-      newErrors.status = "Status is required";
+    if (!form.title.trim()) {
+      next.title = "Ticket title is required";
+    } else if (form.title.trim().length < 3) {
+      next.title = "Ticket title must be at least 3 characters";
     }
 
-    setErrors(newErrors);
+    if (!form.priority) {
+      next.priority = "Priority is required";
+    }
 
-    return Object.keys(newErrors).length === 0;
+    if (!form.description.trim()) {
+      next.description = "Description is required";
+    }
+
+    setErrors(next);
+
+    return Object.keys(next).length === 0;
   };
 
-  const handleChange = (field, value) => {
-    setForm({
-      ...form,
-      [field]: value,
-    });
-
-    setErrors((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-  };
-
-  const onSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    if (saving || !validate()) return;
 
-    handleSubmit(e);
+    // The backend can't change a ticket's customer, and status is
+    // changed from the table, so neither is sent when editing.
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      priority: form.priority,
+      assignedToId: form.assignedToId,
+      ...(isEdit ? {} : { customerId: form.customerId }),
+    };
+
+    try {
+      setSaving(true);
+
+      await onSubmit(payload);
+
+      onClose();
+
+      // Success message (shown AFTER the popup is closed)
+      toast.success(
+        isEdit ? "Ticket updated successfully!" : "Ticket created successfully!"
+      );
+    } catch (error) {
+      console.error("Save ticket error:", error);
+
+      // 403 is already handled by the apiClient interceptor
+      if (error?.response?.status === 403) {
+        setSaving(false);
+        onClose();
+        return;
+      }
+
+      toast.error(
+        error?.response?.data?.message ||
+          (isEdit ? "Failed to update ticket" : "Failed to create ticket")
+      );
+
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-3 sm:p-4">
-        <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between gap-4 bg-[#25D366] px-5 py-4 sm:px-6 sm:py-5">
-            <h2 className="break-words text-xl font-bold text-gray-800 sm:text-2xl">
-              {isEditing ? "Edit Ticket" : "Create Ticket"}
-            </h2>
+    <CustomerModal
+      title={isEdit ? "Edit Ticket" : "Create Ticket"}
+      onClose={onClose}
+      closeDisabled={saving}
+      maxWidth="max-w-2xl"
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        <TicketFields
+          values={form}
+          errors={errors}
+          onChange={handleChange}
+          customers={customerOptions}
+          employees={employeeOptions}
+          disabled={saving}
+          customerLocked={isEdit}
+        />
 
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="p-2 rounded-full hover:bg-[#128C7E] transition"
-            >
-              <X size={22} />
-            </button>
-          </div>
-
-          <form
-            onSubmit={onSubmit}
-            className="max-h-[75vh] space-y-5 overflow-y-auto p-5 sm:p-6"
+        <CustomerModalFooter>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className={secondaryButtonClass}
           >
-            {/* Customer */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Customer <span className="text-red-500">*</span>
-              </label>
+            Cancel
+          </button>
 
-              <select
-                value={form.customerId}
-                disabled={isEditing}
-                onChange={(e) =>
-                  handleChange("customerId", e.target.value)
-                }
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.customerId
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
-              >
-                <option value="">
-                  Select Customer
-                </option>
-
-                {customers.map((customer) => (
-                  <option
-                    key={customer.id}
-                    value={customer.id}
-                  >
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
-
-              {errors.customerId && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.customerId}
-                </p>
-              )}
-            </div>
-
-            {/* Assign Employee */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Assign Employee <span className="text-red-500">*</span>
-              </label>
-
-              <select
-                value={form.assignedToId}
-                onChange={(e) =>
-                  handleChange(
-                    "assignedToId",
-                    e.target.value
-                  )
-                }
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.assignedToId
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
-              >
-                <option value="">
-                  Select Employee
-                </option>
-
-                {employees.map((employee) => (
-                  <option
-                    key={employee.id}
-                    value={employee.id}
-                  >
-                    {employee.name}
-                  </option>
-                ))}
-              </select>
-
-              {errors.assignedToId && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.assignedToId}
-                </p>
-              )}
-            </div>
-
-            {/* Title */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Title <span className="text-red-500">*</span>
-              </label>
-
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) =>
-                  handleChange("title", e.target.value)
-                }
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.title
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
-                placeholder="Ticket title"
-              />
-
-              {errors.title && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.title}
-                </p>
-              )}
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Description <span className="text-red-500">*</span>
-              </label>
-
-              <textarea
-                rows="5"
-                value={form.description}
-                onChange={(e) =>
-                  handleChange(
-                    "description",
-                    e.target.value
-                  )
-                }
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.description
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
-                placeholder="Describe the issue"
-              />
-
-              {errors.description && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.description}
-                </p>
-              )}
-            </div>
-
-            {/* Priority */}
-            <div>
-              <label className="block mb-2 font-medium text-gray-700">
-                Priority <span className="text-red-500">*</span>
-              </label>
-
-              <select
-                value={form.priority}
-                onChange={(e) =>
-                  handleChange(
-                    "priority",
-                    e.target.value
-                  )
-                }
-                className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                  errors.priority
-                    ? "border-red-500"
-                    : "border-gray-300 focus:border-[#25D366]"
-                }`}
-              >
-                <option value="LOW">LOW</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HIGH">HIGH</option>
-              </select>
-
-              {errors.priority && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.priority}
-                </p>
-              )}
-            </div>
-
-            {/* Status */}
-            {isEditing && (
-              <div>
-                <label className="block mb-2 font-medium text-gray-700">
-                  Status <span className="text-red-500">*</span>
-                </label>
-
-                <select
-                  value={form.status}
-                  onChange={(e) =>
-                    handleChange("status", e.target.value)
-                  }
-                  className={`w-full rounded-lg border px-4 py-3 outline-none ${
-                    errors.status
-                      ? "border-red-500"
-                      : "border-gray-300 focus:border-[#25D366]"
-                  }`}
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="IN_PROGRESS">
-                    IN PROGRESS
-                  </option>
-                  <option value="RESOLVED">
-                    RESOLVED
-                  </option>
-                  <option value="CLOSED">
-                    CLOSED
-                  </option>
-                </select>
-
-                {errors.status && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.status}
-                  </p>
-                )}
-              </div>
+          <button type="submit" disabled={saving} className={primaryButtonClass}>
+            {saving ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                {isEdit ? "Saving..." : "Creating..."}
+              </>
+            ) : isEdit ? (
+              "Save Changes"
+            ) : (
+              "Create Ticket"
             )}
-
-            {/* WORK NOTE */}
-            {isEditing && form.id && (
-              <div className="border-t pt-4">
-                <AddWorkNote
-                  entityId={form.id}
-                  addNote={addTicketWorkNote}
-                />
-              </div>
-            )}
-
-            {/* Buttons */}
-            <div className="mt-6 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="crm-secondary-button"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="crm-primary-button"
-              >
-                {loading
-                  ? "Saving..."
-                  : isEditing
-                  ? "Update Ticket"
-                  : "Create Ticket"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          </button>
+        </CustomerModalFooter>
+      </form>
+    </CustomerModal>
   );
 }
 

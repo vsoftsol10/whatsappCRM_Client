@@ -646,6 +646,8 @@ model Customer {
   @@unique([companyId, phone])
   @@index([companyId])
   @@index([userId])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)    // NEW
+  @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 //////////////////////////////////////////////////////
@@ -966,6 +968,7 @@ model Campaign {
   @@index([templateId])
   @@index([status])
   @@index([scheduledAt])
+  @@index([companyId, createdAt])
 }
 
 //////////////////////////////////////////////////////
@@ -1196,6 +1199,8 @@ model Task {
   @@index([companyId])
   @@index([createdById])
   @@index([assignedToId])
+  @@index([companyId, status])      // NEW
+  @@index([companyId, createdAt])
 }
 
 //////////////////////////////////////////////////////
@@ -1257,6 +1262,8 @@ model Ticket {
   @@index([customerId])
   @@index([createdById])
   @@index([assignedToId])
+  @@index([companyId, status])      // NEW
+  @@index([companyId, createdAt]) 
 }
 
 //////////////////////////////////////////////////////

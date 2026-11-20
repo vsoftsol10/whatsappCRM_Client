@@ -1,19 +1,17 @@
-
-
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import {
-  X,
-  Send,
-  Loader2,
-} from "lucide-react";
+import { X, Send, Loader2, Filter, CircleCheck } from "lucide-react";
 
 import { getCustomers } from "../../api/customerApi";
+import { getServices } from "../../api/serviceApi";
 import ServiceFilterChips, {
   matchesServiceFilter,
 } from "../services/ServiceFilterChips";
 import { getCampaignRecipients } from "../../api/campaignApi";
 import useCampaignStore from "../../store/campaignStore";
+
+// How long the "sent" message stays before it closes on its own
+const SUCCESS_AUTO_CLOSE_MS = 3500;
 
 export default function SendCampaignModal({
   isOpen,
@@ -26,7 +24,7 @@ export default function SendCampaignModal({
   const [selectedCustomers, setSelectedCustomers] = useState([]);
 
   // Customers who received this campaign before.
-  // This is now ONLY used to display "Already Sent".
+  // This is ONLY used to display "Already Sent".
   // It does NOT block selection.
   const [sentCustomers, setSentCustomers] = useState([]);
 
@@ -34,7 +32,21 @@ export default function SendCampaignModal({
 
   // Service filter (empty = all customers)
   const [serviceFilter, setServiceFilter] = useState([]);
+  const [hasServices, setHasServices] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+
   const [loading, setLoading] = useState(false);
+
+  // true after the campaign was sent -> shows the success message
+  const [sent, setSent] = useState(false);
+
+  // Always the latest onClose, so timers/listeners below don't restart
+  // every time the page re-renders (it passes a new function each time).
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   // ===========================
   // LOAD DATA
@@ -43,12 +55,47 @@ export default function SendCampaignModal({
     if (isOpen && campaign) {
       fetchCustomers();
       fetchSentCustomers();
+      fetchHasServices();
 
       setSelectedCustomers([]);
       setSearch("");
       setServiceFilter([]);
+      setShowFilter(false);
+      setSent(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, campaign]);
+
+  // Escape closes, the page behind doesn't scroll
+  useEffect(() => {
+    if (!isOpen || !campaign) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !loading) onCloseRef.current();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, campaign, loading]);
+
+  // The success message closes itself after a few seconds
+  useEffect(() => {
+    if (!sent) return undefined;
+
+    const timer = setTimeout(
+      () => onCloseRef.current(),
+      SUCCESS_AUTO_CLOSE_MS
+    );
+
+    return () => clearTimeout(timer);
+  }, [sent]);
 
   // ===========================
   // GET CUSTOMERS
@@ -56,8 +103,6 @@ export default function SendCampaignModal({
   const fetchCustomers = async () => {
     try {
       const response = await getCustomers();
-
-      console.log("Customers Response:", response);
 
       if (Array.isArray(response)) {
         setCustomers(response);
@@ -75,15 +120,24 @@ export default function SendCampaignModal({
   };
 
   // ===========================
+  // DOES THIS COMPANY USE SERVICES? (decides if "Filter" is shown)
+  // ===========================
+  const fetchHasServices = async () => {
+    try {
+      const data = await getServices({ activeOnly: "true" });
+
+      setHasServices((data?.services || []).length > 0);
+    } catch {
+      setHasServices(false);
+    }
+  };
+
+  // ===========================
   // GET ALREADY SENT CUSTOMERS
   // ===========================
   const fetchSentCustomers = async () => {
     try {
       const response = await getCampaignRecipients(campaign.id);
-
-      console.log("Campaign ID:", campaign.id);
-      console.log("Recipients Response:", response);
-      console.log("Recipients Data:", response.data);
 
       if (Array.isArray(response.data)) {
         const sentCustomerIds = response.data
@@ -91,11 +145,6 @@ export default function SendCampaignModal({
           .map((recipient) => recipient.customerId);
 
         setSentCustomers(sentCustomerIds);
-
-        console.log(
-          "Already Sent Customer IDs:",
-          sentCustomerIds
-        );
       } else {
         setSentCustomers([]);
       }
@@ -114,12 +163,8 @@ export default function SendCampaignModal({
     const keyword = search.toLowerCase();
 
     return (
-      customer.name
-        ?.toLowerCase()
-        .includes(keyword) ||
-      customer.phone
-        ?.toLowerCase()
-        .includes(keyword)
+      customer.name?.toLowerCase().includes(keyword) ||
+      customer.phone?.toLowerCase().includes(keyword)
     );
   });
 
@@ -135,35 +180,19 @@ export default function SendCampaignModal({
     // IMPORTANT:
     // Do NOT block already-sent customers.
     // They can be selected and sent again.
-
-    if (selectedCustomers.includes(id)) {
-      setSelectedCustomers((prev) =>
-        prev.filter((item) => item !== id)
-      );
-    } else {
-      setSelectedCustomers((prev) => [
-        ...prev,
-        id,
-      ]);
-    }
-  };
-
-  // ===========================
-  // SELECT ALL
-  // ===========================
-  const handleSelectAll = () => {
-    // Select ALL customers, including
-    // customers who were already sent this campaign.
-    const allCustomerIds = filteredCustomers.map(
-      (customer) => customer.id
+    setSelectedCustomers((prev) =>
+      prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
     );
-
-    setSelectedCustomers(allCustomerIds);
   };
 
-  // ===========================
-  // CLEAR ALL
-  // ===========================
+  // Select ALL customers shown, including
+  // customers who were already sent this campaign.
+  const handleSelectAll = () => {
+    setSelectedCustomers(filteredCustomers.map((customer) => customer.id));
+  };
+
   const handleClearAll = () => {
     setSelectedCustomers([]);
   };
@@ -173,287 +202,277 @@ export default function SendCampaignModal({
   // ===========================
   const handleSend = async () => {
     if (selectedCustomers.length === 0) {
-      return toast.error(
-        "Please select at least one customer."
-      );
+      return toast.error("Please select at least one customer.");
     }
 
     try {
       setLoading(true);
 
-      console.log(
-        "Sending campaign:",
-        campaign.id
-      );
+      await sendCampaign(campaign.id, selectedCustomers);
 
-      console.log(
-        "Selected customers:",
-        selectedCustomers
-      );
-
-      const response = await sendCampaign(
-        campaign.id,
-        selectedCustomers
-      );
-
-      // Refresh "Already Sent" status
-      // after sending.
+      // Refresh "Already Sent" status after sending.
       await fetchSentCustomers();
 
       // Clear selection.
       setSelectedCustomers([]);
 
-      onClose();
-
-      // Success message (shown AFTER the popup is closed)
-      toast.success(
-        response.message ||
-          "Campaign sent successfully"
-      );
-
+      // Show the success message
+      setSent(true);
     } catch (error) {
       console.log("Campaign Send Error:", error);
 
       toast.error(
-        error?.response?.data?.message ||
-          "Unable to send campaign."
+        error?.response?.data?.message || "Unable to send campaign."
       );
     } finally {
       setLoading(false);
     }
   };
 
+  // ===========================
+  // SUCCESS MESSAGE
+  // ===========================
+  if (sent) {
+    return (
+      <div
+        onClick={onClose}
+        className="crm-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="campaign-sent-title"
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-xl rounded-2xl bg-white px-6 py-12 text-center shadow-xl"
+        >
+          <CircleCheck
+            size={64}
+            strokeWidth={1.25}
+            className="mx-auto text-green-800"
+          />
+
+          <h2
+            id="campaign-sent-title"
+            className="mt-5 text-3xl font-bold text-slate-900"
+          >
+            Campaign sent successfully!
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-md text-base text-slate-600">
+            Your campaign has been sent successfully to the selected audience
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const activeFilterCount = serviceFilter.length;
+
+  // ===========================
+  // UI (right-side drawer)
+  // ===========================
   return (
-    <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* BACKDROP */}
+      <div
+        aria-hidden="true"
+        onClick={() => !loading && onClose()}
+        className="crm-fade-in absolute inset-0 bg-slate-900/40"
+      />
 
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col">
-
-        {/* ===========================
-            HEADER
-        =========================== */}
-
-        <div className="border-b px-6 py-4 flex justify-between items-center">
-
-          <div>
-            <h2 className="text-2xl font-bold">
+      {/* PANEL */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="send-campaign-title"
+        className="crm-drawer-in relative flex h-full w-full flex-col bg-white shadow-2xl sm:w-[520px]"
+      >
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0">
+            <h2
+              id="send-campaign-title"
+              className="text-lg font-semibold text-slate-900"
+            >
               Send Campaign
             </h2>
 
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="mt-0.5 truncate text-xs text-slate-500">
               {campaign.name}
             </p>
           </div>
 
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             disabled={loading}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <X />
+            <X size={16} />
           </button>
-
         </div>
 
-        {/* ===========================
-            SEARCH
-        =========================== */}
-
-        <div className="p-5 space-y-3">
-
-          {/* Filter customers by service (hidden when the company has no services) */}
-          <ServiceFilterChips
-            customers={customers}
-            value={serviceFilter}
-            onChange={setServiceFilter}
-            disabled={false}
-          />
-
-          <input
-            type="text"
-            placeholder="Search customer..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-            className="w-full border rounded-xl p-3 focus:ring-2 focus:ring-green-500 outline-none"
-          />
-
+        {/* SEARCH + FILTER */}
+        <div className="px-5 pt-5">
           <div className="flex gap-3">
+            <input
+              type="text"
+              aria-label="Search customer"
+              placeholder="Search Customer"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+            />
 
-            <button
-              type="button"
-              onClick={handleSelectAll}
-              className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
-            >
-              Select All
-            </button>
-
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
-            >
-              Clear All
-            </button>
-
+            {hasServices && (
+              <button
+                type="button"
+                aria-expanded={showFilter}
+                onClick={() => setShowFilter((open) => !open)}
+                className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition ${
+                  showFilter || activeFilterCount > 0
+                    ? "border-green-500 bg-green-50 text-green-700"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
+                }`}
+              >
+                <Filter size={16} />
+                Filter
+                {activeFilterCount > 0 && (
+                  <span className="rounded-full bg-green-600 px-1.5 text-[11px] font-semibold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
+          {/* Filter customers by service */}
+          {hasServices && showFilter && (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 pb-1">
+              <ServiceFilterChips
+                customers={customers}
+                value={serviceFilter}
+                onChange={setServiceFilter}
+                disabled={false}
+              />
+            </div>
+          )}
+
+          {/* selection helpers */}
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-600">
+              Selected: {selectedCustomers.length}
+            </span>
+
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                disabled={filteredCustomers.length === 0}
+                className="font-medium text-green-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Select All
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearAll}
+                disabled={selectedCustomers.length === 0}
+                className="font-medium text-slate-600 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* ===========================
-            CUSTOMER LIST
-        =========================== */}
-
-        <div className="flex-1 overflow-y-auto px-5">
-
+        {/* CUSTOMER LIST */}
+        <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {filteredCustomers.length === 0 ? (
-
-            <div className="text-center py-10 text-gray-500">
+            <div className="py-10 text-center text-sm text-slate-500">
               No Customers Found
             </div>
-
           ) : (
-
             filteredCustomers.map((customer) => {
+              // ONLY for displaying the "Already Sent" label.
+              const alreadySent = sentCustomers.includes(customer.id);
 
-              // This is ONLY for displaying
-              // the "Already Sent" label.
-              const alreadySent =
-                sentCustomers.includes(customer.id);
-
-              const selected =
-                selectedCustomers.includes(
-                  customer.id
-                );
+              const selected = selectedCustomers.includes(customer.id);
 
               return (
-
                 <div
                   key={customer.id}
-                  onClick={() =>
-                    toggleCustomer(customer.id)
-                  }
-                  className={`
-                    flex justify-between items-center
-                    border rounded-xl p-4 mb-3
-                    transition-all duration-200
-                    cursor-pointer
-                    hover:bg-gray-50
-
-                    ${
-                      selected
-                        ? "ring-2 ring-green-500 border-green-500"
-                        : ""
-                    }
-                  `}
+                  onClick={() => toggleCustomer(customer.id)}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-4 transition ${
+                    selected
+                      ? "border-green-500 bg-green-50/50 ring-1 ring-green-500"
+                      : "border-slate-300 hover:bg-slate-50"
+                  }`}
                 >
-
                   {/* CUSTOMER INFORMATION */}
-
-                  <div>
-
-                    <h3 className="font-semibold">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-medium text-slate-900">
                       {customer.name}
                     </h3>
 
-                    <p className="text-sm text-gray-500">
+                    <p className="mt-0.5 text-sm text-slate-600">
                       {customer.phone}
                     </p>
 
-                    {/* ALREADY SENT LABEL */}
-
                     {alreadySent && (
-                      <span className="inline-flex items-center mt-2 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                      <span className="mt-2 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
                         ✓ Already Sent
                       </span>
                     )}
-
                   </div>
 
-                  {/* CHECKBOX */}
-
+                  {/* CHECKBOX (never disabled: sent customers can be re-sent) */}
                   <input
                     type="checkbox"
-
-                    // IMPORTANT:
-                    // Never disable the checkbox.
-                    disabled={false}
-
+                    aria-label={`Select ${customer.name}`}
                     checked={selected}
-
-                    onClick={(e) =>
-                      e.stopPropagation()
-                    }
-
-                    onChange={() =>
-                      toggleCustomer(customer.id)
-                    }
-
-                    className="w-5 h-5 cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleCustomer(customer.id)}
+                    className="h-5 w-5 shrink-0 cursor-pointer accent-green-600"
                   />
-
                 </div>
-
               );
             })
-
           )}
-
         </div>
 
-        {/* ===========================
-            FOOTER
-        =========================== */}
+        {/* FOOTER */}
+        <div className="flex justify-end gap-3 border-t border-slate-100 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="h-10 rounded-xl border border-slate-300 bg-white px-5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
 
-        <div className="border-t p-5 flex justify-between items-center">
-
-          <span className="text-gray-600 font-medium">
-            Selected : {selectedCustomers.length}
-          </span>
-
-          <div className="flex gap-3">
-
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="border rounded-xl px-5 py-2 hover:bg-gray-100 transition"
-            >
-              Cancel
-            </button>
-
-            <button
-              onClick={handleSend}
-              disabled={
-                loading ||
-                selectedCustomers.length === 0
-              }
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl px-6 py-2 flex items-center gap-2 transition"
-            >
-
-              {loading ? (
-                <>
-                  <Loader2
-                    size={18}
-                    className="animate-spin"
-                  />
-
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send size={18} />
-
-                  Send Campaign
-                </>
-              )}
-
-            </button>
-
-          </div>
-
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={loading || selectedCustomers.length === 0}
+            className="inline-flex h-10 min-w-[150px] items-center justify-center gap-2 rounded-xl bg-green-600 px-5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send size={16} />
+                Send templates
+              </>
+            )}
+          </button>
         </div>
-
-      </div>
-
+      </aside>
     </div>
   );
 }

@@ -132,46 +132,42 @@ function InstagramCard({ isAdmin = false }) {
     info: "border-slate-200 bg-slate-50 text-slate-600",
   };
 
+  // This component returns TWO things for the 3-column grid in SecuritySettings:
+  //   1. the channel card (one grid cell)
+  //   2. notices + connected accounts (full-width row under the cards, via `order-2`)
   return (
-    <div
-      data-tour="instagram-card"
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-    >
-      {/* Header: icon + text on the left, action on the right */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-pink-50">
-            <FaInstagram size={26} className="text-[#DD2A7B]" />
+    <>
+      <div
+        data-tour="instagram-card"
+        className="order-1 flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pink-50">
+            <FaInstagram size={22} className="text-[#DD2A7B]" />
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-slate-900">Instagram</h2>
-
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-              {isAdmin
-                ? "Connect your Instagram Business or Creator account to receive and reply to Instagram DMs. No Facebook account is needed."
-                : "Instagram accounts connected to this CRM. Only an admin can connect or change them."}
-            </p>
+            <h2 className="font-semibold text-slate-900">Instagram</h2>
 
             <div
-              className={`mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+              className={`mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 loadingAccounts
                   ? "bg-slate-100 text-slate-600"
                   : needsReconnect
-                  ? "bg-amber-50 text-amber-700"
+                  ? "bg-amber-100 text-amber-700"
                   : hasAccounts
-                  ? "bg-pink-50 text-pink-700"
+                  ? "bg-pink-100 text-pink-700"
                   : "bg-slate-100 text-slate-600"
               }`}
             >
               <span
-                className={`h-2 w-2 rounded-full ${
+                className={`h-1.5 w-1.5 rounded-full ${
                   loadingAccounts
                     ? "bg-slate-300"
                     : needsReconnect
                     ? "bg-amber-400"
                     : hasAccounts
-                    ? "bg-[#DD2A7B]"
+                    ? "bg-green-500"
                     : "bg-slate-400"
                 }`}
               />
@@ -185,38 +181,50 @@ function InstagramCard({ isAdmin = false }) {
                   })`
                 : "Not Connected"}
             </div>
-
-            {!isAdmin && !loadingAccounts && !hasAccounts && (
-              <p className="mt-3 text-sm text-slate-500">
-                No Instagram account is connected yet. Please ask your admin to
-                connect one.
-              </p>
-            )}
           </div>
         </div>
 
+        <p className="mt-4 text-sm leading-relaxed text-slate-500">
+          {isAdmin
+            ? "Connect your Instagram Business or Creator account to receive and reply to Instagram DMs. No Facebook account is needed."
+            : "Instagram accounts connected to this CRM. Only an admin can connect or change them."}
+        </p>
+
+        {!isAdmin && !loadingAccounts && !hasAccounts && (
+          <p className="mt-3 text-sm text-slate-500">
+            No Instagram account is connected yet. Please ask your admin to
+            connect one.
+          </p>
+        )}
+
         {/* Connect button: ADMIN only */}
         {isAdmin && (
-          <div className="flex w-full shrink-0 flex-col gap-3 lg:w-72">
+          <div className="mt-auto pt-5">
             <button
               type="button"
               onClick={handleConnectInstagram}
               disabled={connectingInstagram}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] px-5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                hasAccounts && !needsReconnect
+                  ? "border border-slate-900 bg-white text-slate-900 hover:bg-slate-50"
+                  : "bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF] text-white shadow-sm hover:opacity-90"
+              }`}
             >
-              <FaInstagram size={16} />
+              {!(hasAccounts && !needsReconnect) && <FaInstagram size={16} />}
               {connectingInstagram
                 ? "Opening Instagram..."
                 : needsReconnect
                 ? "Reconnect Instagram"
                 : hasAccounts
-                ? "Add / Reconnect Instagram"
+                ? "Add / update account"
                 : "Connect Instagram"}
             </button>
 
-            <p className="text-center text-xs text-slate-400">
-              Needs a Business or Creator Instagram account.
-            </p>
+            {!hasAccounts && (
+              <p className="mt-2 text-center text-xs text-slate-400">
+                Needs a Business or Creator Instagram account.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -224,7 +232,7 @@ function InstagramCard({ isAdmin = false }) {
       {/* Result message */}
       {notice && (
         <div
-          className={`mt-5 rounded-xl border px-4 py-3 text-sm ${
+          className={`order-2 col-span-full rounded-xl border px-4 py-3 text-sm ${
             noticeStyles[notice.type] || noticeStyles.info
           }`}
         >
@@ -234,50 +242,53 @@ function InstagramCard({ isAdmin = false }) {
 
       {/* Connected Instagram accounts */}
       {hasAccounts && (
-        <div className="mt-6 border-t border-slate-100 pt-5">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <div className="order-2 col-span-full rounded-2xl border border-slate-200 bg-slate-50/70 px-6 py-5 shadow-sm">
+          <p className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-500">
             Connected accounts
           </p>
 
-          <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+          <div className="divide-y divide-slate-200">
             {accounts.map((account) => {
               const needsReconnectRow = account.status === "RECONNECT_NEEDED";
 
               return (
                 <div
                   key={account.id}
-                  className="flex flex-col gap-3 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink-50">
-                      <FaInstagram size={18} className="text-[#DD2A7B]" />
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate font-semibold text-slate-800">
-                          {account.instagramUsername
-                            ? `@${account.instagramUsername}`
-                            : account.pageName || "Instagram account"}
-                        </p>
-
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            needsReconnectRow
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-green-50 text-green-700"
-                          }`}
-                        >
-                          {needsReconnectRow
-                            ? "Reconnect needed — access was removed or expired"
-                            : "Connected"}
-                        </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pink-50">
+                        <FaInstagram size={16} className="text-[#DD2A7B]" />
                       </div>
 
-                      <p className="mt-1 text-xs text-slate-500">
-                        Connected directly with Instagram (no Facebook)
+                      <p className="truncate font-medium text-slate-800">
+                        {account.instagramUsername
+                          ? `@${account.instagramUsername}`
+                          : account.pageName || "Instagram account"}
                       </p>
+
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          needsReconnectRow
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-green-100 text-green-700"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            needsReconnectRow ? "bg-amber-400" : "bg-green-500"
+                          }`}
+                        />
+                        {needsReconnectRow
+                          ? "Reconnect needed — access was removed or expired"
+                          : "Connected"}
+                      </span>
                     </div>
+
+                    <p className="mt-1 text-xs text-slate-500 sm:pl-11">
+                      Connected directly with Instagram (no Facebook)
+                    </p>
                   </div>
 
                   {isAdmin && (
@@ -287,7 +298,7 @@ function InstagramCard({ isAdmin = false }) {
                           type="button"
                           onClick={handleConnectInstagram}
                           disabled={connectingInstagram}
-                          className="h-9 rounded-xl bg-[#DD2A7B] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                          className="h-9 rounded-lg bg-[#DD2A7B] px-4 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-60"
                         >
                           Reconnect
                         </button>
@@ -296,7 +307,7 @@ function InstagramCard({ isAdmin = false }) {
                       <button
                         type="button"
                         onClick={() => setAccountToDisconnect(account)}
-                        className="h-9 rounded-xl border border-red-300 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        className="h-9 rounded-lg border border-red-200 bg-white px-4 text-xs font-medium text-red-600 transition hover:bg-red-50"
                       >
                         Disconnect
                       </button>
@@ -321,8 +332,9 @@ function InstagramCard({ isAdmin = false }) {
         onConfirm={handleDisconnect}
         onCancel={() => setAccountToDisconnect(null)}
       />
-    </div>
+    </>
   );
 }
+
 
 export default InstagramCard;

@@ -1,21 +1,40 @@
-
-import { useState } from "react";
-import { X, Ticket, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, X } from "lucide-react";
 import { toast } from "react-hot-toast";
+
 import { createSupportTicket } from "../../api/supportTicketApi";
 
-export default function RaiseSupportTicketModal({
-  open,
-  onClose,
-  onSuccess,
-}) {
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "MEDIUM",
-  });
+const EMPTY_FORM = {
+  title: "",
+  description: "",
+  priority: "",
+};
 
+const PRIORITY_OPTIONS = [
+  { value: "LOW", label: "Low" },
+  { value: "MEDIUM", label: "Medium" },
+  { value: "HIGH", label: "High" },
+  { value: "URGENT", label: "Urgent" },
+];
+
+const fieldClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100";
+
+export default function RaiseSupportTicketModal({ open, onClose, onSuccess }) {
+  const [formData, setFormData] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
+
+  // Close with the Escape key
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onKey = (e) => {
+      if (e.key === "Escape" && !loading) onClose();
+    };
+
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, loading, onClose]);
 
   if (!open) return null;
 
@@ -36,6 +55,11 @@ export default function RaiseSupportTicketModal({
       return;
     }
 
+    if (!formData.priority) {
+      toast.error("Please select a priority.");
+      return;
+    }
+
     if (!formData.description.trim()) {
       toast.error("Please describe your issue.");
       return;
@@ -50,18 +74,10 @@ export default function RaiseSupportTicketModal({
         priority: formData.priority,
       });
 
-      setFormData({
-        title: "",
-        description: "",
-        priority: "MEDIUM",
-      });
-
+      setFormData(EMPTY_FORM);
       onClose();
 
-      // Success message (shown AFTER the popup is closed)
-      toast.success(
-        response.message || "Support ticket created successfully."
-      );
+      toast.success(response.message || "Support ticket created successfully.");
 
       if (onSuccess) {
         onSuccess(response.ticket);
@@ -70,8 +86,7 @@ export default function RaiseSupportTicketModal({
       console.error("Create support ticket error:", error);
 
       toast.error(
-        error.response?.data?.message ||
-          "Failed to create support ticket."
+        error.response?.data?.message || "Failed to create support ticket."
       );
     } finally {
       setLoading(false);
@@ -79,110 +94,128 @@ export default function RaiseSupportTicketModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={() => !loading && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="raise-ticket-title"
+        className="max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 text-green-600">
-              <Ticket size={22} />
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Raise Support Ticket
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Tell our support team about your issue.
-              </p>
-            </div>
-
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-5">
+          <div>
+            <h2
+              id="raise-ticket-title"
+              className="text-2xl font-bold text-slate-900"
+            >
+              Raise Support Ticket
+            </h2>
+            <p className="mt-1 text-base text-slate-500">
+              Tell our support team about your issue
+            </p>
           </div>
 
           <button
             type="button"
+            aria-label="Close"
             onClick={onClose}
             disabled={loading}
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 disabled:opacity-50"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
-
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit}>
-
-          <div className="space-y-5 p-6">
-
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             {/* Title */}
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
+              <label
+                htmlFor="ticket-title"
+                className="mb-2 block text-base font-medium text-slate-800"
+              >
                 Issue Title
               </label>
-
               <input
+                id="ticket-title"
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="Example: WhatsApp not connecting"
                 disabled={loading}
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100"
+                className={fieldClass}
               />
             </div>
 
             {/* Priority */}
             <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
+              <label
+                htmlFor="ticket-priority"
+                className="mb-2 block text-base font-medium text-slate-800"
+              >
                 Priority
               </label>
-
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                disabled={loading}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100"
-              >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="URGENT">Urgent</option>
-              </select>
+              <div className="relative">
+                <select
+                  id="ticket-priority"
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                  disabled={loading}
+                  className={`${fieldClass} cursor-pointer appearance-none pr-11 ${
+                    formData.priority ? "" : "text-slate-400"
+                  }`}
+                >
+                  <option value="" disabled>
+                    Select priority
+                  </option>
+                  {PRIORITY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value} className="text-slate-800">
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={18}
+                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+                />
+              </div>
             </div>
+          </div>
 
-            {/* Description */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Describe Your Issue
-              </label>
-
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Please explain the problem you are facing..."
-                rows={5}
-                disabled={loading}
-                className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:bg-slate-100"
-              />
-            </div>
-
+          {/* Description */}
+          <div>
+            <label
+              htmlFor="ticket-description"
+              className="mb-2 block text-base font-medium text-slate-800"
+            >
+              Describe Your Issue
+            </label>
+            <textarea
+              id="ticket-description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Please explain the problem you are facing..."
+              rows={5}
+              disabled={loading}
+              className={`${fieldClass} resize-y`}
+            />
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
-
+          <div className="flex justify-end gap-3 pt-1">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+              className="rounded-xl border border-slate-200 bg-white px-8 py-3 text-base font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -190,19 +223,13 @@ export default function RaiseSupportTicketModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1ebe5d] disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-[#1DC55E] px-8 py-3 text-base font-semibold text-white transition hover:bg-[#17a94f] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Send size={17} />
-
               {loading ? "Submitting..." : "Submit Ticket"}
             </button>
-
           </div>
-
         </form>
-
       </div>
     </div>
   );
 }
-

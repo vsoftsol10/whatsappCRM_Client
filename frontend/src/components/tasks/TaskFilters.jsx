@@ -1,135 +1,101 @@
 import {
   Search,
   Filter,
-  Plus,
+  ChevronDown,
+  LayoutGrid,
+  Table2,
 } from "lucide-react";
+
+import {
+  STATUS_OPTIONS,
+} from "./taskHelpers";
 
 export default function TaskFilters({
   search,
   setSearch,
-  priorityFilter,
-  setPriorityFilter,
-  onCreateTask,
-  isAdmin,
+  statusFilter,
+  setStatusFilter,
+  viewMode,
+  setViewMode,
 }) {
+  const toggleClass = (active) =>
+    `flex h-10 w-11 items-center justify-center rounded-lg transition ${
+      active
+        ? "bg-green-500 text-white shadow-sm"
+        : "text-slate-500 hover:bg-slate-100"
+    }`;
+
   return (
-    <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+      {/* SEARCH */}
 
-      {/* Left Section */}
+      <div className="relative flex-1">
+        <Search
+          size={18}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+        />
 
-      <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-center">
-
-        {/* Search */}
-
-        <div className="relative flex-1">
-
-          <Search
-            size={20}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-            className="
-              h-12
-              w-full
-              rounded-xl
-              border
-              border-gray-300
-              pl-11
-              pr-4
-              text-sm
-              outline-none
-              transition
-              focus:border-[#25D366]
-              focus:ring-2
-              focus:ring-[#DCF8C6]
-            "
-          />
-
-        </div>
-
-        {/* Priority Filter */}
-
-        <div className="relative">
-
-          <Filter
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-          />
-
-          <select
-            value={priorityFilter}
-            onChange={(e) =>
-              setPriorityFilter(e.target.value)
-            }
-            className="
-              h-12
-              rounded-xl
-              border
-              border-gray-300
-              bg-white
-              pl-10
-              pr-10
-              text-sm
-              outline-none
-              transition
-              focus:border-[#25D366]
-              focus:ring-2
-              focus:ring-[#DCF8C6]
-            "
-          >
-            <option value="ALL">
-              All Priority
-            </option>
-
-            <option value="HIGH">
-              High
-            </option>
-
-            <option value="MEDIUM">
-              Medium
-            </option>
-
-            <option value="LOW">
-              Low
-            </option>
-          </select>
-
-        </div>
-
+        <input
+          type="text"
+          placeholder="Search task..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-4 focus:ring-green-100"
+        />
       </div>
 
-      {/* Right Section */}
+      {/* STATUS FILTER */}
 
-      {isAdmin && (
-        <button
-          onClick={onCreateTask}
-          className="
-            inline-flex
-            items-center
-            justify-center
-            gap-2
-            rounded-xl
-            bg-[#25D366]
-            px-5
-            py-3
-            font-medium
-            text-black
-            transition
-            hover:bg-[#128C7E]
-          "
+      <div className="relative">
+        <Filter
+          size={16}
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"
+        />
+
+        <select
+          aria-label="Filter by status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-12 w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white pl-11 pr-11 text-sm font-medium text-slate-800 outline-none transition focus:border-green-500 focus:ring-4 focus:ring-green-100 sm:w-52"
         >
-          <Plus size={18} />
-          Add Task
-        </button>
-      )}
+          <option value="ALL">All Status</option>
 
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+
+        <ChevronDown
+          size={16}
+          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-600"
+        />
+      </div>
+
+      {/* VIEW TOGGLE */}
+
+      <div className="flex shrink-0 items-center gap-1 self-start rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:self-auto">
+        <button
+          type="button"
+          aria-label="Table view"
+          aria-pressed={viewMode === "LIST"}
+          onClick={() => setViewMode("LIST")}
+          className={toggleClass(viewMode === "LIST")}
+        >
+          <Table2 size={18} />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Card view"
+          aria-pressed={viewMode === "KANBAN"}
+          onClick={() => setViewMode("KANBAN")}
+          className={toggleClass(viewMode === "KANBAN")}
+        >
+          <LayoutGrid size={18} />
+        </button>
+      </div>
     </div>
   );
 }

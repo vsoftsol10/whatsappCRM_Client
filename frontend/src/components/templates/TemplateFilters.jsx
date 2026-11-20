@@ -1,121 +1,90 @@
-// import { Search } from "lucide-react";
+import { ChevronDown, Filter, LayoutGrid, Table2 } from "lucide-react";
 
-// export default function TemplateFilters({
-//   search,
-//   setSearch,
-//   statusFilter,
-//   setStatusFilter,
-// }) {
-//   const statuses = [
-//     "ALL",
-//     "DRAFT",
-//     "ACTIVE",
-//     "INACTIVE",
-//   ];
-
-//   return (
-//     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
-      
-//       {/* SEARCH */}
-
-//       <div className="relative mb-4">
-//         <Search
-//           size={18}
-//           className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-//         />
-
-//         <input
-//           type="text"
-//           placeholder="Search templates..."
-//           value={search}
-//           onChange={(e) =>
-//             setSearch(e.target.value)
-//           }
-//           className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-//         />
-//       </div>
-
-//       {/* STATUS FILTERS */}
-
-//       <div className="flex flex-wrap gap-2">
-//         {statuses.map((status) => (
-//           <button
-//             key={status}
-//             onClick={() =>
-//               setStatusFilter(status)
-//             }
-//             className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-//               statusFilter === status
-//                 ? "bg-[#25D366] text-black"
-//                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-//             }`}
-//           >
-//             {status}
-//           </button>
-//         ))}
-//       </div>
-
-//     </div>
-//   );
-// }
-
-import { Search } from "lucide-react";
+const STATUS_OPTIONS = [
+  { value: "ALL", label: "All Status" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "PENDING", label: "Pending" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "REJECTED", label: "Rejected" },
+];
 
 export default function TemplateFilters({
   search,
   setSearch,
   statusFilter,
   setStatusFilter,
+  view,
+  setView,
 }) {
-  const statuses = [
-    "ALL",
-    "DRAFT",
-    "PENDING",
-    "APPROVED",
-  ];
+  const toggleClass = (active) =>
+    `flex h-9 w-11 items-center justify-center rounded-lg transition ${
+      active
+        ? "bg-green-500 text-white shadow-sm"
+        : "text-slate-500 hover:bg-slate-100"
+    }`;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
-      
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
       {/* SEARCH */}
+      <input
+        type="text"
+        aria-label="Search templates"
+        placeholder="Search templates..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="h-11 w-full min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+      />
 
-      <div className="relative mb-4">
-        <Search
-          size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-        />
+      <div className="flex items-center gap-3">
+        {/* STATUS FILTER */}
+        <div className="relative flex-1 sm:flex-none">
+          <Filter
+            size={16}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500"
+          />
 
-        <input
-          type="text"
-          placeholder="Search templates..."
-          value={search}
-          onChange={(e) =>
-            setSearch(e.target.value)
-          }
-          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {/* STATUS FILTERS */}
-
-      <div className="flex flex-wrap gap-2">
-        {statuses.map((status) => (
-          <button
-            key={status}
-            onClick={() =>
-              setStatusFilter(status)
-            }
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-              statusFilter === status
-                ? "bg-[#25D366] text-black"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
+          <select
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:w-44"
           >
-            {status}
-          </button>
-        ))}
-      </div>
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
 
+          <ChevronDown
+            size={16}
+            className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-600"
+          />
+        </div>
+
+        {/* VIEW TOGGLE */}
+        <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
+          <button
+            type="button"
+            aria-label="Table view"
+            aria-pressed={view === "table"}
+            onClick={() => setView("table")}
+            className={toggleClass(view === "table")}
+          >
+            <Table2 size={18} />
+          </button>
+
+          <button
+            type="button"
+            aria-label="Card view"
+            aria-pressed={view === "card"}
+            onClick={() => setView("card")}
+            className={toggleClass(view === "card")}
+          >
+            <LayoutGrid size={18} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

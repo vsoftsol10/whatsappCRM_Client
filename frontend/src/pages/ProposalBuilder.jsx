@@ -673,7 +673,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Eye,
   FileText,
   Package,
   Pencil,
@@ -710,7 +709,14 @@ const emptyItem = () => ({
 });
 
 const inputClass =
-  "w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/25";
+  "h-11 w-full rounded-lg border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100";
+
+// same look, but grows with the text instead of a fixed height
+const textareaClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100";
+
+// two columns on large screens, the first one a little wider
+const twoColGrid = "grid gap-5 lg:grid-cols-[3fr_2fr]";
 
 const toDateInput = (value) =>
   value ? new Date(value).toISOString().slice(0, 10) : "";
@@ -718,31 +724,31 @@ const toDateInput = (value) =>
 function Field({ label, children, hint }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
         {label}
       </span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-gray-500">{hint}</span>}
+      {hint && <span className="mt-2 block text-xs text-slate-500">{hint}</span>}
     </label>
   );
 }
 
 function Card({ icon: Icon, title, subtitle, action, children }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#25D366]/15 text-[#128C7E]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600">
             <Icon size={18} />
           </span>
           <div>
-            <h2 className="text-sm font-bold text-gray-900">{title}</h2>
-            {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
           </div>
         </div>
         {action}
       </div>
-      <div className="space-y-4 p-5">{children}</div>
+      <div className="space-y-5">{children}</div>
     </div>
   );
 }
@@ -1027,42 +1033,39 @@ function ProposalBuilder() {
   const previewButton = (
     <button
       type="submit"
-      className="flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition hover:bg-[#1ebe5a]"
+      className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
     >
-      <Eye size={16} />
       Preview
     </button>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+    <div className="crm-page">
       {/* TOP BAR */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate("/proposals")}
-            className="rounded-full border border-gray-200 bg-white p-2 shadow-sm transition hover:bg-gray-100"
-            aria-label="Back to proposals"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? "Edit Proposal" : "New Proposal"}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {isEdit && form.proposalNumber
-                ? form.proposalNumber
-                : "Fill in the details, then preview before saving"}
-            </p>
-          </div>
+      <div className="mb-6 flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => navigate("/proposals")}
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+          aria-label="Back to proposals"
+        >
+          <ArrowLeft size={18} />
+        </button>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+            {isEdit ? "Edit Proposal" : "New Proposal"}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {isEdit && form.proposalNumber
+              ? form.proposalNumber
+              : "Fill in the details. Your proposal starts here."}
+          </p>
         </div>
       </div>
 
       <div className="w-full">
         {/* ================= FORM ================= */}
-        <form onSubmit={handlePreview} className="space-y-5">
+        <form onSubmit={handlePreview} className="space-y-6">
           <Card
             icon={User}
             title="Client details"
@@ -1070,14 +1073,14 @@ function ProposalBuilder() {
           >
             <Field
               label="Existing customer"
-              hint="Optional. Fills the fields below, which you can still edit."
+              hint="Optional. Pick from saved clients to auto-populate details."
             >
               <select
                 className={inputClass}
                 value={form.customerId}
                 onChange={(e) => handlePickCustomer(e.target.value)}
               >
-                <option value="">Not a saved customer / type details below</option>
+                <option value="">Walk-in / guest customer — type details below</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} - {c.phone}
@@ -1086,7 +1089,7 @@ function ProposalBuilder() {
               </select>
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={twoColGrid}>
               <Field label="Client name *">
                 <input
                   className={inputClass}
@@ -1109,7 +1112,7 @@ function ProposalBuilder() {
 
               <Field
                 label="Phone (WhatsApp)"
-                hint="Needed to send on WhatsApp. Add the country code for non-Indian numbers."
+                hint="Used to send via WhatsApp. Add the country code for non-Indian numbers."
               >
                 <input
                   type="tel"
@@ -1137,7 +1140,7 @@ function ProposalBuilder() {
           <Card
             icon={FileText}
             title="Proposal details"
-            subtitle="Title, validity and what you will deliver"
+            subtitle="The what, why, and until when"
           >
             <Field label="Proposal title *">
               <input
@@ -1149,7 +1152,7 @@ function ProposalBuilder() {
               />
             </Field>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={twoColGrid}>
               <Field label="Currency">
                 <select
                   className={inputClass}
@@ -1174,13 +1177,13 @@ function ProposalBuilder() {
               </Field>
             </div>
 
-            <Field label="Intro message">
+            <Field label="Brief summary">
               <textarea
                 rows={3}
-                className={inputClass}
+                className={textareaClass}
                 value={form.introMessage}
                 maxLength={5000}
-                placeholder="A short greeting that opens the proposal"
+                placeholder="A short paragraph that introduces the proposal"
                 onChange={(e) => setField("introMessage", e.target.value)}
               />
             </Field>
@@ -1188,7 +1191,7 @@ function ProposalBuilder() {
             <Field label="Scope of work">
               <textarea
                 rows={4}
-                className={inputClass}
+                className={textareaClass}
                 value={form.scope}
                 maxLength={5000}
                 placeholder="What you will deliver"
@@ -1207,7 +1210,7 @@ function ProposalBuilder() {
             action={
               services.length > 0 && (
                 <select
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700"
+                  className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
                   value=""
                   onChange={(e) => addServiceItem(e.target.value)}
                 >
@@ -1224,10 +1227,10 @@ function ProposalBuilder() {
             {form.items.map((item, index) => (
               <div
                 key={index}
-                className="space-y-3 rounded-xl border border-gray-200 bg-gray-50/70 p-4"
+                className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
               >
                 <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#128C7E] text-[11px] font-bold text-white">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[11px] font-bold text-white">
                     {index + 1}
                   </span>
                   <input
@@ -1310,9 +1313,9 @@ function ProposalBuilder() {
                   </Field>
                 </div>
 
-                <p className="text-right text-sm text-gray-500">
+                <p className="text-right text-xs uppercase tracking-wide text-slate-500">
                   Line total{" "}
-                  <span className="ml-1 font-bold text-gray-900">
+                  <span className="ml-3 text-sm font-semibold normal-case tracking-normal text-slate-900">
                     {formatMoney(totals.lines[index], form.currency)}
                   </span>
                 </p>
@@ -1322,27 +1325,27 @@ function ProposalBuilder() {
             <button
               type="button"
               onClick={addItem}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 px-3 py-2.5 text-sm font-semibold text-gray-600 transition hover:border-[#25D366] hover:bg-[#25D366]/5 hover:text-[#128C7E]"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-sm font-medium text-slate-600 transition hover:border-green-500 hover:bg-green-50 hover:text-green-600"
             >
               <Plus size={16} /> Add item
             </button>
 
-            <div className="ml-auto w-full max-w-xs space-y-1.5 text-sm">
-              <div className="flex justify-between text-gray-600">
+            <div className="ml-auto w-full max-w-xs space-y-2 text-sm">
+              <div className="flex justify-between px-3 text-slate-600">
                 <span>Subtotal</span>
                 <span>{formatMoney(totals.subtotal, form.currency)}</span>
               </div>
               {totals.discountTotal > 0 && (
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between px-3 text-slate-600">
                   <span>Discount</span>
                   <span>- {formatMoney(totals.discountTotal, form.currency)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-gray-600">
+              <div className="flex justify-between px-3 text-slate-600">
                 <span>Tax</span>
                 <span>{formatMoney(totals.taxTotal, form.currency)}</span>
               </div>
-              <div className="flex justify-between rounded-lg bg-[#25D366]/15 px-3 py-2 text-base font-bold text-[#0b6b5e]">
+              <div className="flex justify-between rounded-lg bg-green-100 px-3 py-2 text-base font-bold text-green-900">
                 <span>Total</span>
                 <span>{formatMoney(totals.total, form.currency)}</span>
               </div>
@@ -1356,12 +1359,12 @@ function ProposalBuilder() {
             subtitle="How and when you get paid"
           >
             <Field
-              label="Payment details"
-              hint="Bank name, account number, IFSC, UPI id etc."
+              label="Payment terms"
+              hint="Bank name, account number, IFSC, UPI, etc."
             >
               <textarea
                 rows={3}
-                className={inputClass}
+                className={textareaClass}
                 value={form.paymentDetails}
                 maxLength={5000}
                 onChange={(e) => setField("paymentDetails", e.target.value)}
@@ -1371,7 +1374,7 @@ function ProposalBuilder() {
             <Field label="Terms & conditions">
               <textarea
                 rows={4}
-                className={inputClass}
+                className={textareaClass}
                 value={form.terms}
                 maxLength={5000}
                 placeholder="e.g. 50% advance, balance on delivery"
@@ -1380,11 +1383,11 @@ function ProposalBuilder() {
             </Field>
           </Card>
 
-          <div className="flex flex-wrap justify-end gap-2 pb-6">
+          <div className="flex flex-wrap justify-end gap-3 pb-6 pt-2">
             <button
               type="button"
               onClick={() => navigate("/proposals")}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="h-11 rounded-lg border border-slate-200 bg-white px-5 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -1396,11 +1399,11 @@ function ProposalBuilder() {
       {/* ================= PREVIEW BEFORE SAVE ================= */}
       {showPreview && (
         <div
-          className="fixed inset-0 z-[10000] flex flex-col bg-black/60 p-3 sm:p-6"
+          className="fixed inset-0 z-[10000] flex flex-col bg-slate-900/50 p-3 sm:p-6"
           onClick={() => !saving && setShowPreview(false)}
         >
           <div
-            className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-gray-100 shadow-2xl"
+            className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-gray-100 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-5 py-3">
@@ -1417,7 +1420,7 @@ function ProposalBuilder() {
                   type="button"
                   disabled={saving}
                   onClick={() => setShowPreview(false)}
-                  className="rounded-full p-2 hover:bg-gray-100 disabled:opacity-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
                   aria-label="Close preview"
                 >
                   <X size={18} />
@@ -1434,7 +1437,7 @@ function ProposalBuilder() {
                 type="button"
                 disabled={saving}
                 onClick={() => setShowPreview(false)}
-                className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+                className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 <Pencil size={14} /> Back to edit
               </button>
@@ -1442,7 +1445,7 @@ function ProposalBuilder() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition hover:bg-[#1ebe5a] disabled:opacity-60"
+                className="flex h-11 items-center justify-center gap-2 rounded-lg bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 disabled:opacity-60"
               >
                 <Save size={16} />
                 {saving ? "Saving..." : isEdit ? "Save Changes" : "Save Proposal"}
@@ -1456,5 +1459,4 @@ function ProposalBuilder() {
 }
 
 export default ProposalBuilder;
-
 

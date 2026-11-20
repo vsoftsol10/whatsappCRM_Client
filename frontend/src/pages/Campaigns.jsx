@@ -1,424 +1,37 @@
-// import { useEffect, useMemo, useState } from "react";
-// import toast from "react-hot-toast";
-// import { Sparkles } from "lucide-react";
-
-// import useCampaignStore from "../store/campaignStore";
-// import { getCampaigns } from "../api/campaignApi"; // NEW (silent auto-refresh while sending)
-
-// import CampaignStats from "../components/campaigns/CampaignStats";
-// import CampaignFilters from "../components/campaigns/CampaignFilters";
-// import CampaignCard from "../components/campaigns/CampaignCard";
-// import CreateCampaignModal from "../components/campaigns/CreateCampaignModal";
-// import EditCampaignModal from "../components/campaigns/EditCampaignModal";
-// import AICampaignModal from "../components/campaigns/AICampaignModal";
-// import ViewCampaignModal from "../components/campaigns/ViewCampaignModal";
-// import SendCampaignModal from "../components/campaigns/SendCampaignModal";
-// import Pagination from "../components/common/Pagination";
-// import ConfirmModal from "../components/common/ConfirmModal";
-
-// export default function Campaigns() {
-//   const {
-//     campaigns,
-//     fetchCampaigns,
-//     removeCampaign,
-//     editCampaign,
-//     isLoading,
-//   } = useCampaignStore();
-
-//   const [search, setSearch] = useState("");
-//   const [statusFilter, setStatusFilter] = useState("ALL");
-
-//   const [showCreateModal, setShowCreateModal] = useState(false);
-//   const [showEditModal, setShowEditModal] = useState(false);
-//   const [showAIModal, setShowAIModal] = useState(false);
-
-//   // NEW
-//   const [showViewModal, setShowViewModal] = useState(false);
-//   const [showSendModal, setShowSendModal] = useState(false);
-
-//   const [selectedCampaign, setSelectedCampaign] = useState(null);
-
-//   const [aiCampaign, setAiCampaign] = useState(null);
-//   const [deleteTargetId, setDeleteTargetId] = useState(null);
-
-//   const [currentPage, setCurrentPage] = useState(1);
-
-//   const itemsPerPage = 10;
-
-//   useEffect(() => {
-//     fetchCampaigns();
-//   }, []);
-
-//   // NEW: while any campaign is SENDING, refresh the list every 4 seconds
-//   // (silently - no loading spinner) so sent / failed counts move live.
-//   const hasSendingCampaign = campaigns.some(
-//     (campaign) => campaign.status === "SENDING"
-//   );
-
-//   useEffect(() => {
-//     if (!hasSendingCampaign) return;
-
-//     const timer = setInterval(async () => {
-//       try {
-//         const response = await getCampaigns();
-
-//         useCampaignStore.setState({
-//           campaigns: response.data || [],
-//         });
-//       } catch (error) {
-//         // ignore - the next tick will try again
-//       }
-//     }, 4000);
-
-//     return () => clearInterval(timer);
-//   }, [hasSendingCampaign]);
-
-//   useEffect(() => {
-//     setCurrentPage(1);
-//   }, [search, statusFilter]);
-
-//   const filteredCampaigns = useMemo(() => {
-//     return campaigns.filter((campaign) => {
-//       const matchesSearch = campaign.name
-//         ?.toLowerCase()
-//         .includes(search.toLowerCase());
-
-//       const matchesStatus =
-//         statusFilter === "ALL"
-//           ? true
-//           : campaign.status === statusFilter;
-
-//       return matchesSearch && matchesStatus;
-//     });
-//   }, [campaigns, search, statusFilter]);
-
-//   // =========================
-//   // PAGINATION
-//   // =========================
-
-//   const totalPages = Math.ceil(
-//     filteredCampaigns.length / itemsPerPage
-//   );
-
-//   const startIndex =
-//     (currentPage - 1) * itemsPerPage;
-
-//   const paginatedCampaigns =
-//     filteredCampaigns.slice(
-//       startIndex,
-//       startIndex + itemsPerPage
-//     );
-
-//   // ===============================
-//   // VIEW
-//   // ===============================
-
-//   const handleView = (campaign) => {
-//     setSelectedCampaign(campaign);
-//     setShowViewModal(true);
-//   };
-
-//   // ===============================
-//   // SEND
-//   // ===============================
-
-//   const handleSend = (campaign) => {
-//     setSelectedCampaign(campaign);
-//     setShowSendModal(true);
-//   };
-
-//   // ===============================
-//   // EDIT
-//   // ===============================
-
-//   const handleEdit = (campaign) => {
-//     setSelectedCampaign(campaign);
-//     setShowEditModal(true);
-//   };
-
-//   // ===============================
-//   // DELETE
-//   // ===============================
-
-//   const handleDelete = (id) => {
-//     setDeleteTargetId(id);
-//   };
-
-//   const confirmDelete = async () => {
-//     const id = deleteTargetId;
-//     setDeleteTargetId(null);
-
-//     try {
-//       await removeCampaign(id);
-
-//       toast.success("Campaign deleted successfully");
-//     } catch (error) {
-//       toast.error("Delete failed");
-//     }
-//   };
-
-//   // ===============================
-//   // STATUS
-//   // ===============================
-
-//   const handleStatusChange = async (id, status) => {
-//     try {
-//       await editCampaign(id, {
-//         status,
-//       });
-
-//       toast.success("Campaign status updated");
-//     } catch (error) {
-//       toast.error("Unable to update campaign");
-//     }
-//   };
-
-//   // ===============================
-//   // AI → CREATE
-//   // ===============================
-
-//   const handleUseCampaign = (campaign) => {
-//     setAiCampaign(campaign);
-
-//     setShowAIModal(false);
-
-//     setShowCreateModal(true);
-//   };
-
-//   return (
-//     <div className="p-6">
-
-//       {/* Header */}
-
-//       <div className="flex justify-between items-center mb-6">
-
-//         <div>
-
-//           <h1 className="text-3xl font-bold">
-//             Campaigns
-//           </h1>
-
-//           <p className="text-gray-500">
-//             Manage your marketing campaigns
-//           </p>
-
-//         </div>
-
-//         <div className="flex gap-3">
-
-//           <button
-//             onClick={() => setShowAIModal(true)}
-//             className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white px-5 py-3 rounded-xl hover:opacity-90"
-//           >
-//             <Sparkles size={18} />
-
-//             AI Generate
-//           </button>
-
-//           <button
-//             onClick={() => setShowCreateModal(true)}
-//             className="bg-[#25D366] text-black px-5 py-3 rounded-xl hover:bg-[#128C7E]"
-//           >
-//             Create Campaign
-//           </button>
-
-//         </div>
-
-//       </div>
-
-//       {/* Stats */}
-
-//       <CampaignStats campaigns={campaigns} />
-
-//       {/* Filters */}
-
-//       <CampaignFilters
-//         search={search}
-//         setSearch={setSearch}
-//         statusFilter={statusFilter}
-//         setStatusFilter={setStatusFilter}
-//       />
-
-//       {/* Loading */}
-
-//       {isLoading && (
-//         <div className="text-center mt-10">
-//           Loading campaigns...
-//         </div>
-//       )}
-
-//       {/* Empty */}
-
-//       {!isLoading &&
-//         filteredCampaigns.length === 0 && (
-//           <div className="bg-white rounded-xl p-10 text-center mt-6 shadow">
-
-//             <h2 className="font-semibold text-lg">
-//               No Campaigns Found
-//             </h2>
-
-//             <p className="text-gray-500 mt-2">
-//               Create your first campaign.
-//             </p>
-
-//           </div>
-//         )}
-
-//       {/* Campaign Grid */}
-
-//       {!isLoading &&
-//         filteredCampaigns.length > 0 && (
-
-//           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
-
-//             {paginatedCampaigns.map((campaign) => (
-
-//               <CampaignCard
-//                 key={campaign.id}
-//                 campaign={campaign}
-
-//                 onView={handleView}
-
-//                 onSend={handleSend}
-
-//                 onEdit={handleEdit}
-
-//                 onDelete={handleDelete}
-
-//                 onStatusChange={handleStatusChange}
-//               />
-
-//             ))}
-
-//           </div>
-
-//         )}
-
-//         {!isLoading && filteredCampaigns.length > 0 && (
-//           <Pagination
-//             currentPage={currentPage}
-//             totalPages={totalPages}
-//             totalItems={filteredCampaigns.length}
-//             itemsPerPage={itemsPerPage}
-//             onPageChange={setCurrentPage}
-//           />
-//         )}
-
-//       {/* ========================= */}
-
-//       {/* AI */}
-
-//       {/* ========================= */}
-
-//       <AICampaignModal
-//         isOpen={showAIModal}
-//         onClose={() => setShowAIModal(false)}
-//         onUseCampaign={handleUseCampaign}
-//       />
-
-//       {/* ========================= */}
-
-//       {/* CREATE */}
-
-//       {/* ========================= */}
-
-//       <CreateCampaignModal
-//         isOpen={showCreateModal}
-//         onClose={() => {
-//           setShowCreateModal(false);
-
-//           setAiCampaign(null);
-//         }}
-//         aiCampaign={aiCampaign}
-//         onCreated={(campaign) => {
-//           // Straight after creation, open the Send Campaign modal
-//           setSelectedCampaign(campaign);
-//           setShowSendModal(true);
-//         }}
-//       />
-
-//       {/* ========================= */}
-
-//       {/* VIEW */}
-
-//       {/* ========================= */}
-
-//       <ViewCampaignModal
-//         isOpen={showViewModal}
-//         campaign={selectedCampaign}
-//         onClose={() => {
-//           setShowViewModal(false);
-
-//           setSelectedCampaign(null);
-//         }}
-//       />
-
-//       {/* ========================= */}
-
-//       {/* SEND */}
-
-//       {/* ========================= */}
-
-//       <SendCampaignModal
-//         isOpen={showSendModal}
-//         campaign={selectedCampaign}
-//         onClose={() => {
-//           setShowSendModal(false);
-
-//           setSelectedCampaign(null);
-//         }}
-//       />
-
-//       {/* ========================= */}
-
-//       {/* EDIT */}
-
-//       {/* ========================= */}
-
-//       <EditCampaignModal
-//         isOpen={showEditModal}
-//         onClose={() => {
-//           setShowEditModal(false);
-
-//           setSelectedCampaign(null);
-//         }}
-//         campaign={selectedCampaign}
-//       />
-
-//       <ConfirmModal
-//         isOpen={!!deleteTargetId}
-//         title="Delete Campaign"
-//         message="Are you sure you want to delete this campaign? This cannot be undone."
-//         confirmText="Delete"
-//         cancelText="Cancel"
-//         variant="danger"
-//         onConfirm={confirmDelete}
-//         onCancel={() => setDeleteTargetId(null)}
-//       />
-
-//     </div>
-//   );
-// }
-
-
-
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Sparkles } from "lucide-react";
 
 import useCampaignStore from "../store/campaignStore";
-import { getCampaigns } from "../api/campaignApi"; // NEW (silent auto-refresh while sending)
+import { getCampaigns } from "../api/campaignApi"; // silent auto-refresh while sending
 
 import CampaignStats from "../components/campaigns/CampaignStats";
 import CampaignFilters from "../components/campaigns/CampaignFilters";
 import CampaignCard from "../components/campaigns/CampaignCard";
+import CampaignTable from "../components/campaigns/CampaignTable";
+import CampaignPagination from "../components/campaigns/CampaignPagination";
 import CreateCampaignModal from "../components/campaigns/CreateCampaignModal";
 import EditCampaignModal from "../components/campaigns/EditCampaignModal";
-import AICampaignModal from "../components/campaigns/AICampaignModal";
 import ViewCampaignModal from "../components/campaigns/ViewCampaignModal";
 import SendCampaignModal from "../components/campaigns/SendCampaignModal";
-import Pagination from "../components/common/Pagination";
 import ConfirmModal from "../components/common/ConfirmModal";
+
+const PAGE_SIZES = {
+  card: [6, 9, 12, 24],
+  table: [5, 10, 20, 50],
+};
+
+const DEFAULT_PAGE_SIZE = { card: 6, table: 5 };
+
+const VIEW_STORAGE_KEY = "campaigns:view";
+
+const readSavedView = () => {
+  try {
+    const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+    return saved === "card" ? "card" : "table";
+  } catch {
+    return "table";
+  }
+};
 
 export default function Campaigns() {
   const {
@@ -432,44 +45,40 @@ export default function Campaigns() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
+  const [view, setView] = useState(readSavedView);
+  const [pageSizes, setPageSizes] = useState(DEFAULT_PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
-
-  // NEW
   const [showViewModal, setShowViewModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
 
   const [selectedCampaign, setSelectedCampaign] = useState(null);
-
-  const [aiCampaign, setAiCampaign] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const itemsPerPage = pageSizes[view];
 
   useEffect(() => {
     fetchCampaigns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // NEW: while any campaign is SENDING, refresh the list every 4 seconds
+  // While any campaign is SENDING, refresh the list every 4 seconds
   // (silently - no loading spinner) so sent / failed counts move live.
   const hasSendingCampaign = campaigns.some(
     (campaign) => campaign.status === "SENDING"
   );
 
   useEffect(() => {
-    if (!hasSendingCampaign) return;
+    if (!hasSendingCampaign) return undefined;
 
     const timer = setInterval(async () => {
       try {
         const response = await getCampaigns();
 
-        useCampaignStore.setState({
-          campaigns: response.data || [],
-        });
-      } catch (error) {
+        useCampaignStore.setState({ campaigns: response.data || [] });
+      } catch {
         // ignore - the next tick will try again
       }
     }, 4000);
@@ -477,76 +86,90 @@ export default function Campaigns() {
     return () => clearInterval(timer);
   }, [hasSendingCampaign]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter]);
+  // ==================================================
+  // FILTER + PAGINATE
+  // ==================================================
 
   const filteredCampaigns = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
     return campaigns.filter((campaign) => {
-      const matchesSearch = campaign.name
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
+      const matchesSearch = campaign.name?.toLowerCase().includes(keyword);
 
       const matchesStatus =
-        statusFilter === "ALL"
-          ? true
-          : campaign.status === statusFilter;
+        statusFilter === "ALL" ? true : campaign.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [campaigns, search, statusFilter]);
 
-  // =========================
-  // PAGINATION
-  // =========================
-
-  const totalPages = Math.ceil(
-    filteredCampaigns.length / itemsPerPage
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredCampaigns.length / itemsPerPage)
   );
 
-  const startIndex =
-    (currentPage - 1) * itemsPerPage;
+  // Never sit on a page that no longer exists (e.g. after deleting
+  // the last campaign on the last page)
+  const page = Math.min(currentPage, totalPages);
 
-  const paginatedCampaigns =
-    filteredCampaigns.slice(
-      startIndex,
-      startIndex + itemsPerPage
-    );
+  const paginatedCampaigns = useMemo(() => {
+    const start = (page - 1) * itemsPerPage;
+    return filteredCampaigns.slice(start, start + itemsPerPage);
+  }, [filteredCampaigns, page, itemsPerPage]);
 
-  // ===============================
-  // VIEW
-  // ===============================
+  const handleSearch = (value) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilter = (value) => {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleViewChange = (nextView) => {
+    setView(nextView);
+    setCurrentPage(1);
+
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, nextView);
+    } catch {
+      // storage can be blocked - the choice just won't be remembered
+    }
+  };
+
+  const handlePageSizeChange = (size) => {
+    setPageSizes((prev) => ({ ...prev, [view]: size }));
+    setCurrentPage(1);
+  };
+
+  // ==================================================
+  // ACTIONS
+  // ==================================================
 
   const handleView = (campaign) => {
     setSelectedCampaign(campaign);
     setShowViewModal(true);
   };
 
-  // ===============================
-  // SEND
-  // ===============================
-
   const handleSend = (campaign) => {
     setSelectedCampaign(campaign);
     setShowSendModal(true);
   };
-
-  // ===============================
-  // EDIT
-  // ===============================
 
   const handleEdit = (campaign) => {
     setSelectedCampaign(campaign);
     setShowEditModal(true);
   };
 
-  // ===============================
-  // DELETE
-  // ===============================
-
-  const handleDelete = (id) => {
-    setDeleteTargetId(id);
+  // "Edit" button inside the View drawer: swap View for Edit
+  const handleEditFromView = (campaign) => {
+    setShowViewModal(false);
+    setSelectedCampaign(campaign);
+    setShowEditModal(true);
   };
+
+  const handleDelete = (id) => setDeleteTargetId(id);
 
   const confirmDelete = async () => {
     const id = deleteTargetId;
@@ -556,235 +179,156 @@ export default function Campaigns() {
       await removeCampaign(id);
 
       toast.success("Campaign deleted successfully");
-    } catch (error) {
+    } catch {
       toast.error("Delete failed");
     }
   };
 
-  // ===============================
-  // STATUS
-  // ===============================
-
   const handleStatusChange = async (id, status) => {
     try {
-      await editCampaign(id, {
-        status,
-      });
+      await editCampaign(id, { status });
 
       toast.success("Campaign status updated");
-    } catch (error) {
+    } catch {
       toast.error("Unable to update campaign");
     }
   };
 
-  // ===============================
-  // AI → CREATE
-  // ===============================
+  const closeView = useCallback(() => {
+    setShowViewModal(false);
+    setSelectedCampaign(null);
+  }, []);
 
-  const handleUseCampaign = (campaign) => {
-    setAiCampaign(campaign);
-
-    setShowAIModal(false);
-
-    setShowCreateModal(true);
+  const rowActions = {
+    onView: handleView,
+    onSend: handleSend,
+    onEdit: handleEdit,
+    onDelete: handleDelete,
   };
 
+  // Only show the loader on the very first load, so the list doesn't
+  // blink away every time the store is busy (sending, saving...).
+  const showLoader = isLoading && campaigns.length === 0;
+
   return (
-    <div className="p-6">
-
-      {/* Header */}
-
-      <div className="flex justify-between items-center mb-6">
-
+    <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
+      {/* HEADER */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
+          <h1 className="text-2xl font-bold text-slate-900">Campaigns</h1>
 
-          <h1 className="text-3xl font-bold">
-            Campaigns
-          </h1>
-
-          <p className="text-gray-500">
+          <p className="mt-1 text-sm text-slate-500">
             Manage your marketing campaigns
           </p>
-
         </div>
 
-        <div className="flex gap-3">
-
-          <button
-            onClick={() => setShowAIModal(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white px-5 py-3 rounded-xl hover:opacity-90"
-          >
-            <Sparkles size={18} />
-
-            AI Generate
-          </button>
-
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-[#25D366] text-black px-5 py-3 rounded-xl hover:bg-[#128C7E]"
-          >
-            Create Campaign
-          </button>
-
-        </div>
-
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-green-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700"
+        >
+          + Create Campaigns
+        </button>
       </div>
 
-      {/* Stats */}
-
+      {/* STATS */}
       <CampaignStats campaigns={campaigns} />
 
-      {/* Filters */}
-
+      {/* SEARCH / FILTER / VIEW TOGGLE */}
       <CampaignFilters
         search={search}
-        setSearch={setSearch}
+        setSearch={handleSearch}
         statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
+        setStatusFilter={handleStatusFilter}
+        view={view}
+        setView={handleViewChange}
       />
 
-      {/* Loading */}
-
-      {isLoading && (
-        <div className="text-center mt-10">
+      {/* LOADING */}
+      {showLoader && (
+        <div className="mt-10 text-center text-sm text-slate-500">
           Loading campaigns...
         </div>
       )}
 
-      {/* Empty */}
+      {/* EMPTY */}
+      {!showLoader && filteredCampaigns.length === 0 && (
+        <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center">
+          <h3 className="text-base font-semibold text-slate-900">
+            {campaigns.length === 0
+              ? "No campaigns yet"
+              : "No campaigns match your search"}
+          </h3>
 
-      {!isLoading &&
-        filteredCampaigns.length === 0 && (
-          <div className="bg-white rounded-xl p-10 text-center mt-6 shadow">
+          <p className="mt-1 text-sm text-slate-500">
+            {campaigns.length === 0
+              ? "Create your first campaign."
+              : "Try a different name or status."}
+          </p>
+        </div>
+      )}
 
-            <h2 className="font-semibold text-lg">
-              No Campaigns Found
-            </h2>
+      {/* CARD VIEW */}
+      {!showLoader && filteredCampaigns.length > 0 && view === "card" && (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {paginatedCampaigns.map((campaign) => (
+            <CampaignCard
+              key={campaign.id}
+              campaign={campaign}
+              onStatusChange={handleStatusChange}
+              {...rowActions}
+            />
+          ))}
+        </div>
+      )}
 
-            <p className="text-gray-500 mt-2">
-              Create your first campaign.
-            </p>
+      {/* TABLE VIEW */}
+      {!showLoader && filteredCampaigns.length > 0 && view === "table" && (
+        <CampaignTable campaigns={paginatedCampaigns} {...rowActions} />
+      )}
 
-          </div>
-        )}
-
-      {/* Campaign Grid */}
-
-      {!isLoading &&
-        filteredCampaigns.length > 0 && (
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
-
-            {paginatedCampaigns.map((campaign) => (
-
-              <CampaignCard
-                key={campaign.id}
-                campaign={campaign}
-
-                onView={handleView}
-
-                onSend={handleSend}
-
-                onEdit={handleEdit}
-
-                onDelete={handleDelete}
-
-                onStatusChange={handleStatusChange}
-              />
-
-            ))}
-
-          </div>
-
-        )}
-
-        {!isLoading && filteredCampaigns.length > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredCampaigns.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
-          />
-        )}
-
-      {/* ========================= */}
-
-      {/* AI */}
-
-      {/* ========================= */}
-
-      <AICampaignModal
-        isOpen={showAIModal}
-        onClose={() => setShowAIModal(false)}
-        onUseCampaign={handleUseCampaign}
-      />
-
-      {/* ========================= */}
-
-      {/* CREATE */}
-
-      {/* ========================= */}
+      {/* PAGINATION */}
+      {!showLoader && filteredCampaigns.length > 0 && (
+        <CampaignPagination
+          currentPage={page}
+          totalPages={totalPages}
+          itemsPerPage={itemsPerPage}
+          pageSizeOptions={PAGE_SIZES[view]}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
 
       <CreateCampaignModal
         isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-
-          setAiCampaign(null);
-        }}
-        aiCampaign={aiCampaign}
+        onClose={() => setShowCreateModal(false)}
         onCreated={(campaign) => {
-          // Straight after creation, open the Send Campaign modal
+          // Straight after creation, open the Send Campaign drawer
           setSelectedCampaign(campaign);
           setShowSendModal(true);
         }}
       />
 
-      {/* ========================= */}
-
-      {/* VIEW */}
-
-      {/* ========================= */}
-
       <ViewCampaignModal
         isOpen={showViewModal}
         campaign={selectedCampaign}
-        onClose={() => {
-          setShowViewModal(false);
-
-          setSelectedCampaign(null);
-        }}
+        onClose={closeView}
+        onRequestEdit={handleEditFromView}
       />
-
-      {/* ========================= */}
-
-      {/* SEND */}
-
-      {/* ========================= */}
 
       <SendCampaignModal
         isOpen={showSendModal}
         campaign={selectedCampaign}
         onClose={() => {
           setShowSendModal(false);
-
           setSelectedCampaign(null);
         }}
       />
-
-      {/* ========================= */}
-
-      {/* EDIT */}
-
-      {/* ========================= */}
 
       <EditCampaignModal
         isOpen={showEditModal}
         onClose={() => {
           setShowEditModal(false);
-
           setSelectedCampaign(null);
         }}
         campaign={selectedCampaign}
@@ -800,7 +344,6 @@ export default function Campaigns() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTargetId(null)}
       />
-
     </div>
   );
 }

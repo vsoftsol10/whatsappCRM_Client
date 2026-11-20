@@ -1,5 +1,3 @@
-
-
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom"; // CHANGED (added useSearchParams)
 
@@ -43,6 +41,7 @@ import ViewEmployee from "./pages/ViewEmployee";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import FeatureRoute from "./components/FeatureRoute";
+import ModuleGuideGate from "./components/guide/ModuleGuideGate";
 
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -143,9 +142,9 @@ function App() {
 
             <Route path="/facebook-conversations" element={<FeatureRoute feature="facebook"><FacebookConversations /></FeatureRoute>} />
 
-            <Route path="/instagram-conversations" element={<FeatureRoute feature="instagram"><InstagramConversations /></FeatureRoute>} />
+            <Route path="/instagram-conversations" element={<FeatureRoute feature="instagram"><ModuleGuideGate moduleId="instagram"><InstagramConversations /></ModuleGuideGate></FeatureRoute>} />
 
-            <Route path="/customers" element={<Customers />} />
+            <Route path="/customers" element={<ModuleGuideGate moduleId="customers"><Customers /></ModuleGuideGate>} />
 
             <Route path="/customers/add" element={<AddCustomer />} />
 
@@ -153,13 +152,13 @@ function App() {
 
             <Route path="/campaigns/:id" element={<FeatureRoute feature="campaigns"><CampaignDetails /></FeatureRoute>} />
 
-            <Route path="/leads" element={<FeatureRoute feature="leads"><Leads /></FeatureRoute>} />
+            <Route path="/leads" element={<FeatureRoute feature="leads"><ModuleGuideGate moduleId="leads"><Leads /></ModuleGuideGate></FeatureRoute>} />
 
-            <Route path="/campaigns" element={<FeatureRoute feature="campaigns"><Campaigns /></FeatureRoute>} />
+            <Route path="/campaigns" element={<FeatureRoute feature="campaigns"><ModuleGuideGate moduleId="campaigns"><Campaigns /></ModuleGuideGate></FeatureRoute>} />
 
-            <Route path="/templates" element={<FeatureRoute feature="templates"><Templates /></FeatureRoute>} />
+            <Route path="/templates" element={<FeatureRoute feature="templates"><ModuleGuideGate moduleId="templates"><Templates /></ModuleGuideGate></FeatureRoute>} />
 
-            <Route path="/services" element={<FeatureRoute feature="services"><Services /></FeatureRoute>} />
+            <Route path="/services" element={<FeatureRoute feature="services"><ModuleGuideGate moduleId="services"><Services /></ModuleGuideGate></FeatureRoute>} />
 
             <Route path="/proposals" element={<FeatureRoute feature="proposals"><Proposals /></FeatureRoute>} />
 
@@ -167,9 +166,9 @@ function App() {
 
             <Route path="/proposals/:id/edit" element={<FeatureRoute feature="proposals"><ProposalBuilder /></FeatureRoute>} />
 
-            <Route path="/tasks" element={<FeatureRoute feature="tasks"><Tasks /></FeatureRoute>} />
+            <Route path="/tasks" element={<FeatureRoute feature="tasks"><ModuleGuideGate moduleId="tasks"><Tasks /></ModuleGuideGate></FeatureRoute>} />
 
-            <Route path="/tickets" element={<FeatureRoute feature="tickets"><TicketsPage /></FeatureRoute>} />
+            <Route path="/tickets" element={<FeatureRoute feature="tickets"><ModuleGuideGate moduleId="tickets"><TicketsPage /></ModuleGuideGate></FeatureRoute>} />
 
 
             {/* =================================================
@@ -191,19 +190,19 @@ function App() {
             <Route element={<SettingsLayout />}>
               <Route path="/settings/security" element={<SecuritySettings />} />
 
-              <Route path="/settings/integrations" element={<Integrations />} />
+              <Route path="/settings/integrations" element={<ModuleGuideGate moduleId="integrations"><Integrations /></ModuleGuideGate>} />
 
               <Route path="/settings/user-guide" element={<UserGuide />} />
 
               {/* ADMIN-only tabs */}
               <Route element={<AdminRoute />}>
-                <Route path="/settings/backup" element={<Backup />} />
+                <Route path="/settings/backup" element={<ModuleGuideGate moduleId="backup"><Backup /></ModuleGuideGate>} />
 
-                <Route path="/settings/support" element={<SaasSupportPage />} />
+                <Route path="/settings/support" element={<ModuleGuideGate moduleId="support"><SaasSupportPage /></ModuleGuideGate>} />
 
-                <Route path="/settings/audit-logs" element={<FeatureRoute feature="auditLog"><AuditLogs /></FeatureRoute>} />
+                <Route path="/settings/audit-logs" element={<FeatureRoute feature="auditLog"><ModuleGuideGate moduleId="audit-logs"><AuditLogs /></ModuleGuideGate></FeatureRoute>} />
 
-                <Route path="/settings/ai-auto-reply" element={<FeatureRoute feature="aiAutoReply"><AiAutoReply /></FeatureRoute>} />
+                <Route path="/settings/ai-auto-reply" element={<FeatureRoute feature="aiAutoReply"><ModuleGuideGate moduleId="ai-auto-reply"><AiAutoReply /></ModuleGuideGate></FeatureRoute>} />
                 <Route path="/settings/knowledge-base" element={<FeatureRoute feature="knowledgeBase"><KnowledgeBase /></FeatureRoute>} />
               </Route>
             </Route>
@@ -214,7 +213,7 @@ function App() {
             <Route element={<AdminRoute />}>
               <Route path="/plans" element={<Plans />} />
 
-              <Route path="/employees" element={<ManageEmployees />} />
+              <Route path="/employees" element={<ModuleGuideGate moduleId="employees"><ManageEmployees /></ModuleGuideGate>} />
 
               <Route path="/employees/edit/:id" element={<EditEmployee />} />
 

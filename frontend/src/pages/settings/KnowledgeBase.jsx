@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
-  Check,
+  ChevronDown,
   CircleAlert,
+  Eye,
+  Filter,
   Library,
   LoaderCircle,
   Pencil,
@@ -24,83 +26,80 @@ import {
 } from "../../api/knowledgeBaseApi";
 import { updateAiSettings, testAiSettings } from "../../api/aiSettingsApi";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import RowActionsMenu from "../../components/common/RowActionsMenu";
+import CustomerPagination from "../../components/customers/CustomerPagination";
+import StatusToggle from "../../components/customers/StatusToggle";
 import KnowledgeImportModal from "./KnowledgeImportModal";
 
 // =====================================================
 // LIMITS (same as the server)
 // =====================================================
 const LIMITS = { title: 200, category: 60, keywords: 300, content: 4000 };
-const PAGE_SIZE = 10;
 const CATEGORY_SUGGESTIONS = ["General", "Pricing", "Delivery", "Policies", "Services", "Timings"];
 
-const EMPTY_FORM = { title: "", category: "General", keywords: "", content: "", isActive: true };
+const EMPTY_FORM = { title: "", category: "", keywords: "", content: "", isActive: true };
 
 const errorMessage = (error, fallback) => error?.response?.data?.message || fallback;
 
+const inputClass =
+  "w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 read-only:cursor-default read-only:focus:border-slate-200 read-only:focus:ring-0";
+
+const thClass = "whitespace-nowrap px-5 py-4 text-xs font-semibold text-slate-600";
+const tdClass = "px-5 py-4 text-sm text-slate-700";
+
 // =====================================================
-// SMALL REUSABLE PIECES
+// USAGE BADGE  (entries used / limit, water-fill circle)
 // =====================================================
-function Toggle({ checked, onChange, label, disabled = false }) {
+function UsageBadge({ used, limit }) {
+  const ratio = limit > 0 ? Math.min(used / limit, 1) : 0;
+  // keep a little wave visible even when only a few entries are used
+  const fill = Math.max(ratio * 100, 16);
+
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-60 ${
-        checked ? "bg-[#25D366]" : "bg-slate-300"
-      }`}
+    <div
+      title={`${used} of ${limit} entries used`}
+      aria-label={`${used} of ${limit} entries used`}
+      className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-green-500 bg-white"
     >
-      <span
-        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-          checked ? "left-6" : "left-1"
-        }`}
-      />
-    </button>
-  );
-}
-
-function Card({ title, subtitle, children }) {
-  return (
-    <section className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-6 py-5">
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+      <div
+        className="absolute inset-x-0 bottom-0 bg-green-500 transition-all duration-500"
+        style={{ height: `${fill}%` }}
+      >
+        <svg
+          viewBox="0 0 100 12"
+          preserveAspectRatio="none"
+          className="absolute -top-2.5 left-0 h-3 w-full fill-green-500"
+          aria-hidden="true"
+        >
+          <path d="M0 12 Q 12.5 0 25 6 T 50 6 T 75 6 T 100 6 V12 Z" />
+        </svg>
       </div>
-      <div className="p-6">{children}</div>
-    </section>
-  );
-}
-
-function StatTile({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-0.5 text-xl font-bold text-slate-900">{value}</p>
+      <span className="relative z-10 -mt-3 text-[11px] font-medium text-slate-800">
+        {used}/{limit}
+      </span>
     </div>
   );
 }
 
-const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20";
-
 // =====================================================
-// ADD / EDIT MODAL
+// ADD / VIEW / EDIT MODAL
+// mode: "add" | "view" | "edit"
 // =====================================================
-function EntryModal({ entry, saving, onSave, onClose }) {
+function EntryModal({ entry, mode, saving, onSave, onClose, onEdit }) {
   const [form, setForm] = useState(
     entry
       ? {
           title: entry.title,
-          category: entry.category || "General",
+          category: entry.category || "",
           keywords: entry.keywords || "",
           content: entry.content,
           isActive: entry.isActive,
         }
       : EMPTY_FORM
   );
+
+  const readOnly = mode === "view";
+  const heading = mode === "add" ? "Add Entry" : mode === "view" ? "View Entry" : "Edit Entry";
 
   useEffect(() => {
     const onKey = (event) => {
@@ -115,6 +114,7 @@ function EntryModal({ entry, saving, onSave, onClose }) {
 
   const submit = (event) => {
     event.preventDefault();
+    if (readOnly) return;
 
     const title = form.title.trim();
     const content = form.content.trim();
@@ -132,35 +132,43 @@ function EntryModal({ entry, saving, onSave, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              {entry ? "Edit entry" : "Add knowledge base entry"}
-            </h2>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Write it the way you want the AI to answer customers.
-            </p>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/40 p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+        {/* HEADER */}
+        <div className="flex items-center justify-between gap-4 border-b border-slate-300 pb-5">
+          <h2 className="min-w-0 flex-1 truncate text-2xl font-bold text-slate-900">{heading}</h2>
+
+          <div className="flex shrink-0 items-center gap-3">
+            {readOnly && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-green-500 bg-green-50 px-5 text-base font-medium text-green-700 transition hover:bg-green-100"
+              >
+                <Pencil size={18} />
+                Edit
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              aria-label="Close"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            aria-label="Close"
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={20} />
-          </button>
         </div>
 
-        <form onSubmit={submit} className="space-y-5 px-6 py-6">
+        <form onSubmit={submit} className="mt-6 space-y-6">
           <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-base text-slate-900">
                 Title / question <span className="text-red-500">*</span>
               </label>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 {form.title.length}/{LIMITS.title}
               </span>
             </div>
@@ -168,18 +176,19 @@ function EntryModal({ entry, saving, onSave, onClose }) {
               value={form.title}
               onChange={set("title")}
               maxLength={LIMITS.title}
+              readOnly={readOnly}
               placeholder="e.g. Delivery charges and timing"
               className={inputClass}
-              autoFocus
+              autoFocus={!readOnly}
             />
           </div>
 
           <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700">
-                Answer / content <span className="text-red-500">*</span>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-base text-slate-900">
+                Answer / Content <span className="text-red-500">*</span>
               </label>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 {form.content.length}/{LIMITS.content}
               </span>
             </div>
@@ -187,20 +196,23 @@ function EntryModal({ entry, saving, onSave, onClose }) {
               value={form.content}
               onChange={set("content")}
               maxLength={LIMITS.content}
-              rows={7}
+              readOnly={readOnly}
+              rows={6}
               placeholder="e.g. Delivery inside the city is Rs 40. Orders above Rs 500 ship free. Delivery takes 1-2 days."
               className={`${inputClass} resize-y`}
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">Category</label>
+              <label className="mb-2 block text-base text-slate-900">Category</label>
               <input
                 value={form.category}
                 onChange={set("category")}
                 maxLength={LIMITS.category}
+                readOnly={readOnly}
                 list="kb-categories"
+                placeholder="General"
                 className={inputClass}
               />
               <datalist id="kb-categories">
@@ -211,29 +223,28 @@ function EntryModal({ entry, saving, onSave, onClose }) {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              <label className="mb-2 block text-base text-slate-900">
                 Also known as (keywords)
               </label>
               <input
                 value={form.keywords}
                 onChange={set("keywords")}
                 maxLength={LIMITS.keywords}
-                placeholder="shipping, courier, delivery fee"
+                readOnly={readOnly}
+                placeholder="Shipping, courier, delivery fee"
                 className={inputClass}
               />
             </div>
           </div>
-          <p className="-mt-2 text-xs text-slate-400">
-            Keywords help the AI find this entry when customers use different words, in any language.
-          </p>
 
-          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
             <div>
-              <p className="text-sm font-semibold text-slate-800">Active</p>
-              <p className="text-xs text-slate-500">Inactive entries are never used by the AI.</p>
+              <p className="text-lg font-medium text-slate-900">Active</p>
+              <p className="text-base text-slate-500">Inactive entries are never used by the AI</p>
             </div>
-            <Toggle
+            <StatusToggle
               checked={form.isActive}
+              disabled={readOnly}
               onChange={(value) => setForm((prev) => ({ ...prev, isActive: value }))}
               label="Entry active"
             />
@@ -244,20 +255,155 @@ function EntryModal({ entry, saving, onSave, onClose }) {
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              className="h-12 rounded-xl border border-slate-200 bg-white px-8 text-base font-medium text-slate-900 transition hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              Close
             </button>
             <button
               type="submit"
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#128C7E] disabled:opacity-60"
+              disabled={saving || readOnly}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-green-500 px-10 text-base font-semibold text-white transition hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />}
-              {entry ? "Save changes" : "Add entry"}
+              {saving && <LoaderCircle size={16} className="animate-spin" />}
+              Save
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================
+// TRY DEMO MODAL  (Try it + Tips)
+// =====================================================
+function DemoModal({ useKb, onClose }) {
+  const [message, setMessage] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const handleTest = async () => {
+    const text = message.trim();
+
+    if (!text) return toast.error("Type a customer question to try");
+    if (testing) return;
+
+    setTesting(true);
+    setResult(null);
+
+    try {
+      const data = await testAiSettings({ message: text });
+      setResult({
+        reply: data.reply,
+        handoff: Boolean(data.handoff),
+        matches: data.kbMatches || [],
+      });
+    } catch (error) {
+      toast.error(errorMessage(error, "The test failed"));
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-h-[92vh] w-full max-w-xl space-y-5 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+        >
+          <X size={18} />
+        </button>
+
+        {/* TRY IT */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-6">
+          <h2 className="pr-12 text-2xl font-bold text-slate-900">Try it</h2>
+          <p className="mt-2 text-base text-slate-500">See how the AI answers a customer question</p>
+
+          <label className="mt-6 block text-base text-slate-900" htmlFor="kb-demo-message">
+            Sample customer message
+          </label>
+          <input
+            id="kb-demo-message"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") handleTest();
+            }}
+            maxLength={500}
+            placeholder="Hi, what are your working hours?"
+            className={`${inputClass} mt-3`}
+          />
+
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing}
+            className="mx-auto mt-5 flex h-14 w-full max-w-sm items-center justify-center gap-3 rounded-xl bg-black px-6 text-base font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
+          >
+            {testing ? <LoaderCircle size={20} className="animate-spin" /> : <Send size={20} />}
+            Send test message
+          </button>
+
+          {result && (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-lg text-slate-900">AI reply</p>
+              <p className="mt-2 whitespace-pre-line break-words text-base text-slate-800">
+                {result.reply}
+              </p>
+
+              {result.handoff && (
+                <p className="mt-3 text-sm font-medium text-amber-700">
+                  The AI would pass this chat to your team.
+                </p>
+              )}
+
+              <p className="mt-3 text-xs text-slate-500">
+                {result.matches.length > 0
+                  ? `Entries used: ${result.matches.map((match) => match.title).join(", ")}`
+                  : `No entries matched${useKb ? "" : " (knowledge base is off)"}.`}
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* TIPS */}
+        <section className="rounded-3xl border border-slate-200 bg-white p-6">
+          <h3 className="border-b border-slate-300 px-1 pb-4 text-sm font-semibold text-slate-900">
+            Tips
+          </h3>
+          <ul className="mt-5 list-disc space-y-4 pl-8 pr-2 text-base text-slate-900">
+            <li>One topic per entry works best (delivery, refunds, timings).</li>
+            <li>Add keywords for other words customer use like &ldquo;shipping&rdquo; or &ldquo;courier&rdquo;.</li>
+            <li>If nothing matches the AI hands the chat to your team instead of guessing.</li>
+            <li>
+              Switch the AI itself on or off in{" "}
+              <Link
+                to="/settings/ai-auto-reply"
+                className="font-medium text-green-700 underline underline-offset-2 hover:text-green-800"
+              >
+                AI Auto-Reply
+              </Link>
+            </li>
+          </ul>
+        </section>
       </div>
     </div>
   );
@@ -279,20 +425,18 @@ export default function KnowledgeBase() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
-  const [modal, setModal] = useState(null); // null | { entry: object|null }
+  const [modal, setModal] = useState(null); // null | { entry: object|null, mode: "add"|"view"|"edit" }
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [switching, setSwitching] = useState(false);
 
   const [showImport, setShowImport] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleteAllText, setDeleteAllText] = useState("");
   const [deletingAll, setDeletingAll] = useState(false);
-
-  const [testMessage, setTestMessage] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState(null);
 
   // Bump this to fetch the list again (after add / edit / delete)
   const [reloadKey, setReloadKey] = useState(0);
@@ -303,7 +447,7 @@ export default function KnowledgeBase() {
   useEffect(() => {
     let cancelled = false;
 
-    getKnowledgeBase({ search, status, page, limit: PAGE_SIZE })
+    getKnowledgeBase({ search, status, page, limit: pageSize })
       .then((data) => {
         if (cancelled) return;
 
@@ -324,7 +468,7 @@ export default function KnowledgeBase() {
     return () => {
       cancelled = true;
     };
-  }, [search, status, page, reloadKey]);
+  }, [search, status, page, pageSize, reloadKey]);
 
   // Search as the admin types (small delay so we don't call the server on every key)
   useEffect(() => {
@@ -376,10 +520,18 @@ export default function KnowledgeBase() {
 
   // ---------- active on/off ----------
   const handleToggleEntry = async (entry) => {
+    const next = !entry.isActive;
+
+    // flip it on screen right away, put it back if the server says no
+    setEntries((prev) => prev.map((row) => (row.id === entry.id ? { ...row, isActive: next } : row)));
+
     try {
-      await updateKnowledgeEntry(entry.id, { isActive: !entry.isActive });
+      await updateKnowledgeEntry(entry.id, { isActive: next });
       reload();
     } catch (error) {
+      setEntries((prev) =>
+        prev.map((row) => (row.id === entry.id ? { ...row, isActive: entry.isActive } : row))
+      );
       toast.error(errorMessage(error, "Failed to update the entry"));
     }
   };
@@ -421,38 +573,27 @@ export default function KnowledgeBase() {
     }
   };
 
-  // ---------- try it ----------
-  const handleTest = async () => {
-    const message = testMessage.trim();
-
-    if (!message) return toast.error("Type a customer question to try");
-
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      const data = await testAiSettings({ message });
-      setTestResult({
-        reply: data.reply,
-        handoff: Boolean(data.handoff),
-        matches: data.kbMatches || [],
-      });
-    } catch (error) {
-      toast.error(errorMessage(error, "The test failed"));
-    } finally {
-      setTesting(false);
-    }
-  };
+  // 3-dot menu for one row
+  const rowMenuItems = (entry) => [
+    { key: "view", label: "View", icon: Eye, onClick: () => setModal({ entry, mode: "view" }) },
+    { key: "edit", label: "Edit", icon: Pencil, onClick: () => setModal({ entry, mode: "edit" }) },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: Trash2,
+      danger: true,
+      onClick: () => setDeleteTarget(entry),
+    },
+  ];
 
   // ---------- render ----------
   if (loading) {
     return (
-      <div className="crm-page bg-slate-50">
+      <div className="crm-page">
         <div className="mb-8 h-12 w-72 animate-pulse rounded-xl bg-slate-200" />
         <div className="space-y-4">
-          <div className="h-28 animate-pulse rounded-3xl bg-slate-200" />
-          <div className="h-28 animate-pulse rounded-3xl bg-slate-200" />
-          <div className="h-28 animate-pulse rounded-3xl bg-slate-200" />
+          <div className="h-12 animate-pulse rounded-xl bg-slate-200" />
+          <div className="h-64 animate-pulse rounded-2xl bg-slate-200" />
         </div>
       </div>
     );
@@ -460,7 +601,7 @@ export default function KnowledgeBase() {
 
   if (loadError && entries.length === 0 && stats.total === 0) {
     return (
-      <div className="crm-page bg-slate-50">
+      <div className="crm-page">
         <div className="flex items-start gap-3 rounded-3xl border border-red-200 bg-red-50 p-6 text-red-700">
           <CircleAlert size={20} className="mt-0.5 shrink-0" />
           <div>
@@ -484,33 +625,52 @@ export default function KnowledgeBase() {
   const filtering = Boolean(search) || status !== "all";
 
   return (
-    <div className="crm-page bg-slate-50">
+    <div className="crm-page">
       {/* ================= HEADER ================= */}
-      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#25D366]/10 text-[#128C7E]">
-            <Library size={24} />
-          </div>
-          <div>
-            <h1 className="crm-title text-slate-900">Knowledge Base</h1>
-            <p className="mt-1 text-sm text-slate-500 sm:text-base">
-              Teach the AI your business. It answers customers from these entries only for your company.
-            </p>
-          </div>
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="crm-title">Knowledge base</h1>
+          <p className="crm-subtitle">
+            Teach the AI your business. It answers customers from these entries only for your company.
+          </p>
         </div>
 
-        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-green-500 bg-white px-6 text-sm font-semibold text-green-600 transition hover:bg-green-50"
+          >
+            <Upload size={16} />
+            Import
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowDemo(true)}
+            className="inline-flex h-12 items-center justify-center rounded-xl bg-green-500 px-7 text-sm font-semibold text-white transition hover:bg-green-600"
+          >
+            Try Demo
+          </button>
+        </div>
+      </div>
+
+      {/* usage badge + master switch */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
           <div>
-            <p className="text-sm font-semibold text-slate-900">Use in AI replies</p>
+            <p className="text-sm font-medium text-slate-900">Use in AI replies</p>
             <p className="text-xs text-slate-500">{useKb ? "On" : "Off"}</p>
           </div>
-          <Toggle
+          <StatusToggle
             checked={useKb}
             onChange={handleSwitch}
             disabled={switching}
             label="Use the knowledge base in AI replies"
           />
         </div>
+
+        <UsageBadge used={stats.total} limit={stats.limit} />
       </div>
 
       {!useKb && (
@@ -520,274 +680,189 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <StatTile label="Entries" value={`${stats.total} / ${stats.limit}`} />
-        <StatTile label="Active" value={stats.active} />
-        <StatTile label="Inactive" value={stats.inactive} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        {/* ================= ENTRIES ================= */}
-        <div className="space-y-4 xl:col-span-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search entries..."
-                className={`${inputClass} pl-10`}
-              />
-            </div>
-
-            <select
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-700 outline-none focus:border-[#25D366]"
-              aria-label="Filter by status"
-            >
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-
+      {/* ================= SEARCH + FILTER + ADD ================= */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+          />
+          <input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search entries..."
+            aria-label="Search entries"
+            className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-10 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          />
+          {searchInput && (
             <button
               type="button"
-              onClick={() => setShowImport(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              onClick={() => setSearchInput("")}
+              aria-label="Clear search"
+              title="Clear search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             >
-              <Upload size={16} />
-              Import
+              <X size={14} />
             </button>
-
-            <button
-              type="button"
-              onClick={() => setModal({ entry: null })}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#128C7E]"
-            >
-              <Plus size={16} />
-              Add entry
-            </button>
-          </div>
-
-          {entries.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                <Library size={22} />
-              </div>
-              <p className="text-base font-semibold text-slate-800">
-                {filtering ? "No entries match your search" : "Your knowledge base is empty"}
-              </p>
-              <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-                {filtering
-                  ? "Try a different word or clear the filter."
-                  : "Add your prices, policies, timings and common answers. The AI will use them when customers ask."}
-              </p>
-              {!filtering && (
-                <button
-                  type="button"
-                  onClick={() => setModal({ entry: null })}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#128C7E]"
-                >
-                  <Plus size={16} />
-                  Add your first entry
-                </button>
-              )}
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {entries.map((entry) => (
-                <li
-                  key={entry.id}
-                  className={`rounded-2xl border bg-white p-5 shadow-sm transition ${
-                    entry.isActive ? "border-slate-200" : "border-slate-200 opacity-70"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="break-words text-base font-semibold text-slate-900">
-                          {entry.title}
-                        </h3>
-                        <span className="rounded-full bg-[#25D366]/10 px-2.5 py-0.5 text-xs font-medium text-[#128C7E]">
-                          {entry.category}
-                        </span>
-                        {!entry.isActive && (
-                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                      {entry.keywords && (
-                        <p className="mt-1 break-words text-xs text-slate-400">
-                          Also known as: {entry.keywords}
-                        </p>
-                      )}
-                    </div>
-
-                    <Toggle
-                      checked={entry.isActive}
-                      onChange={() => handleToggleEntry(entry)}
-                      label={`Entry "${entry.title}" active`}
-                    />
-                  </div>
-
-                  <p className="mt-3 line-clamp-3 whitespace-pre-line break-words text-sm text-slate-600">
-                    {entry.content}
-                  </p>
-
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-xs text-slate-400">
-                      Updated {new Date(entry.updatedAt).toLocaleDateString()}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setModal({ entry })}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-                      >
-                        <Pencil size={14} />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(entry)}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-                      >
-                        <Trash2 size={14} />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-slate-500">
-                Page {pagination.page} of {pagination.totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= pagination.totalPages}
-                onClick={() => setPage((prev) => prev + 1)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          )}
-
-          {stats.total > 0 && (
-            <div className="pt-2 text-right">
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteAllText("");
-                  setShowDeleteAll(true);
-                }}
-                className="text-xs font-medium text-slate-400 transition hover:text-red-600"
-              >
-                Delete all entries...
-              </button>
-            </div>
           )}
         </div>
 
-        {/* ================= SIDE ================= */}
-        <div className="space-y-6 xl:col-span-4">
-          <Card title="Try it" subtitle="See how the AI answers a customer question.">
-            <div className="space-y-3">
-              <textarea
-                value={testMessage}
-                onChange={(event) => setTestMessage(event.target.value)}
-                maxLength={500}
-                rows={3}
-                placeholder="e.g. How much is delivery?"
-                className={`${inputClass} resize-none`}
-              />
-              <button
-                type="button"
-                onClick={handleTest}
-                disabled={testing}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
-              >
-                {testing ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-                Send test message
-              </button>
+        <div className="relative sm:w-52">
+          <Filter
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
+          />
+          <select
+            aria-label="Filter by status"
+            value={status}
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
+            className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-12 pr-10 text-sm text-slate-800 outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <ChevronDown
+            size={18}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
+          />
+        </div>
 
-              {testResult && (
-                <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="whitespace-pre-line break-words text-sm text-slate-800">
-                    {testResult.reply}
-                  </p>
+        <button
+          type="button"
+          onClick={() => setModal({ entry: null, mode: "add" })}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
+        >
+          <Plus size={16} />
+          Add Entry
+        </button>
+      </div>
 
-                  {testResult.handoff && (
-                    <p className="text-xs font-medium text-amber-700">
-                      The AI would pass this chat to your team.
+      {/* ================= TABLE ================= */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left">
+            <thead className="bg-green-100">
+              <tr>
+                <th className={thClass}>Title</th>
+                <th className={`${thClass} text-center`}>Description</th>
+                <th className={`${thClass} text-center`}>Category</th>
+                <th className={`${thClass} text-center uppercase`}>Status</th>
+                <th className={`${thClass} text-center uppercase`}>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {entries.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-14 text-center">
+                    <Library size={36} className="mx-auto mb-2 text-slate-300" />
+                    <p className="font-medium text-slate-700">
+                      {filtering ? "No entries match your search" : "Your knowledge base is empty"}
                     </p>
-                  )}
+                    <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+                      {filtering
+                        ? "Try a different word or clear the filter."
+                        : "Add your prices, policies, timings and common answers. The AI will use them when customers ask."}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                entries.map((entry) => (
+                  <tr
+                    key={entry.id}
+                    className="border-t border-slate-200 transition hover:bg-slate-50"
+                  >
+                    <td className={`${tdClass} max-w-[260px]`}>
+                      <button
+                        type="button"
+                        onClick={() => setModal({ entry, mode: "view" })}
+                        className="line-clamp-2 break-words text-left font-semibold text-slate-900 transition hover:text-green-600 hover:underline"
+                      >
+                        {entry.title}
+                      </button>
+                    </td>
 
-                  <div className="border-t border-slate-200 pt-3">
-                    <p className="text-xs font-medium text-slate-500">Entries the AI used</p>
-                    {testResult.matches.length === 0 ? (
-                      <p className="mt-1 text-xs text-slate-400">
-                        None matched{useKb ? "" : " (knowledge base is off)"}.
-                      </p>
-                    ) : (
-                      <ul className="mt-1 space-y-0.5">
-                        {testResult.matches.map((match) => (
-                          <li key={match.id} className="text-xs text-slate-700">
-                            • {match.title}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
+                    <td className={`${tdClass} max-w-[320px] text-center`}>
+                      <p className="line-clamp-2 whitespace-pre-line break-words">{entry.content}</p>
+                    </td>
+
+                    <td className={`${tdClass} text-center`}>{entry.category}</td>
+
+                    <td className={tdClass}>
+                      <div className="flex justify-center">
+                        <StatusToggle
+                          checked={entry.isActive}
+                          onChange={() => handleToggleEntry(entry)}
+                          label={`Entry "${entry.title}" active`}
+                        />
+                      </div>
+                    </td>
+
+                    <td className={tdClass}>
+                      <div className="flex justify-center">
+                        <RowActionsMenu
+                          ariaLabel={`Actions for ${entry.title}`}
+                          items={rowMenuItems(entry)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
-            </div>
-          </Card>
-
-          <Card title="Tips">
-            <ul className="space-y-2.5 text-sm text-slate-600">
-              <li>One topic per entry works best (delivery, refunds, timings).</li>
-              <li>Add keywords for other words customers use, like "shipping" or "courier".</li>
-              <li>If nothing matches, the AI hands the chat to your team instead of guessing.</li>
-              <li>
-                Switch the AI itself on or off in{" "}
-                <Link to="/settings/ai-auto-reply" className="font-semibold text-[#128C7E] underline">
-                  AI Auto-Reply
-                </Link>
-                .
-              </li>
-            </ul>
-          </Card>
+            </tbody>
+          </table>
         </div>
       </div>
 
+      {/* ================= PAGINATION ================= */}
+      {entries.length > 0 && (
+        <CustomerPagination
+          currentPage={pagination.page || page}
+          totalPages={pagination.totalPages || 1}
+          pageSize={pageSize}
+          onPageChange={(next) =>
+            setPage(Math.min(Math.max(1, next), pagination.totalPages || 1))
+          }
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
+
+      {stats.total > 0 && (
+        <div className="mt-4 text-right">
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteAllText("");
+              setShowDeleteAll(true);
+            }}
+            className="text-xs font-medium text-slate-400 transition hover:text-red-600"
+          >
+            Delete all entries...
+          </button>
+        </div>
+      )}
+
+      {/* ================= MODALS ================= */}
       {modal && (
         <EntryModal
           key={modal.entry?.id ?? "new"}
           entry={modal.entry}
+          mode={modal.mode}
           saving={saving}
           onSave={handleSave}
           onClose={() => setModal(null)}
+          onEdit={() => setModal((prev) => (prev ? { ...prev, mode: "edit" } : prev))}
         />
       )}
+
+      {showDemo && <DemoModal useKb={useKb} onClose={() => setShowDemo(false)} />}
 
       {showImport && (
         <KnowledgeImportModal
@@ -800,9 +875,9 @@ export default function KnowledgeBase() {
       )}
 
       {showDeleteAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-bold text-slate-900">Delete all entries?</h2>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+            <h2 className="text-xl font-bold text-slate-900">Delete all entries?</h2>
             <p className="mt-2 text-sm text-slate-600">
               This removes all {stats.total} entries of your knowledge base. The AI will stop using
               them. This cannot be undone.
@@ -816,12 +891,12 @@ export default function KnowledgeBase() {
               className={`${inputClass} mt-2`}
               autoFocus
             />
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowDeleteAll(false)}
                 disabled={deletingAll}
-                className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="h-12 rounded-xl border border-slate-200 bg-white px-6 text-sm font-medium text-slate-900 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -829,7 +904,7 @@ export default function KnowledgeBase() {
                 type="button"
                 onClick={handleDeleteAll}
                 disabled={deleteAllText !== "DELETE ALL" || deletingAll}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                className="inline-flex h-12 items-center gap-2 rounded-xl bg-red-600 px-6 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
               >
                 {deletingAll && <LoaderCircle size={16} className="animate-spin" />}
                 Delete everything

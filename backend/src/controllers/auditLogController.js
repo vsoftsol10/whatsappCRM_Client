@@ -1,7 +1,40 @@
 const prisma = require("../config/prisma");
 
+const MODULE_VALUES = [
+  "CUSTOMER",
+  "EMPLOYEE",
+  "LEAD",
+  "DEAL",
+  "TASK",
+  "TICKET",
+  "CAMPAIGN",
+  "TEMPLATE",
+  "USER",
+  "COMPANY",
+  "BACKUP",
+];
+
+const ACTION_VALUES = [
+  "CREATE",
+  "UPDATE",
+  "DELETE",
+  "STATUS_CHANGE",
+  "ASSIGN",
+  "RESTORE",
+];
+
+const SORT_OPTIONS = {
+  newest: [{ createdAt: "desc" }],
+  oldest: [{ createdAt: "asc" }],
+  user: [{ userName: "asc" }, { createdAt: "desc" }],
+  module: [{ module: "asc" }, { createdAt: "desc" }],
+  action: [{ action: "asc" }, { createdAt: "desc" }],
+};
+
 // GET /api/audit-logs
-// Query params: module, action, userId, startDate, endDate, page, limit
+// Query params: module, action, userId, startDate, endDate, search, sort, page, limit
+//   search -> matches user name, record name, module or action
+//   sort   -> newest (default) | oldest | user | module | action
 const getAuditLogs = async (req, res) => {
   try {
     if (req.user.role !== "ADMIN") {
@@ -17,6 +50,8 @@ const getAuditLogs = async (req, res) => {
       userId,
       startDate,
       endDate,
+      search,
+      sort,
       page = 1,
       limit = 25,
     } = req.query;
@@ -35,13 +70,39 @@ const getAuditLogs = async (req, res) => {
       if (endDate) where.createdAt.lte = new Date(endDate);
     }
 
+    // Free-text search (user name, record name, module, action)
+    const searchText = typeof search === "string" ? search.trim() : "";
+
+    if (searchText) {
+      const normalized = searchText.toUpperCase().replace(/[\s-]+/g, "_");
+
+      const or = [
+        { userName: { contains: searchText, mode: "insensitive" } },
+        { entityName: { contains: searchText, mode: "insensitive" } },
+      ];
+
+      const matchedModules = MODULE_VALUES.filter((m) =>
+        m.includes(normalized)
+      );
+      const matchedActions = ACTION_VALUES.filter((a) =>
+        a.includes(normalized)
+      );
+
+      if (matchedModules.length) or.push({ module: { in: matchedModules } });
+      if (matchedActions.length) or.push({ action: { in: matchedActions } });
+
+      where.OR = or;
+    }
+
+    const orderBy = SORT_OPTIONS[sort] || SORT_OPTIONS.newest;
+
     const pageNum = Math.max(parseInt(page, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(limit, 10) || 25, 1), 100);
 
     const [logs, total] = await Promise.all([
       prisma.crmAuditLog.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (pageNum - 1) * pageSize,
         take: pageSize,
       }),

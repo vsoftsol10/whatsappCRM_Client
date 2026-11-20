@@ -1,45 +1,13 @@
-import { Search } from "lucide-react";
-
-function TicketSearch({
-  searchTerm,
-  setSearchTerm,
-}) {
+function TicketSearch({ searchTerm, setSearchTerm }) {
   return (
-    <div>
-      <div className="relative w-full max-w-xl">
-        <Search
-          size={20}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-        />
-
-        <input
-          type="text"
-          placeholder="Search tickets..."
-          value={searchTerm}
-          onChange={(e) =>
-            setSearchTerm(e.target.value)
-          }
-          className="
-            w-full
-            h-12
-            rounded-2xl
-            border
-            border-gray-300
-            bg-white
-            pl-12
-            pr-4
-            text-base
-            placeholder:text-gray-400
-            shadow-sm
-            transition
-            focus:outline-none
-            focus:ring-2
-            focus:ring-[#25D366]
-            focus:border-[#25D366]
-          "
-        />
-      </div>
-    </div>
+    <input
+      type="text"
+      aria-label="Search tickets"
+      placeholder="Search tickets..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      className="h-12 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+    />
   );
 }
 

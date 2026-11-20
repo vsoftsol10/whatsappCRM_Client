@@ -4,6 +4,9 @@ import { fillTemplatePreview } from "../../utils/templateVariables";
 // Each variable can be the customer's name, the customer's company,
 // or a custom value that is the same for every customer.
 
+const controlClass =
+  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-600";
+
 export default function CampaignVariableInputs({
   content,
   numbers,
@@ -14,58 +17,60 @@ export default function CampaignVariableInputs({
   if (!numbers || numbers.length === 0) return null;
 
   return (
-    <div>
-      <label className="mb-2 block font-medium text-gray-700">
-        Template Variables
-      </label>
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+      <p className="text-sm font-medium text-slate-800">Template Variables</p>
 
-      <p className="mb-3 text-xs text-gray-500">
+      <p className="mt-1 text-xs text-slate-500">
         Choose what goes into each variable. Name and company are filled
         separately for every customer.
       </p>
 
-      {numbers.map((number) => {
-        const config = configs[number] || { source: "custom", value: "" };
+      <div className="mt-3 space-y-2.5">
+        {numbers.map((number) => {
+          const config = configs[number] || { source: "custom", value: "" };
 
-        return (
-          <div key={number} className="mb-3 flex items-center gap-2">
-            <span className="w-12 text-sm font-medium text-gray-600">
-              {`{{${number}}}`}
-            </span>
-
-            <select
-              value={config.source}
-              disabled={disabled}
-              onChange={(e) => onChange(number, { source: e.target.value })}
-              className="rounded-lg border border-gray-300 bg-white p-2 text-sm outline-none focus:border-[#25D366] disabled:bg-gray-100"
-            >
-              <option value="name">Customer name</option>
-              <option value="company">Customer company</option>
-              <option value="custom">Custom value</option>
-            </select>
-
-            {config.source === "custom" ? (
-              <input
-                type="text"
-                value={config.value}
-                disabled={disabled}
-                onChange={(e) => onChange(number, { value: e.target.value })}
-                placeholder="Enter value"
-                className="flex-1 rounded-lg border border-gray-300 p-2 text-sm outline-none focus:border-[#25D366] disabled:bg-gray-100"
-              />
-            ) : (
-              <span className="flex-1 text-sm text-gray-500">
-                Filled for each customer
+          return (
+            <div key={number} className="flex items-center gap-2">
+              <span className="w-11 shrink-0 text-xs font-semibold text-slate-600">
+                {`{{${number}}}`}
               </span>
-            )}
-          </div>
-        );
-      })}
 
-      <div className="mt-3 rounded-xl border bg-gray-50 p-3">
-        <p className="mb-1 text-xs text-gray-500">Preview</p>
+              <select
+                aria-label={`Source for {{${number}}}`}
+                value={config.source}
+                disabled={disabled}
+                onChange={(e) => onChange(number, { source: e.target.value })}
+                className={`${controlClass} w-36 shrink-0`}
+              >
+                <option value="name">Customer name</option>
+                <option value="company">Customer company</option>
+                <option value="custom">Custom value</option>
+              </select>
 
-        <p className="whitespace-pre-wrap text-sm">
+              {config.source === "custom" ? (
+                <input
+                  type="text"
+                  aria-label={`Value for {{${number}}}`}
+                  value={config.value}
+                  disabled={disabled}
+                  onChange={(e) => onChange(number, { value: e.target.value })}
+                  placeholder="Enter value"
+                  className={`${controlClass} min-w-0 flex-1`}
+                />
+              ) : (
+                <span className="min-w-0 flex-1 text-xs text-slate-500">
+                  Filled for each customer
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+        <p className="mb-1 text-xs text-slate-500">Preview</p>
+
+        <p className="whitespace-pre-wrap text-sm text-slate-700">
           {fillTemplatePreview(content, configs)}
         </p>
       </div>
