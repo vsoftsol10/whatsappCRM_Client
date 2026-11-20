@@ -1,102 +1,31 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  MoreVertical,
-  Pencil,
-  Eye,
-  Trash2,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Eye, Pencil, Trash2 } from "lucide-react";
+
+import RowActionsMenu from "../common/RowActionsMenu";
+import StatusToggle from "../customers/StatusToggle";
 
 function roleBadge(role) {
-  switch ((role || "").toUpperCase()) {
-    case "ADMIN":
-      return "bg-red-100 text-red-700";
-
-    case "USER":
-      return "bg-green-100 text-green-700";
-
-    default:
-      return "bg-gray-100 text-gray-700";
-  }
+  return (role || "").toUpperCase() === "ADMIN"
+    ? "bg-teal-100 text-teal-700"
+    : "bg-green-100 text-green-700";
 }
 
-function statusBadge(status) {
-  switch ((status || "").toUpperCase()) {
-    case "ACTIVE":
-      return "bg-green-100 text-green-700";
+const roleText = (role) =>
+  (role || "").toUpperCase() === "ADMIN" ? "Admin" : "User";
 
-    case "INACTIVE":
-      return "bg-red-100 text-red-700";
+const thClass =
+  "whitespace-nowrap px-5 py-4 text-left text-xs font-semibold text-green-900";
 
-    default:
-      return "bg-gray-100 text-gray-700";
-  }
-}
+const tdClass = "px-5 py-4 text-sm text-slate-700";
 
 export default function EmployeeTable({
   employees,
-  handleDelete,
+  handleView,
   handleEdit,
+  handleDelete,
+  onToggleStatus,
+  togglingId,
+  currentUserId,
 }) {
-  const navigate = useNavigate();
-
-  // Which employee menu is currently open
-  const [openMenu, setOpenMenu] = useState(null);
-
-  // Reference to the currently opened menu
-  const menuRef = useRef(null);
-
-  // =========================
-  // CLOSE MENU WHEN CLICKING OUTSIDE
-  // =========================
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target)
-      ) {
-        setOpenMenu(null);
-      }
-    };
-
-    document.addEventListener(
-      "mousedown",
-      handleClickOutside
-    );
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleClickOutside
-      );
-    };
-  }, []);
-
-  // =========================
-  // CLOSE MENU WHEN ESC IS PRESSED
-  // =========================
-
-  useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        setOpenMenu(null);
-      }
-    };
-
-    document.addEventListener(
-      "keydown",
-      handleEscape
-    );
-
-    return () => {
-      document.removeEventListener(
-        "keydown",
-        handleEscape
-      );
-    };
-  }, []);
-
   // =========================
   // NO EMPLOYEES
   // =========================
@@ -109,276 +38,113 @@ export default function EmployeeTable({
     );
   }
 
+  const menuItems = (employee) => [
+    {
+      key: "view",
+      label: "View",
+      icon: Eye,
+      onClick: () => handleView(employee.id),
+    },
+    {
+      key: "edit",
+      label: "Edit",
+      icon: Pencil,
+      onClick: () => handleEdit(employee.id),
+    },
+    {
+      key: "delete",
+      label: "Delete",
+      icon: Trash2,
+      danger: true,
+      onClick: () => handleDelete(employee.id),
+    },
+  ];
+
   return (
-    <div className="crm-table-shell overflow-visible">
-      <div className="crm-table-scroll overflow-visible">
-        <table className="w-full min-w-[980px]">
-
-          {/* =========================
-              TABLE HEADER
-          ========================= */}
-
-          <thead className="bg-[#25D366] text-black">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px]">
+          <thead className="bg-green-100">
             <tr>
-              <th className="crm-th min-w-[240px]">
-                Employee
-              </th>
-
-              <th className="crm-th">
-                Phone
-              </th>
-
-              <th className="crm-th">
-                Department
-              </th>
-
-              <th className="crm-th">
-                Designation
-              </th>
-
-              <th className="crm-th">
-                Status
-              </th>
-
-              <th className="crm-th">
-                Role
-              </th>
-
-              <th className="crm-th text-center">
-                Actions
-              </th>
+              <th className={thClass}>Employee</th>
+              <th className={thClass}>Email</th>
+              <th className={thClass}>Department</th>
+              <th className={thClass}>Designation</th>
+              <th className={thClass}>Status</th>
+              <th className={thClass}>Role</th>
+              <th className={`${thClass} text-center`}>Actions</th>
             </tr>
           </thead>
 
-          {/* =========================
-              TABLE BODY
-          ========================= */}
-
           <tbody>
-            {employees.map((employee, index) => {
-
-              // Check whether this is one of the last two rows
-              const isLastTwoRows =
-                index >= employees.length - 2;
-
-              const isMenuOpen =
-                openMenu === employee.id;
+            {employees.map((employee) => {
+              const isSelf = employee.id === currentUserId;
 
               return (
                 <tr
                   key={employee.id}
-                  className="relative border-b border-gray-100 last:border-b-0 hover:bg-[#DCF8C6] transition"
+                  className="border-t border-slate-200 transition hover:bg-slate-50"
                 >
-
-                  {/* =========================
-                      EMPLOYEE
-                  ========================= */}
-
-                  <td className="crm-td">
-                    <div className="flex items-center gap-3">
-
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25D366] font-bold text-black">
-                        {employee.name
-                          ?.charAt(0)
-                          .toUpperCase()}
-                      </div>
-
-                      <div className="min-w-0">
-
-                        <div className="font-semibold text-slate-800">
-                          {employee.name}
-                        </div>
-
-                        <div className="break-all text-xs text-gray-500">
-                          {employee.email}
-                        </div>
-
-                      </div>
-
-                    </div>
+                  <td className={`${tdClass} font-medium text-slate-800`}>
+                    {employee.name}
                   </td>
 
-                  {/* =========================
-                      PHONE
-                  ========================= */}
-
-                  <td className="crm-td">
-                    {employee.phone || "-"}
+                  <td className={`${tdClass} break-all`}>
+                    {employee.email}
                   </td>
 
-                  {/* =========================
-                      DEPARTMENT
-                  ========================= */}
-
-                  <td className="crm-td">
+                  <td className={tdClass}>
                     {employee.department || "-"}
                   </td>
 
-                  {/* =========================
-                      DESIGNATION
-                  ========================= */}
-
-                  <td className="crm-td">
+                  <td className={tdClass}>
                     {employee.designation || "-"}
                   </td>
 
-                  {/* =========================
-                      STATUS
-                  ========================= */}
-
-                  <td className="crm-td">
+                  <td className={tdClass}>
                     <span
-                      className={`crm-badge ${statusBadge(
-                        employee.status
-                      )}`}
+                      title={
+                        isSelf
+                          ? "You cannot change your own status"
+                          : undefined
+                      }
+                      className="inline-flex"
                     >
-                      {employee.status}
+                      <StatusToggle
+                        checked={employee.status === "ACTIVE"}
+                        label={`${employee.name} is ${
+                          employee.status === "ACTIVE" ? "active" : "inactive"
+                        }`}
+                        disabled={isSelf || togglingId === employee.id}
+                        onChange={(makeActive) =>
+                          onToggleStatus(employee, makeActive)
+                        }
+                      />
                     </span>
                   </td>
 
-                  {/* =========================
-                      ROLE
-                  ========================= */}
-
-                  <td className="crm-td">
+                  <td className={tdClass}>
                     <span
-                      className={`crm-badge ${roleBadge(
+                      className={`inline-flex whitespace-nowrap rounded-full px-4 py-1 text-xs font-medium ${roleBadge(
                         employee.role
                       )}`}
                     >
-                      {employee.role}
+                      {roleText(employee.role)}
                     </span>
                   </td>
 
-                  {/* =========================
-                      ACTIONS
-                  ========================= */}
-
-                  <td className="crm-td">
-                    <div
-                      ref={
-                        isMenuOpen
-                          ? menuRef
-                          : null
-                      }
-                      className="relative flex justify-center"
-                    >
-
-                      {/* Three dots button */}
-
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-
-                          setOpenMenu(
-                            isMenuOpen
-                              ? null
-                              : employee.id
-                          );
-                        }}
-                        className="rounded-lg p-2 transition hover:bg-gray-100"
-                        aria-label="Employee actions"
-                      >
-                        <MoreVertical size={18} />
-                      </button>
-
-                      {/* =========================
-                          ACTION MENU
-                      ========================= */}
-
-                      {isMenuOpen && (
-                        <div
-                          className={`
-                            absolute
-                            right-0
-                            z-[100]
-                            w-44
-                            overflow-hidden
-                            rounded-xl
-                            border
-                            border-gray-200
-                            bg-white
-                            shadow-xl
-                            ${
-                              isLastTwoRows
-                                ? "bottom-11"
-                                : "top-11"
-                            }
-                          `}
-                        >
-
-                          {/* VIEW */}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenMenu(null);
-
-                              navigate(
-                                `/employees/${employee.id}`
-                              );
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100"
-                          >
-                            <Eye size={16} />
-
-                            <span>
-                              View
-                            </span>
-                          </button>
-
-                          {/* EDIT */}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenMenu(null);
-
-                              handleEdit(
-                                employee.id
-                              );
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-100"
-                          >
-                            <Pencil size={16} />
-
-                            <span>
-                              Edit
-                            </span>
-                          </button>
-
-                          {/* DELETE */}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenMenu(null);
-
-                              handleDelete(
-                                employee.id
-                              );
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-600 transition hover:bg-red-50"
-                          >
-                            <Trash2 size={16} />
-
-                            <span>
-                              Delete
-                            </span>
-                          </button>
-
-                        </div>
-                      )}
-
+                  <td className={tdClass}>
+                    <div className="flex justify-center">
+                      <RowActionsMenu
+                        ariaLabel={`Actions for ${employee.name}`}
+                        items={menuItems(employee)}
+                      />
                     </div>
                   </td>
-
                 </tr>
               );
             })}
           </tbody>
-
         </table>
       </div>
     </div>

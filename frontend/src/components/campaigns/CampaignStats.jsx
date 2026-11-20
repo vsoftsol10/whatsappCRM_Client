@@ -1,99 +1,38 @@
-import {
-  Megaphone,
-  FileText,
-  Clock,
-  CheckCircle,
-} from "lucide-react";
+import { Megaphone, FileText, Clock, CheckCircle } from "lucide-react";
 
-export default function CampaignStats({
-  campaigns = [],
-}) {
-  const totalCampaigns = campaigns.length;
+export default function CampaignStats({ campaigns = [] }) {
+  const countByStatus = (status) =>
+    campaigns.filter((campaign) => campaign.status === status).length;
 
-  const draftCampaigns = campaigns.filter(
-    (campaign) => campaign.status === "DRAFT"
-  ).length;
-
-  const scheduledCampaigns = campaigns.filter(
-    (campaign) => campaign.status === "SCHEDULED"
-  ).length;
-
-  const completedCampaigns = campaigns.filter(
-    (campaign) => campaign.status === "COMPLETED"
-  ).length;
-
-  const cards = [
-    {
-      title: "Total Campaigns",
-      value: totalCampaigns,
-      icon: Megaphone,
-    },
-    {
-      title: "Draft",
-      value: draftCampaigns,
-      icon: FileText,
-    },
-    {
-      title: "Scheduled",
-      value: scheduledCampaigns,
-      icon: Clock,
-    },
-    {
-      title: "Completed",
-      value: completedCampaigns,
-      icon: CheckCircle,
-    },
+  const stats = [
+    { title: "Total Campaigns", value: campaigns.length, icon: Megaphone },
+    { title: "Draft", value: countByStatus("DRAFT"), icon: FileText },
+    { title: "Scheduled", value: countByStatus("SCHEDULED"), icon: Clock },
+    { title: "Completed", value: countByStatus("COMPLETED"), icon: CheckCircle },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 mb-8">
-      {cards.map((card) => {
-        const Icon = card.icon;
+    <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {stats.map((stat) => {
+        const Icon = stat.icon;
 
         return (
           <div
-            key={card.title}
-            className="
-              bg-white
-              rounded-2xl
-              border
-              border-gray-200
-              p-5
-              shadow-sm
-              transition-all
-              duration-200
-              hover:border-[#25D366]
-              hover:bg-[#DCF8C6]
-              hover:shadow-lg
-            "
+            key={stat.title}
+            className="flex items-start justify-between rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  {card.title}
-                </p>
+            <div>
+              <p className="text-xs font-medium text-slate-500">
+                {stat.title}
+              </p>
 
-                <h2 className="mt-3 text-3xl font-bold text-gray-900">
-                  {card.value}
-                </h2>
-              </div>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {stat.value}
+              </p>
+            </div>
 
-              <div
-                className="
-                  flex
-                  h-12
-                  w-12
-                  items-center
-                  justify-center
-                  rounded-xl
-                  bg-[#DCF8C6]
-                "
-              >
-                <Icon
-                  size={24}
-                  className="text-[#25D366]"
-                />
-              </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100">
+              <Icon size={22} className="text-green-600" />
             </div>
           </div>
         );

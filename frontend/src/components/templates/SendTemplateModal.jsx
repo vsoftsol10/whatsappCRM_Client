@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Send, Loader2, CircleCheck, TriangleAlert } from "lucide-react";
 
 import { getCustomers } from "../../api/customerApi";
 import ServiceFilterChips, {
@@ -65,6 +65,9 @@ export default function SendTemplateModal({
   // 👈 NEW: "variables" (step 1) -> "customers" (step 2)
   const [step, setStep] = useState("customers");
 
+  // After sending: { total, successful, failed } -> shows the result screen
+  const [sendResult, setSendResult] = useState(null);
+
   const [customers, setCustomers] = useState([]);
   const [selectedCustomers, setSelectedCustomers] =
     useState([]);
@@ -90,6 +93,7 @@ export default function SendTemplateModal({
 
       setSelectedCustomers([]);
       setSearch("");
+      setSendResult(null);
       setVariableConfigs(buildDefaultVariableConfigs(template.content)); // 👈 NEW
       // Templates with variables start on the variables step
       setStep(
@@ -283,13 +287,15 @@ export default function SendTemplateModal({
 
     setSelectedCustomers([]);
 
-    onClose();
+    // The backend answers 200 even when some sends fail, so read the
+    // summary instead of assuming everything was delivered.
+    const summary = response?.summary;
 
-    // Success message (shown AFTER the popup is closed)
-    toast.success(
-      response.message ||
-        "Template sent successfully."
-    );
+    setSendResult({
+      total: summary?.total ?? selectedCustomers.length,
+      successful: summary?.successful ?? selectedCustomers.length,
+      failed: summary?.failed ?? 0,
+    });
   } catch (error) {
     console.log(error);
 
@@ -301,6 +307,65 @@ export default function SendTemplateModal({
     setLoading(false);
   }
 };
+
+  // ✅ RESULT SCREEN (after sending)
+  if (sendResult) {
+    const { total, successful, failed } = sendResult;
+
+    const allSent = failed === 0;
+    const noneSent = successful === 0;
+
+    const title = allSent
+      ? "Template sent successfully!"
+      : noneSent
+      ? "Template could not be sent"
+      : `Sent to ${successful} of ${total} customers`;
+
+    const message = allSent
+      ? "Your message has been sent to the selected customers."
+      : noneSent
+      ? "None of the selected customers received the message. Check their WhatsApp numbers and try again."
+      : `${failed} customer${failed === 1 ? "" : "s"} did not receive the message. Check their WhatsApp numbers and try again.`;
+
+    const Icon = allSent ? CircleCheck : TriangleAlert;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="send-result-title"
+          className="w-full max-w-xl rounded-2xl bg-white px-6 py-12 text-center shadow-xl"
+        >
+          <Icon
+            size={64}
+            strokeWidth={1.25}
+            className={allSent ? "mx-auto text-green-800" : "mx-auto text-amber-600"}
+          />
+
+          <h2
+            id="send-result-title"
+            className="mt-5 text-3xl font-bold text-slate-900"
+          >
+            {title}
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-md text-base text-slate-600">
+            {message}
+          </p>
+
+          <button
+            type="button"
+            autoFocus
+            onClick={onClose}
+            className="mt-8 h-10 min-w-[120px] rounded-xl bg-green-600 px-6 text-sm font-semibold text-white transition hover:bg-green-700"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">

@@ -721,6 +721,10 @@ const getEmployees = async (req, res) => {
 
       where.role = { in: ["USER", "ADMIN"] };
 
+      // This page also lists inactive people, so an admin can switch them
+      // back on. The other dropdowns (tasks, deals...) stay active-only.
+      delete where.status;
+
       if (ownerId) {
         where.id = { not: ownerId };
       }

@@ -1,278 +1,4 @@
-// import React, { useEffect, useState } from "react";
-// import { X, Loader2, Plug } from "lucide-react";
-// import { getSupportedProviders } from "../../api/integrationApi";
-
-// // Fallback list shown if the /providers call fails (e.g. while
-// // offline) - kept in sync manually with
-// // backend/src/integrations/adapters/index.js as a safety net.
-// // The live list from the API always wins when it loads.
-// const FALLBACK_PROVIDERS = ["GENERIC", "STRIPE", "RAZORPAY"];
-
-// const PROVIDER_LABELS = {
-//   GENERIC: "Generic / Custom (I'll send events in your CRM's format)",
-//   STRIPE: "Stripe",
-//   RAZORPAY: "Razorpay",
-// };
-
-// const integrationTypes = [
-//   {
-//     value: "BILLING",
-//     label: "Billing",
-//     description: "Connect your billing software",
-//   },
-//   {
-//     value: "ECOMMERCE",
-//     label: "E-commerce",
-//     description: "Connect your online store",
-//   },
-//   {
-//     value: "POS",
-//     label: "POS",
-//     description: "Connect your point-of-sale system",
-//   },
-//   {
-//     value: "ERP",
-//     label: "ERP",
-//     description: "Connect your ERP software",
-//   },
-//   {
-//     value: "PAYMENT",
-//     label: "Payment",
-//     description: "Connect your payment system",
-//   },
-//   {
-//     value: "CUSTOM",
-//     label: "Custom",
-//     description: "Connect another system",
-//   },
-// ];
-
-// const AddIntegrationModal = ({
-//   show,
-//   form,
-//   setForm,
-//   submitting,
-//   onClose,
-//   onSubmit,
-// }) => {
-//   const [providers, setProviders] = useState(FALLBACK_PROVIDERS);
-
-//   // Load the real list of supported providers from the backend
-//   // as soon as the modal is used, so this dropdown can never
-//   // drift out of sync with the adapters that actually exist.
-//   useEffect(() => {
-//     if (!show) return;
-
-//     let cancelled = false;
-
-//     getSupportedProviders()
-//       .then((res) => {
-//         if (!cancelled && res?.providers?.length) {
-//           setProviders(res.providers);
-//         }
-//       })
-//       .catch(() => {
-//         // Keep FALLBACK_PROVIDERS - no need to block the form.
-//       });
-
-//     return () => {
-//       cancelled = true;
-//     };
-//   }, [show]);
-
-//   if (!show) return null;
-
-//   const handleChange = (e) => {
-//     const { name, value } = e.target;
-
-//     setForm((current) => ({
-//       ...current,
-//       [name]: value,
-//     }));
-//   };
-
-//   return (
-//     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-//       {/* Overlay */}
-//       <div
-//         className="absolute inset-0 bg-black/50"
-//         onClick={onClose}
-//       />
-
-//       {/* Modal */}
-//       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-xl">
-//         {/* Header */}
-//         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
-//           <div className="flex items-center gap-3">
-//             <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
-//               <Plug className="w-5 h-5 text-green-600" />
-//             </div>
-
-//             <div>
-//               <h2 className="text-lg font-semibold text-gray-900">
-//                 Add Integration
-//               </h2>
-
-//               <p className="text-sm text-gray-500">
-//                 Connect an external system to your CRM
-//               </p>
-//             </div>
-//           </div>
-
-//           <button
-//             type="button"
-//             onClick={onClose}
-//             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-//           >
-//             <X className="w-5 h-5" />
-//           </button>
-//         </div>
-
-//         {/* Form */}
-//         <form onSubmit={onSubmit}>
-//           <div className="px-6 py-6 space-y-5">
-//             {/* Integration Name */}
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-2">
-//                 Integration Name
-//               </label>
-
-//               <input
-//                 type="text"
-//                 name="name"
-//                 value={form.name}
-//                 onChange={handleChange}
-//                 placeholder="e.g. My Billing System"
-//                 disabled={submitting}
-//                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
-//               />
-//             </div>
-
-//             {/* Provider */}
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-2">
-//                 Provider
-//               </label>
-
-//               {/*
-//                 CHANGED from a free-text input to a dropdown.
-//                 The provider value picks which backend adapter
-//                 handles this integration's webhooks (signature
-//                 verification + payload normalization) - a typo
-//                 or an unsupported name here used to silently
-//                 fall back to the generic format and fail on the
-//                 first real webhook. A dropdown makes that
-//                 impossible.
-//               */}
-//               <select
-//                 name="provider"
-//                 value={form.provider || "GENERIC"}
-//                 onChange={handleChange}
-//                 disabled={submitting}
-//                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
-//               >
-//                 {providers.map((providerKey) => (
-//                   <option key={providerKey} value={providerKey}>
-//                     {PROVIDER_LABELS[providerKey] || providerKey}
-//                   </option>
-//                 ))}
-//               </select>
-
-//               <p className="mt-1.5 text-xs text-gray-500">
-//                 Don't see your billing system? Choose "Generic /
-//                 Custom" and send events directly in your CRM's
-//                 expected format, or ask your developer to add a
-//                 dedicated adapter for it.
-//               </p>
-//             </div>
-
-//             {/* Integration Type */}
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-2">
-//                 Integration Type
-//               </label>
-
-//               <select
-//                 name="type"
-//                 value={form.type}
-//                 onChange={handleChange}
-//                 disabled={submitting}
-//                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
-//               >
-//                 {integrationTypes.map((type) => (
-//                   <option
-//                     key={type.value}
-//                     value={type.value}
-//                   >
-//                     {type.label} - {type.description}
-//                   </option>
-//                 ))}
-//               </select>
-//             </div>
-
-//             {/* Info */}
-//             <div className="bg-green-50 border border-green-100 rounded-lg p-4">
-//               <p className="text-sm text-green-800">
-//                 After creating the integration, you'll receive a
-//                 unique webhook URL and secret. Your billing,
-//                 e-commerce, POS, or other system can use these to
-//                 send customer and purchase events to your CRM.
-//               </p>
-
-//               {form.provider &&
-//                 form.provider !== "GENERIC" && (
-//                   <p className="text-sm text-green-800 mt-2">
-//                     For {PROVIDER_LABELS[form.provider] || form.provider},
-//                     open that provider's dashboard after creating
-//                     this integration and copy their real webhook
-//                     signing secret over the generated one here -
-//                     otherwise their webhook calls will be
-//                     rejected as unverified.
-//                   </p>
-//                 )}
-//             </div>
-//           </div>
-
-//           {/* Footer */}
-//           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-//             <button
-//               type="button"
-//               onClick={onClose}
-//               disabled={submitting}
-//               className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
-//             >
-//               Cancel
-//             </button>
-
-//             <button
-//               type="submit"
-//               disabled={submitting}
-//               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
-//             >
-//               {submitting ? (
-//                 <>
-//                   <Loader2 className="w-4 h-4 animate-spin" />
-//                   Creating...
-//                 </>
-//               ) : (
-//                 <>
-//                   <Plug className="w-4 h-4" />
-//                   Create Integration
-//                 </>
-//               )}
-//             </button>
-//           </div>
-//         </form>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default AddIntegrationModal;
-
-
-
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Loader2,
@@ -284,6 +10,7 @@ import {
   Webhook,
   Check,
   Info,
+  ChevronDown,
 } from "lucide-react";
 import { getSupportedProviders } from "../../api/integrationApi";
 
@@ -517,56 +244,55 @@ const AddIntegrationModal = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={() => !submitting && onClose()}
       />
 
       {/* Modal */}
-      <div className="relative flex w-full max-w-2xl max-h-[92vh] flex-col bg-white rounded-2xl shadow-xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-integration-title"
+        className="relative flex max-h-[94vh] w-full max-w-3xl flex-col rounded-3xl bg-white shadow-2xl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
-              <Plug className="w-5 h-5 text-green-600" />
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Add Integration
-              </h2>
-
-              <p className="text-sm text-gray-500">
-                Connect a website, store or payment system to your CRM
-              </p>
-            </div>
+        <div className="mx-6 flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 pb-4 pt-6 sm:mx-8">
+          <div>
+            <h2
+              id="add-integration-title"
+              className="text-xl font-bold text-slate-900"
+            >
+              Add Integration
+            </h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Connect a website, store or payment system to your CRM
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             aria-label="Close"
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
           >
-            <X className="w-5 h-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Form */}
-        <form
-          onSubmit={onSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6 sm:px-8">
             {/* Provider picker */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                What do you want to connect?
-              </label>
+              <p className="mb-4 text-lg text-slate-900">
+                What do you want to connect ?
+              </p>
 
               <div
                 role="radiogroup"
                 aria-label="Provider"
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2"
               >
                 {orderedProviders.map((providerKey) => {
                   const meta = metaFor(providerKey);
@@ -581,34 +307,34 @@ const AddIntegrationModal = ({
                       aria-checked={isSelected}
                       disabled={submitting}
                       onClick={() => handleSelectProvider(providerKey)}
-                      className={`relative flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:opacity-60 ${
+                      className={`relative flex items-center gap-4 rounded-2xl border p-4 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-[#25D366] disabled:opacity-60 ${
                         isSelected
-                          ? "border-green-600 bg-green-50 ring-1 ring-green-600"
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                          ? "border-[#22C55E] bg-[#E3FCEA]"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
                       <div
-                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
                           isSelected
-                            ? "bg-green-600 text-white"
-                            : "bg-gray-100 text-gray-600"
+                            ? "bg-[#22C55E] text-white"
+                            : "bg-slate-100 text-slate-900"
                         }`}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-6 w-6" />
                       </div>
 
-                      <div className="min-w-0 pr-5">
-                        <p className="text-sm font-semibold text-gray-900">
+                      <div className="min-w-0 pr-6">
+                        <p className="text-lg font-semibold leading-tight text-slate-900">
                           {meta.label}
                         </p>
-                        <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                        <p className="mt-1 text-sm leading-snug text-slate-500">
                           {meta.tagline}
                         </p>
                       </div>
 
                       {isSelected && (
-                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
+                        <span className="absolute right-4 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border border-[#22C55E] text-[#22C55E]">
+                          <Check className="h-3.5 w-3.5" />
                         </span>
                       )}
                     </button>
@@ -618,11 +344,11 @@ const AddIntegrationModal = ({
             </div>
 
             {/* Name + type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <label
                   htmlFor="integration-name"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  className="mb-2 block text-base font-medium text-slate-900"
                 >
                   Integration Name
                 </label>
@@ -635,9 +361,10 @@ const AddIntegrationModal = ({
                   onChange={handleChange}
                   placeholder={selectedMeta.namePlaceholder}
                   disabled={submitting}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 disabled:bg-slate-100"
                 />
-                <p className="mt-1.5 text-xs text-gray-500">
+
+                <p className="mt-2 text-sm text-slate-500">
                   A name only you see, to tell integrations apart.
                 </p>
               </div>
@@ -645,41 +372,46 @@ const AddIntegrationModal = ({
               <div>
                 <label
                   htmlFor="integration-type"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  className="mb-2 block text-base font-medium text-slate-900"
                 >
                   Integration Type
                 </label>
 
-                <select
-                  id="integration-type"
-                  name="type"
-                  value={form.type}
-                  onChange={handleChange}
-                  disabled={submitting}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
-                >
-                  {integrationTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label} - {type.description}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-xs text-gray-500">
-                  Filled in for you when you pick a provider.
+                <div className="relative">
+                  <select
+                    id="integration-type"
+                    name="type"
+                    value={form.type}
+                    onChange={handleChange}
+                    disabled={submitting}
+                    className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-800 outline-none transition focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 disabled:bg-slate-100"
+                  >
+                    {integrationTypes.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label} - {type.description}
+                      </option>
+                    ))}
+                  </select>
+
+                  <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-700" />
+                </div>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  Pick the kind of system you are connecting.
                 </p>
               </div>
             </div>
 
             {/* What happens next */}
-            <div className="rounded-xl border border-green-100 bg-green-50 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <Info className="h-4 w-4 text-green-700" />
-                <p className="text-sm font-semibold text-green-900">
+            <div className="rounded-2xl border border-[#22C55E] bg-[#EEFCF2] p-5">
+              <div className="mb-3 flex items-center gap-2.5">
+                <Info className="h-5 w-5 text-green-700" />
+                <p className="text-base font-semibold text-green-700">
                   What happens next ({selectedMeta.label})
                 </p>
               </div>
 
-              <ol className="list-decimal space-y-1.5 pl-5 text-sm text-green-800">
+              <ol className="list-decimal space-y-2 pl-6 text-sm text-slate-800 marker:text-slate-800">
                 {selectedMeta.steps.map((step) => (
                   <li key={step}>{step}</li>
                 ))}
@@ -688,12 +420,12 @@ const AddIntegrationModal = ({
           </div>
 
           {/* Footer */}
-          <div className="flex flex-shrink-0 items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+          <div className="flex shrink-0 items-center justify-end gap-3 px-6 pb-6 pt-2 sm:px-8">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              className="rounded-xl border border-slate-200 bg-white px-8 py-3 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -701,18 +433,15 @@ const AddIntegrationModal = ({
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#22C55E] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#16a34a] disabled:opacity-60"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Creating...
                 </>
               ) : (
-                <>
-                  <Plug className="w-4 h-4" />
-                  Create Integration
-                </>
+                "Create Integration"
               )}
             </button>
           </div>

@@ -1,5 +1,6 @@
 // import { useEffect, useMemo, useRef, useState } from "react";
 // import { FaBell } from "react-icons/fa";
+// import toast from "react-hot-toast";
 
 // import {
 //   getNotifications,
@@ -7,6 +8,8 @@
 //   markAllNotificationsAsRead,
 //   deleteNotification,
 // } from "../../api/notificationApi";
+
+// import { connectSocket } from "../../api/socketClient";
 
 // import NotificationDropdown from "./NotificationDropdown";
 
@@ -35,6 +38,52 @@
 //   // ================= INITIAL LOAD =================
 //   useEffect(() => {
 //     fetchNotifications();
+//   }, []);
+
+//   // ================= LIVE NOTIFICATIONS =================
+//   // The server pushes "notification:new" the moment something is
+//   // assigned to this user (e.g. a lead), so no page refresh is needed.
+//   useEffect(() => {
+//     if (!localStorage.getItem("token")) return undefined;
+
+//     const socket = connectSocket();
+
+//     const handleNew = (notification) => {
+//       if (!notification?.id) return;
+
+//       setNotifications((prev) =>
+//         prev.some((n) => n.id === notification.id)
+//           ? prev
+//           : [notification, ...prev]
+//       );
+
+//       toast(`${notification.title}\n${notification.message}`, {
+//         icon: "🔔",
+//         duration: 5000,
+//       });
+//     };
+
+//     // After a dropped connection, quietly catch up on anything missed
+//     let hasConnectedBefore = false;
+//     const handleConnect = async () => {
+//       if (hasConnectedBefore) {
+//         try {
+//           const response = await getNotifications();
+//           setNotifications(response.data || []);
+//         } catch (error) {
+//           console.error("Refresh Notifications Error:", error);
+//         }
+//       }
+//       hasConnectedBefore = true;
+//     };
+
+//     socket.on("connect", handleConnect);
+//     socket.on("notification:new", handleNew);
+
+//     return () => {
+//       socket.off("connect", handleConnect);
+//       socket.off("notification:new", handleNew);
+//     };
 //   }, []);
 
 //   // ================= CLOSE DROPDOWN ON OUTSIDE CLICK =================
@@ -328,7 +377,7 @@ function NotificationButton() {
     <div className="relative" ref={wrapperRef}>
       <button
         onClick={handleToggleDropdown}
-        className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white transition hover:border-[#25D366] hover:bg-[#DCF8C6]"
+        className="relative flex h-11 w-11 items-center justify-center rounded-full text-gray-700 transition hover:bg-[#159A4B]/10"
       >
         <FaBell size={18} className="text-gray-700" />
 

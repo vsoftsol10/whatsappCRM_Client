@@ -29,17 +29,23 @@ import {
 // Put your PNG at: src/assets/vatup-logo.png (no spaces in the name)
 import platformLogo from "../assets/vatup-logo.png";
 
+// Dark-text Vatup logo with a transparent background, for the light sidebar.
+import brandLogoDark from "../assets/vatup-logo-dark.png";
+
 // YOUR SaaS platform's branding (shown at the bottom of the sidebar: "Powered by ...").
 export const PLATFORM = {
   name: "Vatup CRM", // used only as the image alt text
   logo: platformLogo,
 };
 
+export const BRAND_LOGO = brandLogoDark;
+
 export const navGroups = [
   {
     id: "main",
     items: [
       { key: "dashboard", name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { key: "customers", name: "Customers", path: "/customers", icon: Users },
       {
         key: "conversations",
         name: "Conversations",
@@ -55,7 +61,6 @@ export const navGroups = [
   {
     id: "crm",
     items: [
-      { key: "customers", name: "Customers", path: "/customers", icon: Users },
       { key: "services", feature: "services", name: "Services", path: "/services", icon: Briefcase },
       { key: "leads", feature: "leads", name: "Leads", path: "/leads", icon: UserPlus },
       { key: "campaigns", feature: "campaigns", name: "Campaigns", path: "/campaigns", icon: Megaphone },

@@ -288,6 +288,20 @@ function SocialChatHeader({
             <FaArrowLeft size={18} />
           </button>
 
+          {/* Click the person to open the profile information panel */}
+          <div
+            role="button"
+            tabIndex={0}
+            title="View profile information"
+            onClick={() => setShowInfo(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setShowInfo(true);
+              }
+            }}
+            className="flex min-w-0 cursor-pointer items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CED0D4]"
+          >
           <SocialAvatar
             conversation={selectedConversation}
             theme={theme}
@@ -295,7 +309,7 @@ function SocialChatHeader({
           />
 
           <div className="min-w-0">
-            <h2 className="truncate text-[16px] font-semibold text-[#050505]">
+            <h2 className="truncate text-[16px] font-semibold text-[#050505] hover:underline">
               {getContactName(selectedConversation)}
             </h2>
             <p className="flex flex-wrap items-center gap-1 text-[12px] text-[#65676B]">
@@ -319,6 +333,7 @@ function SocialChatHeader({
                 </span>
               )}
             </p>
+          </div>
           </div>
         </div>
 

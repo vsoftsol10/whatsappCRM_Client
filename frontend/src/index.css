@@ -68,3 +68,37 @@
     @apply inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold;
   }
 }
+
+/* Right-side drawer used by the Templates module (create / edit / view) */
+@keyframes crm-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes crm-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.crm-drawer-in {
+  animation: crm-drawer-in 0.22s ease-out;
+}
+
+.crm-fade-in {
+  animation: crm-fade-in 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crm-drawer-in,
+  .crm-fade-in {
+    animation: none;
+  }
+}

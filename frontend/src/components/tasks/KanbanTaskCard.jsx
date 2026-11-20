@@ -1,16 +1,29 @@
-import { useState } from "react";
-import { MoreVertical, Calendar, User, Flag } from "lucide-react";
+import { Eye, Pencil, Trash2, User } from "lucide-react";
+
 import { useAuthStore } from "../../store/authStore";
+import RowActionsMenu from "../common/RowActionsMenu";
+import {
+  Pill,
+  PillSelect,
+} from "./taskUi";
+import {
+  STATUS_OPTIONS,
+  PRIORITY_OPTIONS,
+  formatDate,
+  priorityTone,
+  statusTone,
+  optionLabel,
+} from "./taskHelpers";
 
 export default function KanbanTaskCard({
   task,
+  onView,
   onEdit,
   onDelete,
   onStatusChange,
+  onPriorityChange,
 }) {
   const { user } = useAuthStore();
-
-  const [menuOpen, setMenuOpen] = useState(false);
 
   const isAdmin = user?.role === "ADMIN";
 
@@ -19,145 +32,102 @@ export default function KanbanTaskCard({
   const canUpdateStatus =
     isAdmin || task.assignedToId === currentUserId;
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "HIGH":
-        return "bg-red-100 text-red-700";
+  const menuItems = [
+    {
+      key: "view",
+      label: "View",
+      icon: Eye,
+      onClick: () => onView?.(task),
+    },
+  ];
 
-      case "MEDIUM":
-        return "bg-[#DCF8C6] text-[#128C7E]";
-
-      case "LOW":
-        return "bg-green-100 text-green-700";
-
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "TODO":
-        return "bg-gray-100 text-gray-700";
-
-      case "IN_PROGRESS":
-        return "bg-blue-100 text-blue-700";
-
-      case "REVIEW":
-        return "bg-[#DCF8C6] text-[#128C7E]";
-
-      case "COMPLETED":
-        return "bg-green-100 text-green-700";
-
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
+  if (isAdmin) {
+    menuItems.push(
+      {
+        key: "edit",
+        label: "Edit",
+        icon: Pencil,
+        onClick: () => onEdit?.(task),
+      },
+      {
+        key: "delete",
+        label: "Delete",
+        icon: Trash2,
+        danger: true,
+        onClick: () => onDelete?.(task.id),
+      }
+    );
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative hover:shadow-md transition-all duration-200">
-      {/* MENU */}
-      {isAdmin && (
-        <div className="absolute top-3 right-3">
-          <MoreVertical
-            size={18}
-            className="cursor-pointer text-gray-500"
-            onClick={() => setMenuOpen(!menuOpen)}
+    <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+      {/* TITLE + MENU */}
+
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => onView?.(task)}
+          className="min-w-0 break-words text-left text-[15px] font-semibold text-slate-900 hover:text-green-600"
+        >
+          {task.title}
+        </button>
+
+        <div className="shrink-0 [&>button]:bg-slate-100 [&>button]:text-slate-600">
+          <RowActionsMenu
+            ariaLabel={`Actions for ${task.title}`}
+            items={menuItems}
           />
-
-          {menuOpen && (
-            <div className="absolute right-0 mt-2 w-28 rounded-lg border bg-white shadow-lg z-20">
-              <button
-                onClick={() => {
-                  onEdit(task);
-                  setMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-              >
-                Edit
-              </button>
-
-              <button
-                onClick={() => {
-                  onDelete(task.id);
-                  setMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-              >
-                Delete
-              </button>
-            </div>
-          )}
         </div>
-      )}
-
-      {/* TITLE */}
-      <h3 className="font-semibold text-gray-800 pr-6">
-        {task.title}
-      </h3>
-
-      {/* DESCRIPTION */}
-      {task.description && (
-        <p className="text-sm text-gray-500 mt-2 line-clamp-3">
-          {task.description}
-        </p>
-      )}
-
-      {/* ASSIGNEE */}
-      <div className="flex items-center gap-2 text-sm text-gray-600 mt-4">
-        <User size={15} />
-        <span>{task.assignedTo?.name || "Unassigned"}</span>
       </div>
 
       {/* DUE DATE */}
-      {task.dueDate && (
-        <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
-          <Calendar size={15} />
-          <span>
-            {new Date(task.dueDate).toLocaleDateString()}
-          </span>
-        </div>
-      )}
+
+      <p className="mt-5 text-sm text-slate-500">
+        Due date{" "}
+        <span className="ml-1 font-semibold text-slate-900">
+          {formatDate(task.dueDate, { utc: true })}
+        </span>
+      </p>
 
       {/* FOOTER */}
-      <div className="flex items-center justify-between mt-4 gap-2">
-        <span
-          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(
-            task.priority
-          )}`}
-        >
-          <Flag size={12} />
-          {task.priority}
-        </span>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {isAdmin ? (
+          <PillSelect
+            label="Priority"
+            value={task.priority}
+            options={PRIORITY_OPTIONS}
+            tone={priorityTone(task.priority)}
+            onChange={(value) =>
+              onPriorityChange?.(task.id, value)
+            }
+          />
+        ) : (
+          <Pill tone={priorityTone(task.priority)}>
+            {optionLabel(PRIORITY_OPTIONS, task.priority)}
+          </Pill>
+        )}
 
         {canUpdateStatus ? (
-          <select
+          <PillSelect
+            label="Status"
             value={task.status}
-            onChange={(e) =>
-              onStatusChange(task.id, e.target.value)
+            options={STATUS_OPTIONS}
+            tone={statusTone(task.status)}
+            onChange={(value) =>
+              onStatusChange?.(task.id, value)
             }
-            className={`text-xs rounded-lg border px-2 py-1 ${getStatusColor(
-              task.status
-            )}`}
-          >
-            <option value="TODO">TODO</option>
-            <option value="IN_PROGRESS">
-              IN PROGRESS
-            </option>
-            <option value="REVIEW">REVIEW</option>
-            <option value="COMPLETED">
-              COMPLETED
-            </option>
-          </select>
+          />
         ) : (
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-              task.status
-            )}`}
-          >
-            {task.status}
-          </span>
+          <Pill tone={statusTone(task.status)}>
+            {optionLabel(STATUS_OPTIONS, task.status)}
+          </Pill>
         )}
+
+        <span className="ml-auto flex items-center gap-1.5 text-sm text-slate-500">
+          <User size={14} />
+          {task.assignedTo?.name || "Unassigned"}
+        </span>
       </div>
     </div>
   );
