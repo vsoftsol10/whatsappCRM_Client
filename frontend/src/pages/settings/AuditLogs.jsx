@@ -290,15 +290,7 @@ export default function AuditLogs() {
 
   return (
     <div className="p-4 sm:p-6">
-      {/* HEADER */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-          Audit Logs
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Track who did what, and when, across your CRM.
-        </p>
-      </div>
+      {/* Heading removed - the "Audit Logs" tab above already names this page */}
 
       {/* TOOLBAR */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -483,8 +475,8 @@ export default function AuditLogs() {
                     <div className="font-medium leading-snug text-slate-800">
                       {log.userName}
                     </div>
-                    <div className="text-sm uppercase leading-snug text-slate-800">
-                      {log.userRole}
+                    <div className="text-sm leading-snug text-slate-800">
+                      {toTitleCase(log.userRole || "")}
                     </div>
                   </td>
 
@@ -499,8 +491,8 @@ export default function AuditLogs() {
                     </span>
                   </td>
 
-                  <td className="px-6 py-4 uppercase text-slate-800">
-                    {log.module}
+                  <td className="px-6 py-4 text-slate-800">
+                    {toTitleCase(formatLabel(log.module || ""))}
                   </td>
 
                   <td className="px-6 py-4 text-slate-800">
@@ -635,7 +627,7 @@ export default function AuditLogs() {
               <div className="flex justify-between gap-4">
                 <span className="text-slate-500">User</span>
                 <span className="font-medium text-slate-800">
-                  {selectedLog.userName} ({selectedLog.userRole})
+                  {selectedLog.userName} ({toTitleCase(selectedLog.userRole || "")})
                 </span>
               </div>
 
@@ -654,7 +646,7 @@ export default function AuditLogs() {
               <div className="flex justify-between gap-4">
                 <span className="text-slate-500">Module</span>
                 <span className="font-medium text-slate-800">
-                  {selectedLog.module}
+                  {toTitleCase(formatLabel(selectedLog.module || ""))}
                 </span>
               </div>
 

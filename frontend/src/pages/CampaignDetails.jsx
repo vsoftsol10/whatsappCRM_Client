@@ -10,6 +10,7 @@
 // } from "lucide-react";
 
 // import useCampaignStore from "../store/campaignStore";
+// import { getCampaignMessageText } from "../utils/campaignMessage";
 
 // export default function CampaignDetails() {
 //   const { id } = useParams();
@@ -143,7 +144,7 @@
 //         </div>
 
 //         <div className="whitespace-pre-wrap break-words rounded-lg border p-4">
-//           {selectedCampaign.messageContent}
+//           {getCampaignMessageText(selectedCampaign)}
 //         </div>
 //       </div>
 
@@ -212,6 +213,8 @@
 // }
 
 
+
+
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -270,7 +273,7 @@ export default function CampaignDetails() {
           Back
         </button>
 
-        <h1 className="break-words text-2xl font-bold sm:text-3xl">
+        <h1 className="crm-title break-words">
           {selectedCampaign.name}
         </h1>
       </div>

@@ -1,20 +1,31 @@
-// // frontend/src/pages/ProposalBuilder.jsx   (NEW FILE)
-// // Create / edit a proposal (one full-width form, no live preview).
+// // Create / edit a proposal: fill the form, click Preview, then Save from the preview.
 // //   /proposals/new        -> create
 // //   /proposals/:id/edit   -> edit
 // import { useEffect, useMemo, useState } from "react";
 // import { useNavigate, useParams } from "react-router-dom";
-// import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+// import {
+//   ArrowLeft,
+//   FileText,
+//   Package,
+//   Pencil,
+//   Plus,
+//   Save,
+//   ScrollText,
+//   Trash2,
+//   User,
+//   X,
+// } from "lucide-react";
 // import toast from "react-hot-toast";
 
 // import { getCustomers } from "../api/customerApi";
 // import { getServices } from "../api/serviceApi";
+// import { getCompanySettings } from "../api/companyApi";
 // import {
 //   createProposal,
 //   getProposalById,
 //   updateProposal,
 // } from "../api/proposalApi";
-// import {
+// import ProposalPreview, {
 //   CURRENCIES,
 //   calculateTotals,
 //   formatMoney,
@@ -30,7 +41,14 @@
 // });
 
 // const inputClass =
-//   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366]";
+//   "h-11 w-full rounded-lg border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100";
+
+// // same look, but grows with the text instead of a fixed height
+// const textareaClass =
+//   "w-full rounded-lg border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100";
+
+// // two columns on large screens, the first one a little wider
+// const twoColGrid = "grid gap-5 lg:grid-cols-[3fr_2fr]";
 
 // const toDateInput = (value) =>
 //   value ? new Date(value).toISOString().slice(0, 10) : "";
@@ -38,12 +56,32 @@
 // function Field({ label, children, hint }) {
 //   return (
 //     <label className="block">
-//       <span className="mb-1 block text-sm font-medium text-gray-700">
+//       <span className="mb-2 block text-xs font-medium uppercase tracking-wide text-slate-500">
 //         {label}
 //       </span>
 //       {children}
-//       {hint && <span className="mt-1 block text-xs text-gray-500">{hint}</span>}
+//       {hint && <span className="mt-2 block text-xs text-slate-500">{hint}</span>}
 //     </label>
+//   );
+// }
+
+// function Card({ icon: Icon, title, subtitle, action, children }) {
+//   return (
+//     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+//       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+//         <div className="flex items-center gap-3">
+//           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600">
+//             <Icon size={18} />
+//           </span>
+//           <div>
+//             <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+//             {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+//           </div>
+//         </div>
+//         {action}
+//       </div>
+//       <div className="space-y-5">{children}</div>
+//     </div>
 //   );
 // }
 
@@ -57,6 +95,10 @@
 
 //   const [customers, setCustomers] = useState([]);
 //   const [services, setServices] = useState([]);
+//   const [company, setCompany] = useState(null);
+
+//   // preview shown before saving
+//   const [showPreview, setShowPreview] = useState(false);
 
 //   const [form, setForm] = useState({
 //     proposalNumber: "",
@@ -92,6 +134,11 @@
 //         ]);
 
 //         if (cancelled) return;
+
+//         // branding is only used by the preview, so never block on it
+//         getCompanySettings()
+//           .then((res) => !cancelled && setCompany(res.company || null))
+//           .catch(() => {});
 
 //         setCustomers(customerRes.customers || []);
 //         setServices(serviceRes.services || []);
@@ -171,6 +218,14 @@
 
 //   const totals = useMemo(() => calculateTotals(form.items), [form.items]);
 
+//   // Closing the full-screen preview with Esc
+//   useEffect(() => {
+//     if (!showPreview) return undefined;
+//     const onKey = (e) => e.key === "Escape" && !saving && setShowPreview(false);
+//     window.addEventListener("keydown", onKey);
+//     return () => window.removeEventListener("keydown", onKey);
+//   }, [showPreview, saving]);
+
 //   // ---------- items ----------
 //   const updateItem = (index, name, value) =>
 //     setForm((prev) => ({
@@ -219,14 +274,16 @@
 //           : prev.items.filter((_, i) => i !== index),
 //     }));
 
-//   // ---------- save ----------
-//   const handleSave = async (e) => {
-//     e.preventDefault();
-
-//     if (saving) return;
-
-//     if (!form.title.trim()) return toast.error("Proposal title is required");
-//     if (!form.clientName.trim()) return toast.error("Client name is required");
+//   // ---------- validate + build payload ----------
+//   const buildPayload = () => {
+//     if (!form.title.trim()) {
+//       toast.error("Proposal title is required");
+//       return null;
+//     }
+//     if (!form.clientName.trim()) {
+//       toast.error("Client name is required");
+//       return null;
+//     }
 
 //     const hasBadItem = form.items.some(
 //       (it) =>
@@ -237,12 +294,11 @@
 //     );
 
 //     if (hasBadItem) {
-//       return toast.error(
-//         "Every item needs a name, a quantity above 0 and a price"
-//       );
+//       toast.error("Every item needs a name, a quantity above 0 and a price");
+//       return null;
 //     }
 
-//     const payload = {
+//     return {
 //       title: form.title.trim(),
 //       customerId: form.customerId || null,
 //       clientName: form.clientName.trim(),
@@ -264,6 +320,23 @@
 //         taxPercent: Number(it.taxPercent) || 0,
 //       })),
 //     };
+//   };
+
+//   // Form submit / "Preview" button: validate first, then show the preview
+//   const handlePreview = (e) => {
+//     e?.preventDefault();
+//     if (buildPayload()) setShowPreview(true);
+//   };
+
+//   // ---------- save (from inside the preview) ----------
+//   const handleSave = async () => {
+//     if (saving) return;
+
+//     const payload = buildPayload();
+//     if (!payload) {
+//       setShowPreview(false);
+//       return;
+//     }
 
 //     try {
 //       setSaving(true);
@@ -289,64 +362,57 @@
 //     return <div className="p-8 text-center text-gray-500">Loading...</div>;
 //   }
 
-//   return (
-//     <div className="p-4 sm:p-6">
-//       {/* TOP BAR */}
-//       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-//         <div className="flex items-center gap-3">
-//           <button
-//             type="button"
-//             onClick={() => navigate("/proposals")}
-//             className="rounded-full bg-white p-2 shadow transition hover:bg-gray-100"
-//             aria-label="Back to proposals"
-//           >
-//             <ArrowLeft size={18} />
-//           </button>
-//           <div>
-//             <h1 className="text-2xl font-bold text-gray-900">
-//               {isEdit ? "Edit Proposal" : "New Proposal"}
-//             </h1>
-//             {isEdit && (
-//               <p className="text-sm text-gray-500">{form.proposalNumber}</p>
-//             )}
-//           </div>
-//         </div>
+//   const previewButton = (
+//     <button
+//       type="submit"
+//       className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
+//     >
+//       Preview
+//     </button>
+//   );
 
-//         <div className="flex gap-2">
-//           <button
-//             type="button"
-//             onClick={() => navigate("/proposals")}
-//             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
-//           >
-//             Cancel
-//           </button>
-//           <button
-//             type="button"
-//             onClick={handleSave}
-//             disabled={saving}
-//             className="rounded-lg bg-[#25D366] px-5 py-2 text-sm font-semibold text-black transition hover:bg-[#1ebe5a] disabled:opacity-60"
-//           >
-//             {saving ? "Saving..." : isEdit ? "Save Changes" : "Save Proposal"}
-//           </button>
+//   return (
+//     <div className="crm-page">
+//       {/* TOP BAR */}
+//       <div className="mb-6 flex items-start gap-3">
+//         <button
+//           type="button"
+//           onClick={() => navigate("/proposals")}
+//           className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+//           aria-label="Back to proposals"
+//         >
+//           <ArrowLeft size={18} />
+//         </button>
+//         <div className="min-w-0">
+//           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+//             {isEdit ? "Edit Proposal" : "New Proposal"}
+//           </h1>
+//           <p className="mt-1 text-sm text-slate-500">
+//             {isEdit && form.proposalNumber
+//               ? form.proposalNumber
+//               : "Fill in the details. Your proposal starts here."}
+//           </p>
 //         </div>
 //       </div>
 
-//       <div className="mx-auto max-w-4xl">
+//       <div className="w-full">
 //         {/* ================= FORM ================= */}
-//         <form onSubmit={handleSave} className="space-y-5">
-//           <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-//             <h2 className="font-semibold text-gray-900">Client details</h2>
-
+//         <form onSubmit={handlePreview} className="space-y-6">
+//           <Card
+//             icon={User}
+//             title="Client details"
+//             subtitle="Who is this proposal for?"
+//           >
 //             <Field
-//               label="Choose an existing customer (optional)"
-//               hint="Fills the fields below. You can also leave this empty and type the details yourself."
+//               label="Existing customer"
+//               hint="Optional. Pick from saved clients to auto-populate details."
 //             >
 //               <select
 //                 className={inputClass}
 //                 value={form.customerId}
 //                 onChange={(e) => handlePickCustomer(e.target.value)}
 //               >
-//                 <option value="">Not a saved customer / type details below</option>
+//                 <option value="">Walk-in / guest customer — type details below</option>
 //                 {customers.map((c) => (
 //                   <option key={c.id} value={c.id}>
 //                     {c.name} - {c.phone}
@@ -355,7 +421,7 @@
 //               </select>
 //             </Field>
 
-//             <div className="grid gap-4 sm:grid-cols-2">
+//             <div className={twoColGrid}>
 //               <Field label="Client name *">
 //                 <input
 //                   className={inputClass}
@@ -378,7 +444,7 @@
 
 //               <Field
 //                 label="Phone (WhatsApp)"
-//                 hint="Needed to send on WhatsApp. Add the country code for non-Indian numbers."
+//                 hint="Used to send via WhatsApp. Add the country code for non-Indian numbers."
 //               >
 //                 <input
 //                   type="tel"
@@ -401,11 +467,13 @@
 //                 />
 //               </Field>
 //             </div>
-//           </div>
+//           </Card>
 
-//           <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-//             <h2 className="font-semibold text-gray-900">Basic details</h2>
-
+//           <Card
+//             icon={FileText}
+//             title="Proposal details"
+//             subtitle="The what, why, and until when"
+//           >
 //             <Field label="Proposal title *">
 //               <input
 //                 className={inputClass}
@@ -416,7 +484,7 @@
 //               />
 //             </Field>
 
-//             <div className="grid gap-4 sm:grid-cols-2">
+//             <div className={twoColGrid}>
 //               <Field label="Currency">
 //                 <select
 //                   className={inputClass}
@@ -441,13 +509,13 @@
 //               </Field>
 //             </div>
 
-//             <Field label="Intro message">
+//             <Field label="Brief summary">
 //               <textarea
 //                 rows={3}
-//                 className={inputClass}
+//                 className={textareaClass}
 //                 value={form.introMessage}
 //                 maxLength={5000}
-//                 placeholder="A short greeting that opens the proposal"
+//                 placeholder="A short paragraph that introduces the proposal"
 //                 onChange={(e) => setField("introMessage", e.target.value)}
 //               />
 //             </Field>
@@ -455,23 +523,26 @@
 //             <Field label="Scope of work">
 //               <textarea
 //                 rows={4}
-//                 className={inputClass}
+//                 className={textareaClass}
 //                 value={form.scope}
 //                 maxLength={5000}
 //                 placeholder="What you will deliver"
 //                 onChange={(e) => setField("scope", e.target.value)}
 //               />
 //             </Field>
-//           </div>
+//           </Card>
 
 //           {/* ITEMS */}
-//           <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-//             <div className="flex flex-wrap items-center justify-between gap-2">
-//               <h2 className="font-semibold text-gray-900">Items</h2>
-
-//               {services.length > 0 && (
+//           <Card
+//             icon={Package}
+//             title="Items & pricing"
+//             subtitle={`${form.items.length} item${
+//               form.items.length > 1 ? "s" : ""
+//             }`}
+//             action={
+//               services.length > 0 && (
 //                 <select
-//                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+//                   className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
 //                   value=""
 //                   onChange={(e) => addServiceItem(e.target.value)}
 //                 >
@@ -482,15 +553,18 @@
 //                     </option>
 //                   ))}
 //                 </select>
-//               )}
-//             </div>
-
+//               )
+//             }
+//           >
 //             {form.items.map((item, index) => (
 //               <div
 //                 key={index}
-//                 className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+//                 className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
 //               >
-//                 <div className="flex items-start gap-2">
+//                 <div className="flex items-center gap-2">
+//                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[11px] font-bold text-white">
+//                     {index + 1}
+//                   </span>
 //                   <input
 //                     className={inputClass}
 //                     placeholder="Item name *"
@@ -501,7 +575,7 @@
 //                   <button
 //                     type="button"
 //                     onClick={() => removeItem(index)}
-//                     className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+//                     className="rounded-lg p-2 text-red-500 transition hover:bg-red-50"
 //                     aria-label="Remove item"
 //                   >
 //                     <Trash2 size={16} />
@@ -571,9 +645,9 @@
 //                   </Field>
 //                 </div>
 
-//                 <p className="text-right text-sm text-gray-600">
-//                   Line total:{" "}
-//                   <span className="font-semibold text-gray-900">
+//                 <p className="text-right text-xs uppercase tracking-wide text-slate-500">
+//                   Line total{" "}
+//                   <span className="ml-3 text-sm font-semibold normal-case tracking-normal text-slate-900">
 //                     {formatMoney(totals.lines[index], form.currency)}
 //                   </span>
 //                 </p>
@@ -583,44 +657,46 @@
 //             <button
 //               type="button"
 //               onClick={addItem}
-//               className="flex items-center gap-1 rounded-lg border border-dashed border-gray-400 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+//               className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 text-sm font-medium text-slate-600 transition hover:border-green-500 hover:bg-green-50 hover:text-green-600"
 //             >
 //               <Plus size={16} /> Add item
 //             </button>
 
-//             <div className="ml-auto w-full max-w-xs space-y-1 text-sm">
-//               <div className="flex justify-between">
-//                 <span className="text-gray-600">Subtotal</span>
+//             <div className="ml-auto w-full max-w-xs space-y-2 text-sm">
+//               <div className="flex justify-between px-3 text-slate-600">
+//                 <span>Subtotal</span>
 //                 <span>{formatMoney(totals.subtotal, form.currency)}</span>
 //               </div>
 //               {totals.discountTotal > 0 && (
-//                 <div className="flex justify-between">
-//                   <span className="text-gray-600">Discount</span>
+//                 <div className="flex justify-between px-3 text-slate-600">
+//                   <span>Discount</span>
 //                   <span>- {formatMoney(totals.discountTotal, form.currency)}</span>
 //                 </div>
 //               )}
-//               <div className="flex justify-between">
-//                 <span className="text-gray-600">Tax</span>
+//               <div className="flex justify-between px-3 text-slate-600">
+//                 <span>Tax</span>
 //                 <span>{formatMoney(totals.taxTotal, form.currency)}</span>
 //               </div>
-//               <div className="flex justify-between border-t border-gray-200 pt-1 text-base font-bold">
+//               <div className="flex justify-between rounded-lg bg-green-100 px-3 py-2 text-base font-bold text-green-900">
 //                 <span>Total</span>
 //                 <span>{formatMoney(totals.total, form.currency)}</span>
 //               </div>
 //             </div>
-//           </div>
+//           </Card>
 
 //           {/* PAYMENT + TERMS */}
-//           <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-//             <h2 className="font-semibold text-gray-900">Payment &amp; terms</h2>
-
+//           <Card
+//             icon={ScrollText}
+//             title="Payment & terms"
+//             subtitle="How and when you get paid"
+//           >
 //             <Field
-//               label="Payment details"
-//               hint="Bank name, account number, IFSC, UPI id etc."
+//               label="Payment terms"
+//               hint="Bank name, account number, IFSC, UPI, etc."
 //             >
 //               <textarea
 //                 rows={3}
-//                 className={inputClass}
+//                 className={textareaClass}
 //                 value={form.paymentDetails}
 //                 maxLength={5000}
 //                 onChange={(e) => setField("paymentDetails", e.target.value)}
@@ -630,39 +706,93 @@
 //             <Field label="Terms & conditions">
 //               <textarea
 //                 rows={4}
-//                 className={inputClass}
+//                 className={textareaClass}
 //                 value={form.terms}
 //                 maxLength={5000}
 //                 placeholder="e.g. 50% advance, balance on delivery"
 //                 onChange={(e) => setField("terms", e.target.value)}
 //               />
 //             </Field>
-//           </div>
+//           </Card>
 
-//           <div className="flex justify-end gap-2 pb-6">
+//           <div className="flex flex-wrap justify-end gap-3 pb-6 pt-2">
 //             <button
 //               type="button"
 //               onClick={() => navigate("/proposals")}
-//               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+//               className="h-11 rounded-lg border border-slate-200 bg-white px-5 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
 //             >
 //               Cancel
 //             </button>
-//             <button
-//               type="submit"
-//               disabled={saving}
-//               className="rounded-lg bg-[#25D366] px-5 py-2 text-sm font-semibold text-black transition hover:bg-[#1ebe5a] disabled:opacity-60"
-//             >
-//               {saving ? "Saving..." : isEdit ? "Save Changes" : "Save Proposal"}
-//             </button>
+//             {previewButton}
 //           </div>
 //         </form>
-
 //       </div>
+
+//       {/* ================= PREVIEW BEFORE SAVE ================= */}
+//       {showPreview && (
+//         <div
+//           className="fixed inset-0 z-[10000] flex flex-col bg-slate-900/50 p-3 sm:p-6"
+//           onClick={() => !saving && setShowPreview(false)}
+//         >
+//           <div
+//             className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-gray-100 shadow-2xl"
+//             onClick={(e) => e.stopPropagation()}
+//           >
+//             <div className="flex items-center justify-between border-b border-gray-200 bg-white px-5 py-3">
+//               <div>
+//                 <h2 className="text-base font-bold text-gray-900">
+//                   Proposal preview
+//                 </h2>
+//                 <p className="text-xs text-gray-500">
+//                   Check everything, then save. Nothing is saved until you click Save.
+//                 </p>
+//               </div>
+//               <div className="flex items-center gap-2">
+//                 <button
+//                   type="button"
+//                   disabled={saving}
+//                   onClick={() => setShowPreview(false)}
+//                   className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
+//                   aria-label="Close preview"
+//                 >
+//                   <X size={18} />
+//                 </button>
+//               </div>
+//             </div>
+
+//             <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+//               <ProposalPreview proposal={form} company={company} />
+//             </div>
+
+//             <div className="flex justify-end gap-2 border-t border-gray-200 bg-white px-5 py-3">
+//               <button
+//                 type="button"
+//                 disabled={saving}
+//                 onClick={() => setShowPreview(false)}
+//                 className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 text-sm font-medium text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
+//               >
+//                 <Pencil size={14} /> Back to edit
+//               </button>
+//               <button
+//                 type="button"
+//                 onClick={handleSave}
+//                 disabled={saving}
+//                 className="flex h-11 items-center justify-center gap-2 rounded-lg bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 disabled:opacity-60"
+//               >
+//                 <Save size={16} />
+//                 {saving ? "Saving..." : isEdit ? "Save Changes" : "Save Proposal"}
+//               </button>
+//             </div>
+//           </div>
+//         </div>
+//       )}
 //     </div>
 //   );
 // }
 
 // export default ProposalBuilder;
+
+
 
 
 
@@ -1052,10 +1182,10 @@ function ProposalBuilder() {
           <ArrowLeft size={18} />
         </button>
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+          <h1 className="crm-title">
             {isEdit ? "Edit Proposal" : "New Proposal"}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="crm-subtitle">
             {isEdit && form.proposalNumber
               ? form.proposalNumber
               : "Fill in the details. Your proposal starts here."}

@@ -1,5 +1,4 @@
 
-
 // // src/components/guide/ModuleGuideGate.jsx
 // //
 // // First-visit guide for a module.
@@ -48,6 +47,14 @@
 
 // const HEADER_BUTTON_MODULES = ["customers", ...ADD_FORM_MODULES, "instagram"];
 
+// // The Instagram connect card lives on Settings -> Security (not on the
+// // Integrations page), so the Instagram guide buttons just open that page.
+// // Modules that must open directly, without the first-visit demo video.
+// // The Instagram conversations page opens straight to the inbox.
+// const NO_GUIDE_MODULES = ["instagram"];
+
+// const INSTAGRAM_PAGE = "/settings/security";
+
 // function Gate({ moduleId, children }) {
 //   const navigate = useNavigate();
 //   const location = useLocation();
@@ -71,6 +78,8 @@
 
 //   // Customers first visit: add-customer form opens from the panel
 //   const [showAddCustomer, setShowAddCustomer] = useState(false);
+
+//   if (NO_GUIDE_MODULES.includes(moduleId)) return children;
 
 //   if (!show || !module || !video) return children;
 
@@ -97,9 +106,14 @@
 //     moduleId === "customers" || ADD_FORM_MODULES.includes(moduleId);
 //   const canAdd = hasAddForm && (isAdmin || !ADMIN_ONLY_ADD.includes(moduleId));
 
-//   // Instagram: always show the top button (it goes to Integrations)
+//   // Instagram: always show the top button (it opens the Security page)
 //   const showHeaderButton =
 //     HEADER_BUTTON_MODULES.includes(moduleId) && (canAdd || isInstagram);
+
+//   const handleInstagram = () => {
+//     finish();
+//     navigate(INSTAGRAM_PAGE);
+//   };
 
 //   const extraPadding = FULL_WIDTH_GUIDE_MODULES.includes(moduleId)
 //     ? LAYOUT_PADDING
@@ -111,9 +125,9 @@
 //       return;
 //     }
 
-//     // Instagram: connect button is in Integrations, go there
+//     // Instagram: go to the page with the Instagram connect button
 //     if (isInstagram) {
-//       handleContinue();
+//       handleInstagram();
 //       return;
 //     }
 
@@ -124,7 +138,7 @@
 
 //   // modules with an add form: open it. Others (e.g. Backup): the old behaviour.
 //   const primaryAction = isInstagram
-//     ? handleContinue
+//     ? handleInstagram
 //     : canAdd
 //     ? handleAdd
 //     : hasAddForm
@@ -211,6 +225,7 @@
 //     </Gate>
 //   );
 // }
+
 
 
 // src/components/guide/ModuleGuideGate.jsx
@@ -380,11 +395,11 @@ function Gate({ moduleId, children }) {
     <div className="bg-gray-50 px-4 py-2 text-gray-900 sm:px-6 lg:px-8">
       <div className="mb-12 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-[28px] font-bold leading-9 text-[#0F1B3D]">
+          <h1 className="crm-title">
             {header.title}
           </h1>
           {header.subtitle && (
-            <p className="mt-1 text-[14px] text-[#5F6F8F]">{header.subtitle}</p>
+            <p className="crm-subtitle">{header.subtitle}</p>
           )}
         </div>
 

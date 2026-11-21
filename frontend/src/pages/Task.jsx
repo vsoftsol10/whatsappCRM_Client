@@ -1,4 +1,6 @@
+
 // import { useEffect, useMemo, useState } from "react";
+// import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 // import toast from "react-hot-toast";
 // import { Plus } from "lucide-react";
 
@@ -52,6 +54,11 @@
 //   const [deleteTargetId, setDeleteTargetId] = useState(null);
 
 //   const [showCreateModal, setShowCreateModal] = useState(false);
+
+//   // Opens the add form when coming from the first-visit guide
+//   useGuideAutoOpen("tasks", () => {
+//     if (isAdmin) setShowCreateModal(true);
+//   });
 
 //   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -358,6 +365,7 @@
 
 
 
+
 import { useEffect, useMemo, useState } from "react";
 import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 import toast from "react-hot-toast";
@@ -549,11 +557,11 @@ export default function Tasks() {
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">
+          <h1 className="crm-title">
             Tasks
           </h1>
 
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="crm-subtitle">
             Manage and monitor your tasks
           </p>
         </div>

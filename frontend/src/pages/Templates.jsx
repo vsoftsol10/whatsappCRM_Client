@@ -1,4 +1,6 @@
+
 // import { useCallback, useEffect, useMemo, useState } from "react";
+// import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 // import toast from "react-hot-toast";
 
 // import useTemplateStore from "../store/templateStore";
@@ -122,6 +124,9 @@
 //   // ==================================================
 
 //   const openCreate = () => setDrawer({ mode: "create", template: null });
+
+//   // Opens the add form when coming from the first-visit guide
+//   useGuideAutoOpen("templates", () => openCreate());
 
 //   const handlePreview = (template) => setDrawer({ mode: "view", template });
 
@@ -489,9 +494,9 @@ export default function Templates() {
       {/* HEADER */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Templates</h1>
+          <h1 className="crm-title">Templates</h1>
 
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="crm-subtitle">
             Manage and monitor your templates
           </p>
         </div>
