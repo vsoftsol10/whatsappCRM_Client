@@ -1,5 +1,3 @@
-
-
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   FaEllipsisV,
@@ -164,7 +162,7 @@ function ChatHeader({
           >
             <span className="relative shrink-0">
               <span
-                className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-semibold text-white ${avatarColor(name)}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-full text-base font-semibold text-white ${avatarColor(name)}`}
               >
                 {getInitial(name)}
               </span>

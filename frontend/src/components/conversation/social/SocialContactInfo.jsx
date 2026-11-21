@@ -23,7 +23,11 @@ function SocialContactInfo({
 
   const content = (
     <div className="flex flex-col items-center px-5 py-8">
-      <SocialAvatar conversation={conversation} theme={theme} size={96} />
+      <SocialAvatar
+        conversation={conversation}
+        theme={theme}
+        size={72}
+      />
 
       <h2 className="mt-4 max-w-full break-words text-center text-xl font-semibold text-[#050505]">
         {getContactName(conversation)}

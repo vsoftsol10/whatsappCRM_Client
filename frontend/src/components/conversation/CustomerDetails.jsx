@@ -1,4 +1,5 @@
 
+
 import { useEffect } from "react";
 import { FaPhoneAlt, FaEnvelope, FaBuilding, FaTimes } from "react-icons/fa";
 import {
@@ -79,7 +80,7 @@ function CustomerDetails({ conversation, onClose }) {
         {/* Avatar + name */}
         <div className="flex flex-col items-center px-6 pb-6">
           <span
-            className={`flex h-28 w-28 items-center justify-center rounded-full text-5xl font-bold text-white ${avatarColor(name)}`}
+            className={`flex h-20 w-20 items-center justify-center rounded-full text-3xl font-bold text-white ${avatarColor(name)}`}
           >
             {getInitial(name)}
           </span>

@@ -212,6 +212,16 @@ function SocialInbox({ variant = "facebook" }) {
               disabled={!selectedConversation}
             />
           </>
+        ) : theme.variant === "instagram" ? (
+          <div className="flex flex-1 flex-col items-center justify-center bg-[#EFF1F5] px-6 text-center">
+            <Icon size={44} className="text-black" />
+            <h2 className="mt-3 text-lg font-semibold text-[#4B5A73]">
+              {theme.emptyTitle}
+            </h2>
+            <p className="mt-1 max-w-xs text-xs text-[#5B6B85]">
+              {theme.emptyText}
+            </p>
+          </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
             <span
