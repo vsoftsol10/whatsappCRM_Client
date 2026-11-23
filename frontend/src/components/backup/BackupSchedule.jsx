@@ -15,7 +15,7 @@ import toast from "react-hot-toast";
 import { CalendarClock, ChevronDown, Loader2 } from "lucide-react";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL || "http://localhost:5000" || "https://whatsappcrm-client-46lf.onrender.com";
 
 const DAYS_OF_WEEK = [
   { value: 1, label: "Monday" },

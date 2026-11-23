@@ -33,7 +33,7 @@ let socket = null;
 export const connectSocket = () => {
   if (socket) return socket;
 
-  socket = io(import.meta.env.VITE_API_URL || "https://whatsappcrm-client.onrender.com", {
+  socket = io(import.meta.env.VITE_API_URL || "https://whatsappcrm-client-46lf.onrender.com", {
     // Read the token on every (re)connect so a fresh login is picked up.
     auth: (cb) => cb({ token: localStorage.getItem("token") }),
     reconnection: true,

@@ -9,7 +9,7 @@ import usePlanFeatures from "../hooks/usePlanFeatures";
 import RestoreBackupModal from "../components/backup/RestoreBackupModal";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL || "http://localhost:5000" || "https://whatsappcrm-client-46lf.onrender.com";
 
 // The new design does not show the 3 summary cards (Total / Completed / Latest).
 // Set to true if you want them back between the Automatic Backup card and the table.
