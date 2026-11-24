@@ -1,3 +1,4 @@
+
 // const prisma = require("../config/prisma");
 // const bcrypt = require("bcrypt");
 // const jwt = require("jsonwebtoken");
@@ -64,6 +65,15 @@
 //   try {
 
 //     const { email, password, companyId } = req.body;
+
+//     if (
+//       typeof email !== "string" || !email.trim() ||
+//       typeof password !== "string" || !password
+//     ) {
+//       return res.status(400).json({
+//         message: "Email and password are required",
+//       });
+//     }
 
 //     const users = await prisma.user.findMany({
 //       where: {
@@ -180,6 +190,7 @@
 //           companyLogo: user.company?.logo,
 //           companyStatus: user.company?.status,
 //           expiryDate: user.company?.expiryDate,
+//           tourSeenAt: user.tourSeenAt || null, // NEW
 //         },
 //       });
 //     }
@@ -212,6 +223,7 @@
 //         companyLogo: user.company?.logo,
 //         companyStatus: user.company?.status,
 //         expiryDate: user.company?.expiryDate,
+//         tourSeenAt: user.tourSeenAt || null, // NEW
 //       },
 //     });
 //   } catch (error) {
@@ -261,11 +273,45 @@
 //       companyLogo: user.company?.logo,
 //       companyStatus: user.company?.status,
 //       expiryDate: user.company?.expiryDate,
+//       tourSeenAt: user.tourSeenAt || null, // NEW
 //     });
 //   } catch (error) {
 //     return res.status(500).json({
 //       message: error.message,
 //     });
+//   }
+// };
+
+// // ========================
+// // MARK PRODUCT TOUR (USER GUIDE) AS SEEN
+// // ========================
+// // Saved on the account, so the guide is shown only on the user's
+// // first login - not again in every new browser.
+// const markTourSeen = async (req, res) => {
+//   try {
+//     const existing = await prisma.user.findUnique({
+//       where: { id: req.user.userId },
+//       select: { tourSeenAt: true },
+//     });
+
+//     if (!existing) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     // Already saved - keep the first date
+//     if (existing.tourSeenAt) {
+//       return res.status(200).json({ tourSeenAt: existing.tourSeenAt });
+//     }
+
+//     const updated = await prisma.user.update({
+//       where: { id: req.user.userId },
+//       data: { tourSeenAt: new Date() },
+//       select: { tourSeenAt: true },
+//     });
+
+//     return res.status(200).json({ tourSeenAt: updated.tourSeenAt });
+//   } catch (error) {
+//     return res.status(500).json({ message: error.message });
 //   }
 // };
 
@@ -573,6 +619,12 @@
 //     const { token } = req.params;
 //     const { password } = req.body;
 
+//     if (typeof password !== "string" || password.length < 6) {
+//       return res.status(400).json({
+//         message: "Password must be at least 6 characters",
+//       });
+//     }
+
 //     const user = await prisma.user.findFirst({
 //       where: {
 //         resetToken: token,
@@ -623,6 +675,7 @@
 //   registerUser,
 //   loginUser,
 //   getMe,
+//   markTourSeen, 
 //   updateProfile,
 //   changePassword,
 //   forgotPassword,
@@ -825,6 +878,7 @@ const loginUser = async (req, res) => {
           companyStatus: user.company?.status,
           expiryDate: user.company?.expiryDate,
           tourSeenAt: user.tourSeenAt || null, // NEW
+          moduleGuideSeenAt: user.moduleGuideSeenAt || null, // NEW
         },
       });
     }
@@ -858,6 +912,7 @@ const loginUser = async (req, res) => {
         companyStatus: user.company?.status,
         expiryDate: user.company?.expiryDate,
         tourSeenAt: user.tourSeenAt || null, // NEW
+        moduleGuideSeenAt: user.moduleGuideSeenAt || null, // NEW
       },
     });
   } catch (error) {
@@ -908,6 +963,7 @@ const getMe = async (req, res) => {
       companyStatus: user.company?.status,
       expiryDate: user.company?.expiryDate,
       tourSeenAt: user.tourSeenAt || null, // NEW
+      moduleGuideSeenAt: user.moduleGuideSeenAt || null, // NEW
     });
   } catch (error) {
     return res.status(500).json({
@@ -944,6 +1000,40 @@ const markTourSeen = async (req, res) => {
     });
 
     return res.status(200).json({ tourSeenAt: updated.tourSeenAt });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// ========================
+// MARK MODULE DEMO VIDEO AS SEEN
+// ========================
+// Saved on the account, so the module demo video ("Your ___ Space Start
+// Here") is shown only on the user's first login - not again in every new
+// browser and not again for every module.
+const markModuleGuideSeen = async (req, res) => {
+  try {
+    const existing = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { moduleGuideSeenAt: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Already saved - keep the first date
+    if (existing.moduleGuideSeenAt) {
+      return res.status(200).json({ moduleGuideSeenAt: existing.moduleGuideSeenAt });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { moduleGuideSeenAt: new Date() },
+      select: { moduleGuideSeenAt: true },
+    });
+
+    return res.status(200).json({ moduleGuideSeenAt: updated.moduleGuideSeenAt });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -1310,6 +1400,7 @@ module.exports = {
   loginUser,
   getMe,
   markTourSeen, 
+  markModuleGuideSeen, // NEW
   updateProfile,
   changePassword,
   forgotPassword,

@@ -551,6 +551,11 @@ model User {
   // so it is shown only once per account, not once per browser.
   tourSeenAt DateTime?
 
+  // Set the first time the user finishes the module demo video ("Your ___
+  // Space Start Here"). Saved on the account, so the demo video is shown only
+  // once - on the first login - and not again in every new browser / module.
+  moduleGuideSeenAt DateTime?
+
   resetToken       String?
   resetTokenExpiry DateTime?
 

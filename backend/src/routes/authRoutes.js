@@ -4,6 +4,7 @@
 //   registerUser,
 //   loginUser,
 //   getMe,
+//   markTourSeen, // NEW
 //   updateProfile,
 //   changePassword,
 //   forgotPassword,
@@ -24,6 +25,9 @@
 // // Get logged-in user (Protected route)
 // router.get("/me", authMiddleware, getMe);
 
+// // NEW: remember on the account that the user guide was shown (first login only)
+// router.post("/tour-seen", authMiddleware, markTourSeen);
+
 // // Update MY OWN profile (Protected — admin or employee, self only)
 // router.put(
 //   "/update-profile",
@@ -41,12 +45,16 @@
 // module.exports = router;
 
 
+
+
+
 const express = require("express");
 const {
   registerUser,
   loginUser,
   getMe,
   markTourSeen, // NEW
+  markModuleGuideSeen, // NEW
   updateProfile,
   changePassword,
   forgotPassword,
@@ -69,6 +77,9 @@ router.get("/me", authMiddleware, getMe);
 
 // NEW: remember on the account that the user guide was shown (first login only)
 router.post("/tour-seen", authMiddleware, markTourSeen);
+
+// NEW: remember on the account that the module demo video was shown (first login only)
+router.post("/module-guide-seen", authMiddleware, markModuleGuideSeen);
 
 // Update MY OWN profile (Protected — admin or employee, self only)
 router.put(
