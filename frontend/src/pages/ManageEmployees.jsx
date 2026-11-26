@@ -1,5 +1,6 @@
 
 // import { useCallback, useEffect, useMemo, useState } from "react";
+// import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 
 // import { Plus } from "lucide-react";
 
@@ -48,6 +49,9 @@
 
 //   const [showAddEmployeeModal, setShowAddEmployeeModal] =
 //     useState(false);
+
+//   // Opens the add form when coming from the first-visit guide
+//   useGuideAutoOpen("employees", () => setShowAddEmployeeModal(true));
 
 //   // Employee whose status switch is being saved
 //   const [togglingId, setTogglingId] =
@@ -654,7 +658,7 @@ const ManageEmployees = () => {
 
       {/* ================= HEADER ================= */}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
 
         <div className="min-w-0">
           <h1 className="crm-title">
@@ -669,7 +673,7 @@ const ManageEmployees = () => {
         <button
           type="button"
           onClick={() => setShowAddEmployeeModal(true)}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
         >
           <Plus size={16} />
           Add Employee

@@ -1,4 +1,5 @@
 
+
 // import { useCallback, useEffect, useMemo, useState } from "react";
 // import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 // import toast from "react-hot-toast";
@@ -220,9 +221,9 @@
 //       {/* HEADER */}
 //       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 //         <div>
-//           <h1 className="text-2xl font-bold text-slate-900">Campaigns</h1>
+//           <h1 className="crm-title">Campaigns</h1>
 
-//           <p className="mt-1 text-sm text-slate-500">
+//           <p className="crm-subtitle">
 //             Manage your marketing campaigns
 //           </p>
 //         </div>
@@ -352,6 +353,7 @@
 //     </div>
 //   );
 // }
+
 
 
 
@@ -575,7 +577,7 @@ export default function Campaigns() {
   return (
     <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">
       {/* HEADER */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="crm-title">Campaigns</h1>
 

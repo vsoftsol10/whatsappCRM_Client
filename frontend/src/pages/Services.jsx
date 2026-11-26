@@ -1,4 +1,6 @@
+
 // import { useEffect, useMemo, useState } from "react";
+// import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 // import { Users, Table2, LayoutGrid } from "lucide-react";
 // import toast from "react-hot-toast";
 
@@ -40,6 +42,11 @@
 
 //   // Which modal is open: { mode: "add" | "view" | "edit", service }
 //   const [formModal, setFormModal] = useState(null);
+
+//   // Opens the add form when coming from the first-visit guide
+//   useGuideAutoOpen("services", () => {
+//     if (isAdmin) setFormModal({ mode: "add", service: null });
+//   });
 //   const [customersService, setCustomersService] = useState(null);
 //   const [deleteTarget, setDeleteTarget] = useState(null);
 //   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
@@ -453,6 +460,9 @@
 // }
 
 
+
+
+
 import { useEffect, useMemo, useState } from "react";
 import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 import { Users, Table2, LayoutGrid } from "lucide-react";
@@ -685,7 +695,7 @@ export default function Services() {
   return (
     <div className="crm-page">
       {/* ================= HEADER ================= */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="crm-title">Services</h1>
           <p className="crm-subtitle">
@@ -697,7 +707,7 @@ export default function Services() {
           <button
             type="button"
             onClick={() => setFormModal({ mode: "add", service: null })}
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
+            className="inline-flex h-12 items-center justify-center rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
           >
             + Add Service
           </button>
