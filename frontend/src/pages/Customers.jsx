@@ -1,3 +1,4 @@
+
 // import { useEffect, useState, useMemo, useRef } from "react";
 // import { useNavigate } from "react-router-dom";
 // import {
@@ -893,7 +894,7 @@
 
 //       {/* ================= HEADER ================= */}
 
-//       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+//       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
 
 //         <div className="min-w-0">
 
@@ -2065,6 +2066,9 @@
 // export default Customers;
 
 
+
+
+
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -3034,7 +3038,7 @@ function Customers() {
           onChange={(e) =>
             setSearchTerm(e.target.value)
           }
-          className="h-12 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          className="h-12 w-full min-w-0 shrink-0 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 sm:w-auto sm:flex-1"
         />
 
         {/* Service filter (only shown when the company has services) */}

@@ -1,3 +1,4 @@
+
 // import { Users } from "lucide-react";
 // import { FaWhatsapp, FaInstagram, FaFacebookF } from "react-icons/fa";
 
@@ -52,22 +53,22 @@
 //   ];
 
 //   return (
-//     <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+//     <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 xl:gap-5">
 //       {cards.map((card) => (
 //         <div
 //           key={card.key}
-//           className="flex items-start justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+//           className="flex items-start justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
 //         >
-//           <div>
-//             <p className="text-sm text-slate-500">{card.title}</p>
+//           <div className="min-w-0">
+//             <p className="text-xs text-slate-500 sm:text-sm">{card.title}</p>
 
-//             <p className="mt-2 text-4xl font-bold text-slate-900">
+//             <p className="mt-2 text-3xl font-bold sm:text-4xl text-slate-900">
 //               {card.value}
 //             </p>
 //           </div>
 
 //           <div
-//             className={`flex h-14 w-14 items-center justify-center rounded-2xl ${card.badgeBg}`}
+//             className={`flex h-11 w-11 shrink-0 items-center sm:h-14 sm:w-14 justify-center rounded-2xl ${card.badgeBg}`}
 //           >
 //             {card.icon}
 //           </div>
@@ -78,6 +79,7 @@
 // }
 
 // export default CustomerStatCard;
+
 
 
 
@@ -139,18 +141,18 @@ function CustomerStatCard({
       {cards.map((card) => (
         <div
           key={card.key}
-          className="flex items-start justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex sm:justify-between sm:gap-0 sm:p-5"
         >
-          <div className="min-w-0">
-            <p className="text-xs text-slate-500 sm:text-sm">{card.title}</p>
+          <div className="contents sm:block sm:min-w-0">
+            <p className="col-start-1 row-start-1 min-h-[2rem] text-xs text-slate-500 sm:min-h-0 sm:text-sm">{card.title}</p>
 
-            <p className="mt-2 text-3xl font-bold sm:text-4xl text-slate-900">
+            <p className="col-span-2 row-start-2 text-2xl font-bold text-slate-900 sm:mt-2 sm:text-4xl">
               {card.value}
             </p>
           </div>
 
           <div
-            className={`flex h-11 w-11 shrink-0 items-center sm:h-14 sm:w-14 justify-center rounded-2xl ${card.badgeBg}`}
+            className={`col-start-2 row-start-1 flex h-11 w-11 shrink-0 items-center sm:h-14 sm:w-14 justify-center rounded-2xl ${card.badgeBg}`}
           >
             {card.icon}
           </div>

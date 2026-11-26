@@ -1,4 +1,5 @@
 
+
 // // Sidebar page "Proposals": list + send on WhatsApp + download + delete.
 // import { useCallback, useEffect, useState } from "react";
 // import { useNavigate } from "react-router-dom";
@@ -255,7 +256,7 @@
 // // =====================================================
 // function StatCard({ icon: Icon, label, value }) {
 //   return (
-//     <div className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+//     <div className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
 //       <div className="min-w-0">
 //         <p className="text-xs text-slate-500">{label}</p>
 //         <p className="mt-2 truncate text-3xl font-bold text-slate-900">
@@ -263,7 +264,7 @@
 //         </p>
 //       </div>
 
-//       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600">
+//       <span className="flex h-11 w-11 shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-green-100 text-green-600">
 //         <Icon size={22} />
 //       </span>
 //     </div>
@@ -439,7 +440,7 @@
 //   return (
 //     <div className="crm-page">
 //       {/* HEADER */}
-//       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+//       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
 //         <div className="min-w-0">
 //           <h1 className="crm-title">Proposals</h1>
 //           <p className="crm-subtitle">
@@ -450,14 +451,14 @@
 //         <button
 //           type="button"
 //           onClick={() => navigate("/proposals/new")}
-//           className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
+//           className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
 //         >
 //           <Plus size={16} /> New Proposal
 //         </button>
 //       </div>
 
 //       {/* STATS */}
-//       <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+//       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 xl:gap-5">
 //         <StatCard
 //           icon={FileText}
 //           label="Total proposals"
@@ -689,7 +690,6 @@
 // }
 
 // export default Proposals;
-
 
 
 
@@ -950,15 +950,15 @@ function PreviewModal({ proposalId, onClose, onEdit }) {
 // =====================================================
 function StatCard({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="min-w-0">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="mt-2 truncate text-3xl font-bold text-slate-900">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex sm:justify-between sm:gap-3 sm:p-5">
+      <div className="contents sm:block sm:min-w-0">
+        <p className="col-start-1 row-start-1 min-h-[2rem] text-xs text-slate-500 sm:min-h-0">{label}</p>
+        <p className="col-span-2 row-start-2 truncate text-2xl font-bold text-slate-900 sm:mt-2 sm:text-3xl">
           {value}
         </p>
       </div>
 
-      <span className="flex h-11 w-11 shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-green-100 text-green-600">
+      <span className="col-start-2 row-start-1 flex h-11 w-11 shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-green-100 text-green-600">
         <Icon size={22} />
       </span>
     </div>

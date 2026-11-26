@@ -1,12 +1,14 @@
+
+
 // import { useEffect, useMemo, useState } from "react";
 // import { useLocation } from "react-router-dom";
+// import { FaWhatsapp } from "react-icons/fa";
 // import useConversationStore from "../store/conversationStore";
 // import Sidebar from "../components/conversation/Sidebar";
 // import ChatHeader from "../components/conversation/ChatHeader";
 // import MessageList from "../components/conversation/MessageList";
 // import MessageInput from "../components/conversation/MessageInput";
 // import CustomerDetails from "../components/conversation/CustomerDetails";
-
 
 // import useMessageStore from "../store/messageStore";
 // import { toast } from "react-hot-toast";
@@ -20,11 +22,29 @@
 //   return "WHATSAPP";
 // };
 
-// const CHANNEL_TITLES = {
-//   WHATSAPP: "WhatsApp Conversations",
-//   MESSENGER: "Facebook Conversations",
-//   INSTAGRAM: "Instagram Conversations",
+// const CHANNEL_LABELS = {
+//   WHATSAPP: "WhatsApp",
+//   MESSENGER: "Facebook",
+//   INSTAGRAM: "Instagram",
 // };
+
+// // Shown on the right when no chat is selected
+// function SelectChatPlaceholder({ channel }) {
+//   return (
+//     <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 text-center">
+//       <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#22C55E] text-[#22C55E]">
+//         <FaWhatsapp size={36} aria-hidden="true" />
+//       </span>
+
+//       <h2 className="mt-5 text-2xl font-semibold text-slate-600">Select a chat</h2>
+
+//       <p className="mt-2 max-w-sm text-slate-600">
+//         Choose a {CHANNEL_LABELS[channel] || "WhatsApp"} chat from the list to
+//         start messaging.
+//       </p>
+//     </div>
+//   );
+// }
 
 // // channel = "WHATSAPP" (default) | "MESSENGER" | "INSTAGRAM"
 // function Conversations({ channel = "WHATSAPP" }) {
@@ -32,7 +52,7 @@
 
 //   const customerId = location.state?.customerId;
 
-//   // Mobile Navigation State
+//   // Mobile navigation + customer profile panel
 //   const [showChat, setShowChat] = useState(false);
 //   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
 
@@ -67,19 +87,22 @@
 //     [conversations, channel]
 //   );
 
+//   // The profile panel only makes sense while a chat is open
+//   const profileOpen = showCustomerDetails && !!selectedConversation;
+
 //   // Load conversations when page opens
 //   useEffect(() => {
 //     fetchConversations();
 
 //     // The selected chat is shared between pages. If it belongs to another
 //     // channel (e.g. we came from the WhatsApp page), clear it.
-//     const { selectedConversation: current } =
-//       useConversationStore.getState();
+//     const { selectedConversation: current } = useConversationStore.getState();
 
 //     if (current && getConversationChannel(current) !== channel) {
 //       setSelectedConversation(null);
 //       clearMessages();
 //     }
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
 //   }, []);
 
 //   useEffect(() => {
@@ -105,8 +128,7 @@
 //           return;
 //         }
 
-//         // No conversation yet.
-//         // Create one for this customer.
+//         // No conversation yet. Create one for this customer.
 //         const newConversation = await addConversation({
 //           customerId,
 //           status: "OPEN",
@@ -120,14 +142,12 @@
 //           setShowChat(true);
 //         }
 //       } catch (error) {
-//         console.error(
-//           "Failed to open customer conversation:",
-//           error
-//         );
+//         console.error("Failed to open customer conversation:", error);
 //       }
 //     };
 
 //     openCustomerConversation();
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
 //   }, [customerId]);
 
 //   // Load messages whenever a conversation is selected
@@ -139,6 +159,7 @@
 //       // Open chat on mobile after selecting a conversation
 //       setShowChat(true);
 //     }
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
 //   }, [selectedConversation]);
 
 //   // Send message
@@ -191,81 +212,73 @@
 //   };
 
 //   return (
-//     <div className="flex h-full min-h-[calc(100vh-4rem)] flex-col bg-white xl:min-h-full xl:flex-row">
-
-//       {/* Left Sidebar */}
+//     <div className="flex h-full min-h-[calc(100vh-5rem)] flex-col bg-white xl:min-h-full xl:flex-row">
+//       {/* Chat list */}
 //       <div
-//         className={`
-//             ${showChat ? "hidden" : "flex"}
-//             flex-1 min-h-0 bg-white
-//             xl:flex xl:w-[350px] xl:min-w-[300px]
-//             xl:flex-none xl:border-r
-//           `}
+//         className={`${showChat ? "hidden" : "flex"} min-h-0 flex-1 bg-white xl:flex xl:w-[350px] xl:min-w-[300px] xl:flex-none xl:border-r xl:border-gray-200`}
 //       >
 //         <Sidebar
-//           title={CHANNEL_TITLES[channel] || "Conversations"}
+//           title="Chats"
 //           conversations={channelConversations}
 //           selectedConversation={selectedConversation}
 //           setSelectedConversation={setSelectedConversation}
 //         />
 //       </div>
 
-//       {/* Chat Section */}
+//       {/* Chat area */}
 //       <div
-//         className={`
-//           ${showChat ? "flex" : "hidden"}
-//           min-h-[520px] min-w-0 flex-1 flex-col bg-[#f7f7f7]
-//           xl:flex xl:min-h-0
-//         `}
+//         className={`${showChat ? "flex" : "hidden"} min-h-[520px] min-w-0 flex-1 flex-col xl:flex xl:min-h-0 ${
+//           selectedConversation ? "bg-[#f7f7f7]" : "bg-white"
+//         }`}
 //       >
-//         {/* Chat Header */}
-//         <ChatHeader
-//           selectedConversation={selectedConversation}
-//           showChat={showChat}
-//           setShowChat={setShowChat}
-//           setShowCustomerDetails={setShowCustomerDetails}
-//         />
+//         {selectedConversation ? (
+//           <>
+//             <ChatHeader
+//               selectedConversation={selectedConversation}
+//               setShowChat={setShowChat}
+//               showCustomerDetails={profileOpen}
+//               setShowCustomerDetails={setShowCustomerDetails}
+//             />
 
-//         {/* Messages */}
-//         <div className="min-h-0 flex-1">
-//           <MessageList
-//             messages={
-//               selectedConversation &&
-//               messagesConversationId === selectedConversation.id
-//                 ? messages
-//                 : []
-//             }
-//             loading={
-//               !!selectedConversation &&
-//               (messagesLoading ||
-//                 messagesConversationId !== selectedConversation.id)
-//             }
-//           />
-//         </div>
+//             <div className="min-h-0 flex-1">
+//               <MessageList
+//                 messages={
+//                   messagesConversationId === selectedConversation.id
+//                     ? messages
+//                     : []
+//                 }
+//                 loading={
+//                   messagesLoading ||
+//                   messagesConversationId !== selectedConversation.id
+//                 }
+//               />
+//             </div>
 
-//         {/* Message Input */}
-//         <MessageInput
-//           onSendMessage={handleSendMessage}
-//           onSendMedia={handleSendMedia}
-//           conversationKey={selectedConversation?.id}
-//           disabled={!selectedConversation}
-//         />
+//             <MessageInput
+//               onSendMessage={handleSendMessage}
+//               onSendMedia={handleSendMedia}
+//               conversationKey={selectedConversation.id}
+//             />
+//           </>
+//         ) : (
+//           <SelectChatPlaceholder channel={channel} />
+//         )}
 //       </div>
 
-//       {/* Customer Details */}
-//       <div className="hidden max-h-[320px] border-t bg-white xl:block xl:max-h-none xl:w-[320px] xl:min-w-[280px] xl:border-l xl:border-t-0">
+//       {/* Customer profile: opens when you click the customer's name */}
+//       {profileOpen && (
 //         <CustomerDetails
-//           customer={selectedConversation}
-//           showCustomerDetails={showCustomerDetails}
-//           setShowCustomerDetails={setShowCustomerDetails}
+//           conversation={selectedConversation}
+//           onClose={() => setShowCustomerDetails(false)}
 //         />
-//       </div>
-
+//       )}
 //     </div>
 //   );
 // }
 
 // export default Conversations;
+
+
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -298,9 +311,9 @@ const CHANNEL_LABELS = {
 // Shown on the right when no chat is selected
 function SelectChatPlaceholder({ channel }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-[#F1F3F6] px-6 text-center">
-      <span className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-[#22C55E] text-[#22C55E]">
-        <FaWhatsapp size={60} aria-hidden="true" />
+    <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 text-center">
+      <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#22C55E] text-[#22C55E]">
+        <FaWhatsapp size={36} aria-hidden="true" />
       </span>
 
       <h2 className="mt-5 text-2xl font-semibold text-slate-600">Select a chat</h2>
@@ -482,7 +495,7 @@ function Conversations({ channel = "WHATSAPP" }) {
     <div className="flex h-full min-h-[calc(100vh-5rem)] flex-col bg-white xl:min-h-full xl:flex-row">
       {/* Chat list */}
       <div
-        className={`${showChat ? "hidden" : "flex"} min-h-0 flex-1 bg-white xl:flex xl:w-[350px] xl:min-w-[300px] xl:flex-none xl:border-r xl:border-gray-200`}
+        className={`${showChat && selectedConversation ? "hidden" : "flex"} min-h-0 flex-1 bg-white xl:flex xl:w-[350px] xl:min-w-[300px] xl:flex-none xl:border-r xl:border-gray-200`}
       >
         <Sidebar
           title="Chats"
@@ -494,8 +507,8 @@ function Conversations({ channel = "WHATSAPP" }) {
 
       {/* Chat area */}
       <div
-        className={`${showChat ? "flex" : "hidden"} min-h-[520px] min-w-0 flex-1 flex-col xl:flex xl:min-h-0 ${
-          selectedConversation ? "bg-[#f7f7f7]" : "bg-[#F1F3F6]"
+        className={`${showChat && selectedConversation ? "flex" : "hidden"} min-h-[520px] min-w-0 flex-1 flex-col xl:flex xl:min-h-0 ${
+          selectedConversation ? "bg-[#f7f7f7]" : "bg-white"
         }`}
       >
         {selectedConversation ? (

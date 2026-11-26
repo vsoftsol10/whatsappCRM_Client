@@ -12,24 +12,24 @@
 //   ];
 
 //   return (
-//     <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+//     <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4 xl:gap-5">
 //       {stats.map((item) => {
 //         const Icon = item.icon;
 
 //         return (
 //           <div
 //             key={item.key}
-//             className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+//             className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
 //           >
 //             <div className="min-w-0">
-//               <p className="text-sm text-slate-500">{item.label}</p>
+//               <p className="text-xs text-slate-500 sm:text-sm">{item.label}</p>
 
-//               <p className="mt-2 text-4xl font-bold text-slate-900">
+//               <p className="mt-2 text-3xl font-bold sm:text-4xl text-slate-900">
 //                 {item.count}
 //               </p>
 //             </div>
 
-//             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-green-100">
+//             <div className="flex h-10 w-10 shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-green-100">
 //               <Icon size={22} className="text-green-600" />
 //             </div>
 //           </div>
@@ -64,17 +64,17 @@ function TicketStats({ ticketCounts }) {
         return (
           <div
             key={item.key}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex sm:justify-between sm:gap-3 sm:p-5"
           >
-            <div className="min-w-0">
-              <p className="text-xs text-slate-500 sm:text-sm">{item.label}</p>
+            <div className="contents sm:block sm:min-w-0">
+              <p className="col-start-1 row-start-1 min-h-[2rem] text-xs text-slate-500 sm:min-h-0 sm:text-sm">{item.label}</p>
 
-              <p className="mt-2 text-3xl font-bold sm:text-4xl text-slate-900">
+              <p className="col-span-2 row-start-2 text-2xl font-bold text-slate-900 sm:mt-2 sm:text-4xl">
                 {item.count}
               </p>
             </div>
 
-            <div className="flex h-10 w-10 shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-green-100">
+            <div className="col-start-2 row-start-1 flex h-10 w-10 shrink-0 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-green-100">
               <Icon size={22} className="text-green-600" />
             </div>
           </div>
