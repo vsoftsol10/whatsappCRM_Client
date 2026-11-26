@@ -1,3 +1,5 @@
+
+
 // // src/layouts/SettingsLayout.jsx
 // //
 // // One "Settings" page that holds every settings area as a tab:
@@ -10,6 +12,12 @@
 // import { useAuthStore } from "../store/authStore";
 // import { settingsTabs, filterTabsByRole, filterTabsByFeatures } from "../config/navigation";
 // import usePlanFeatures from "../hooks/usePlanFeatures";
+
+// // Tab names shown in the underline tab bar (display only - routes unchanged)
+// const TAB_LABELS = {
+//   backup: "Backup & Restore",
+//   "knowledge-base": "Knowledge base",
+// };
 
 // export default function SettingsLayout() {
 //   const user = useAuthStore((state) => state.user);
@@ -36,10 +44,10 @@
 //     <div className="mx-auto w-full max-w-[1340px] pb-10">
 //       {/* ================= HEADER ================= */}
 //       <div>
-//         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+//         <h1 className="crm-title">
 //           Settings
 //         </h1>
-//         <p className="mt-2 text-base text-slate-500">
+//         <p className="crm-subtitle">
 //           Manage your security, integrations, backups and workspace preferences.
 //         </p>
 //       </div>
@@ -47,9 +55,9 @@
 //       {/* ================= TABS ================= */}
 //       <div
 //         ref={tabsRef}
-//         className="mt-6 max-w-full overflow-x-auto rounded-full border border-slate-200 bg-white p-2 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:inline-block"
+//         className="mt-5 max-w-full overflow-x-auto border-b border-slate-200 [scrollbar-width:none] md:overflow-visible [&::-webkit-scrollbar]:hidden"
 //       >
-//         <nav aria-label="Settings sections" className="flex w-max items-center gap-1">
+//         <nav aria-label="Settings sections" className="flex w-max items-center gap-3 md:w-full md:flex-wrap md:gap-x-2 lg:gap-x-3">
 //           {tabs.map((tab) => {
 //             const Icon = tab.icon;
 //             return (
@@ -58,15 +66,15 @@
 //                 to={tab.path}
 //                 data-tour={tab.key}
 //                 className={({ isActive }) =>
-//                   `inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full px-5 text-[15px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 ${
+//                   `-mb-px inline-flex h-11 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 ${
 //                     isActive
-//                       ? "bg-green-600 text-white shadow-md shadow-green-600/25"
-//                       : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+//                       ? "border-green-600 text-slate-900"
+//                       : "border-transparent text-slate-600 hover:text-slate-900"
 //                   }`
 //                 }
 //               >
-//                 <Icon size={18} strokeWidth={1.9} className="shrink-0" />
-//                 <span>{tab.name}</span>
+//                 <Icon size={16} strokeWidth={1.9} className="shrink-0" />
+//                 <span>{TAB_LABELS[tab.key] || tab.name}</span>
 //               </NavLink>
 //             );
 //           })}
@@ -77,12 +85,14 @@
 //           The existing pages bring their own outer padding / background.
 //           Inside this shell the layout already provides that, so we neutralise
 //           it here instead of editing every page. */}
-//       <div className="mt-8 [&>div]:min-h-0! [&>div]:bg-transparent! [&>div]:p-0!">
+//       <div className="mt-6 [&>div]:min-h-0! [&>div]:bg-transparent! [&>div]:p-0!">
 //         <Outlet />
 //       </div>
 //     </div>
 //   );
 // }
+
+
 
 
 // src/layouts/SettingsLayout.jsx
@@ -125,6 +135,20 @@ export default function SettingsLayout() {
     bar.scrollLeft = active.offsetLeft - (bar.clientWidth - active.clientWidth) / 2;
   }, [pathname]);
 
+  // Mouse wheel scrolls the tab bar sideways (scrollbar is hidden)
+  useEffect(() => {
+    const bar = tabsRef.current;
+    if (!bar) return;
+    const onWheel = (e) => {
+      if (bar.scrollWidth <= bar.clientWidth) return;
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      bar.scrollLeft += e.deltaY;
+    };
+    bar.addEventListener("wheel", onWheel, { passive: false });
+    return () => bar.removeEventListener("wheel", onWheel);
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-[1340px] pb-10">
       {/* ================= HEADER ================= */}
@@ -140,9 +164,9 @@ export default function SettingsLayout() {
       {/* ================= TABS ================= */}
       <div
         ref={tabsRef}
-        className="mt-5 max-w-full overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="relative mt-5 max-w-full overflow-x-auto border-b border-slate-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <nav aria-label="Settings sections" className="flex w-max items-center gap-3">
+        <nav aria-label="Settings sections" className="flex w-max flex-nowrap items-center gap-3">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -151,7 +175,7 @@ export default function SettingsLayout() {
                 to={tab.path}
                 data-tour={tab.key}
                 className={({ isActive }) =>
-                  `-mb-px inline-flex h-11 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 ${
+                  `-mb-px inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 ${
                     isActive
                       ? "border-green-600 text-slate-900"
                       : "border-transparent text-slate-600 hover:text-slate-900"
