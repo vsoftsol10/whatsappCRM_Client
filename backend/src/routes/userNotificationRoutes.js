@@ -45,6 +45,7 @@ const {
   markUserNotificationAsRead,
   markAllUserNotificationsAsRead,
   deleteUserNotification,
+  deleteAllUserNotifications,
 } = require("../controllers/userNotificationController");
 
 // ==========================================
@@ -76,6 +77,12 @@ router.patch(
   authMiddleware,
   markAllUserNotificationsAsRead
 );
+
+// ==========================================
+// DELETE ALL NOTIFICATIONS (of the logged-in user)
+// DELETE /api/user-notifications
+// ==========================================
+router.delete("/", authMiddleware, deleteAllUserNotifications);
 
 // ==========================================
 // DELETE NOTIFICATION
