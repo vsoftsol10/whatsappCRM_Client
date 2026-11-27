@@ -10,12 +10,18 @@ import {
 import { connectSocket } from "../../api/socket";
 
 import NotificationDropdown from "./NotificationDropdown";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 function NotificationButton() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+
+  // "Delete all" confirmation popup
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   // unreadCount comes from the backend's own count query (across ALL
   // of the user's notifications), not from notifications.filter(...)
@@ -130,6 +136,10 @@ function NotificationButton() {
   // ================= CLOSE DROPDOWN ON OUTSIDE CLICK =================
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // The confirm popup is rendered in <body> (outside wrapperRef), so
+      // ignore clicks while it is open or the dropdown would close.
+      if (showDeleteConfirm) return;
+
       if (
         wrapperRef.current &&
         !wrapperRef.current.contains(event.target)
@@ -146,7 +156,7 @@ function NotificationButton() {
         handleClickOutside
       );
     };
-  }, []);
+  }, [showDeleteConfirm]);
 
   // ================= TOGGLE DROPDOWN =================
   const handleToggleDropdown = () => {
@@ -186,12 +196,24 @@ function NotificationButton() {
   };
 
   // ================= DELETE ALL =================
-  const handleDeleteAllNotifications = async () => {
-    if (!window.confirm("Delete all notifications? This cannot be undone.")) {
-      return;
-    }
+  // Step 1: "Delete all" button only opens the confirmation popup
+  const handleDeleteAllClick = () => {
+    setDeleteError("");
+    setShowDeleteConfirm(true);
+  };
 
+  const handleCancelDeleteAll = () => {
+    if (deleting) return;
+    setShowDeleteConfirm(false);
+    setDeleteError("");
+  };
+
+  // Step 2: popup "Delete all" button does the real delete
+  const handleConfirmDeleteAll = async () => {
     try {
+      setDeleting(true);
+      setDeleteError("");
+
       await deleteAllNotifications();
 
       // The backend removes EVERY notification of this user, not just
@@ -200,8 +222,12 @@ function NotificationButton() {
       setUnreadCount(0);
       setPage(1);
       setHasMore(false);
+      setShowDeleteConfirm(false);
     } catch (error) {
       console.error("Delete All Notifications Error:", error);
+      setDeleteError("Something went wrong. Please try again.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -257,7 +283,7 @@ function NotificationButton() {
           loading={loading}
           notifications={notifications}
           onMarkAsRead={handleMarkAsRead}
-          onDeleteAll={handleDeleteAllNotifications}
+          onDeleteAll={handleDeleteAllClick}
           onDelete={handleDeleteNotification}
           hasMore={hasMore}
           loadingMore={loadingMore}
@@ -267,6 +293,14 @@ function NotificationButton() {
         />
         </>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteConfirm}
+        loading={deleting}
+        error={deleteError}
+        onConfirm={handleConfirmDeleteAll}
+        onCancel={handleCancelDeleteAll}
+      />
     </div>
   );
 }
