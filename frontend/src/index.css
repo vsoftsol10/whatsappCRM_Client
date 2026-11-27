@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* ---- UI team colours ----
+   Page background : #FAFBFD
+   Stroke / borders: #E5E1E1
+   Every existing border-gray-200 / border-slate-200 and bg-gray-50 now
+   uses these, so all modules match without touching each page. */
+@theme {
+  --color-gray-50: #FAFBFD;
+  --color-gray-200: #E5E1E1;
+  --color-slate-200: #E5E1E1;
+}
+
 @layer base {
   html,
   body,

@@ -1,4 +1,6 @@
+
 // import { useEffect, useMemo, useState } from "react";
+// import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 // import { Trash2 } from "lucide-react";
 
 // import useLeadStore from "../store/leadStore";
@@ -56,6 +58,9 @@
 
 //   const [showAddModal, setShowAddModal] =
 //     useState(false);
+
+//   // Opens the add form when coming from the first-visit guide
+//   useGuideAutoOpen("leads", () => setShowAddModal(true));
 
 //   const [showEditModal, setShowEditModal] =
 //     useState(false);
@@ -644,6 +649,8 @@
 // }
 
 
+
+
 import { useEffect, useMemo, useState } from "react";
 import useGuideAutoOpen from "../components/guide/useGuideAutoOpen";
 import { Trash2 } from "lucide-react";
@@ -1053,7 +1060,7 @@ export default function Lead() {
 
       {/* ================= HEADER ================= */}
 
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
 
         <div className="min-w-0">
           <h1 className="crm-title">
@@ -1068,7 +1075,7 @@ export default function Lead() {
         <button
           type="button"
           onClick={() => setShowAddModal(true)}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
+          className="inline-flex h-12 items-center justify-center rounded-xl bg-green-500 px-6 text-sm font-semibold text-white transition hover:bg-green-600"
         >
           + Add Leads
         </button>
