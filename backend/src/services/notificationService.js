@@ -158,14 +158,22 @@ const notifyUsers = async ({
       return;
     }
 
-    return await prisma.userNotification.createMany({
-      data: userIds.map((userId) => ({
-        userId,
-        title,
-        message,
-        type,
-      })),
-    });
+    // Created one by one (not createMany) so each saved row can be pushed
+    // live to that user's open browser tab — createMany returns only a
+    // count, so the bell would not update until a refresh.
+    const notifications = await Promise.all(
+      userIds.map((userId) =>
+        prisma.userNotification.create({
+          data: { userId, title, message, type },
+        })
+      )
+    );
+
+    notifications.forEach((n) =>
+      emitToUser(n.userId, "notification:new", n)
+    );
+
+    return notifications;
   } catch (error) {
     console.error("Notify Users Error:", error);
     throw error;
@@ -204,14 +212,23 @@ const notifyAdmins = async ({
       return;
     }
 
-    return await prisma.userNotification.createMany({
-      data: admins.map((admin) => ({
-        userId: admin.id,
-        title,
-        message,
-        type,
-      })),
-    });
+    console.log(
+      `[notifyAdmins] "${title}" -> ${admins.length} admin(s) in company ${companyId}`
+    );
+
+    const notifications = await Promise.all(
+      admins.map((admin) =>
+        prisma.userNotification.create({
+          data: { userId: admin.id, title, message, type },
+        })
+      )
+    );
+
+    notifications.forEach((n) =>
+      emitToUser(n.userId, "notification:new", n)
+    );
+
+    return notifications;
   } catch (error) {
     console.error("Notify Admins Error:", error);
     throw error;
