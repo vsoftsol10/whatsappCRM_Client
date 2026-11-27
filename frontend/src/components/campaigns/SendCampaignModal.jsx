@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { X, Send, Loader2, Filter, CircleCheck } from "lucide-react";
+import { X, Send, Loader2 } from "lucide-react";
 
 import { getCustomers } from "../../api/customerApi";
-import { getServices } from "../../api/serviceApi";
 import ServiceFilterChips, {
   matchesServiceFilter,
 } from "../services/ServiceFilterChips";
 import { getCampaignRecipients } from "../../api/campaignApi";
 import useCampaignStore from "../../store/campaignStore";
-
-// How long the "sent" message stays before it closes on its own
-const SUCCESS_AUTO_CLOSE_MS = 3500;
 
 export default function SendCampaignModal({
   isOpen,
@@ -32,13 +28,8 @@ export default function SendCampaignModal({
 
   // Service filter (empty = all customers)
   const [serviceFilter, setServiceFilter] = useState([]);
-  const [hasServices, setHasServices] = useState(false);
-  const [showFilter, setShowFilter] = useState(false);
 
   const [loading, setLoading] = useState(false);
-
-  // true after the campaign was sent -> shows the success message
-  const [sent, setSent] = useState(false);
 
   // Always the latest onClose, so timers/listeners below don't restart
   // every time the page re-renders (it passes a new function each time).
@@ -55,13 +46,10 @@ export default function SendCampaignModal({
     if (isOpen && campaign) {
       fetchCustomers();
       fetchSentCustomers();
-      fetchHasServices();
 
       setSelectedCustomers([]);
       setSearch("");
       setServiceFilter([]);
-      setShowFilter(false);
-      setSent(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, campaign]);
@@ -85,18 +73,6 @@ export default function SendCampaignModal({
     };
   }, [isOpen, campaign, loading]);
 
-  // The success message closes itself after a few seconds
-  useEffect(() => {
-    if (!sent) return undefined;
-
-    const timer = setTimeout(
-      () => onCloseRef.current(),
-      SUCCESS_AUTO_CLOSE_MS
-    );
-
-    return () => clearTimeout(timer);
-  }, [sent]);
-
   // ===========================
   // GET CUSTOMERS
   // ===========================
@@ -116,19 +92,6 @@ export default function SendCampaignModal({
     } catch (error) {
       console.log("Customers Error:", error);
       setCustomers([]);
-    }
-  };
-
-  // ===========================
-  // DOES THIS COMPANY USE SERVICES? (decides if "Filter" is shown)
-  // ===========================
-  const fetchHasServices = async () => {
-    try {
-      const data = await getServices({ activeOnly: "true" });
-
-      setHasServices((data?.services || []).length > 0);
-    } catch {
-      setHasServices(false);
     }
   };
 
@@ -216,8 +179,9 @@ export default function SendCampaignModal({
       // Clear selection.
       setSelectedCustomers([]);
 
-      // Show the success message
-      setSent(true);
+      // Show a toast (same as the other modules) and close the drawer
+      toast.success("Campaign sent successfully!");
+      onClose();
     } catch (error) {
       console.log("Campaign Send Error:", error);
 
@@ -228,45 +192,6 @@ export default function SendCampaignModal({
       setLoading(false);
     }
   };
-
-  // ===========================
-  // SUCCESS MESSAGE
-  // ===========================
-  if (sent) {
-    return (
-      <div
-        onClick={onClose}
-        className="crm-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      >
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="campaign-sent-title"
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-xl rounded-2xl bg-white px-6 py-12 text-center shadow-xl"
-        >
-          <CircleCheck
-            size={64}
-            strokeWidth={1.25}
-            className="mx-auto text-green-800"
-          />
-
-          <h2
-            id="campaign-sent-title"
-            className="mt-5 text-3xl font-bold text-slate-900"
-          >
-            Campaign sent successfully!
-          </h2>
-
-          <p className="mx-auto mt-3 max-w-md text-base text-slate-600">
-            Your campaign has been sent successfully to the selected audience
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const activeFilterCount = serviceFilter.length;
 
   // ===========================
   // UI (right-side drawer)
@@ -315,49 +240,23 @@ export default function SendCampaignModal({
 
         {/* SEARCH + FILTER */}
         <div className="px-5 pt-5">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              aria-label="Search customer"
-              placeholder="Search Customer"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
-            />
+          {/* Filter customers by service (dropdown, hidden when the company has no services) */}
+          <ServiceFilterChips
+            customers={customers}
+            value={serviceFilter}
+            onChange={setServiceFilter}
+            disabled={false}
+            variant="dropdown"
+          />
 
-            {hasServices && (
-              <button
-                type="button"
-                aria-expanded={showFilter}
-                onClick={() => setShowFilter((open) => !open)}
-                className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition ${
-                  showFilter || activeFilterCount > 0
-                    ? "border-green-500 bg-green-50 text-green-700"
-                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
-                }`}
-              >
-                <Filter size={16} />
-                Filter
-                {activeFilterCount > 0 && (
-                  <span className="rounded-full bg-green-600 px-1.5 text-[11px] font-semibold text-white">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Filter customers by service */}
-          {hasServices && showFilter && (
-            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 pb-1">
-              <ServiceFilterChips
-                customers={customers}
-                value={serviceFilter}
-                onChange={setServiceFilter}
-                disabled={false}
-              />
-            </div>
-          )}
+          <input
+            type="text"
+            aria-label="Search customer"
+            placeholder="Search Customer"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+          />
 
           {/* selection helpers */}
           <div className="mt-4 flex items-center justify-between text-sm">

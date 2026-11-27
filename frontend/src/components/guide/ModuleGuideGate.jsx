@@ -1,3 +1,4 @@
+
 // // src/components/guide/ModuleGuideGate.jsx
 // //
 // // First-visit guide for a module.
@@ -43,8 +44,8 @@
 // // AppLayout renders these routes full width (no padding around the page), so
 // // the guide needs the same padding the layout gives every other module.
 // // Without it the title sits ~28px higher than in Tasks, Leads, etc.
-// const FULL_WIDTH_GUIDE_MODULES = ["tickets", "instagram"];
-// const LAYOUT_PADDING = "px-4 py-5 sm:px-5 sm:py-6";
+// const FULL_WIDTH_GUIDE_MODULES = ["instagram"];
+// const LAYOUT_PADDING = "px-4 py-5 sm:px-6 sm:py-6 lg:px-8";
 
 // const HEADER_BUTTON_MODULES = ["customers", ...ADD_FORM_MODULES, "instagram"];
 
@@ -164,7 +165,7 @@
 //   // inside the already-scrolling content area, which made this page scroll).
 //   return (
 //     <div className={extraPadding}>
-//     <div className="bg-gray-50 px-4 py-2 text-gray-900 sm:px-6 lg:px-8">
+//     <div className="bg-gray-50 py-2 text-gray-900">
 //       <div className="mb-12 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 //         <div className="min-w-0">
 //           <h1 className="crm-title">
@@ -229,6 +230,7 @@
 
 
 
+
 // src/components/guide/ModuleGuideGate.jsx
 //
 // First-visit guide for a module.
@@ -248,7 +250,7 @@
 //
 // All text, checklists and video links come from src/data/userGuide.js - the
 // same data as Settings -> User Guide.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Upload } from "lucide-react";
 
@@ -310,6 +312,17 @@ function Gate({ moduleId, children }) {
 
   // Customers first visit: add-customer form opens from the panel
   const [showAddCustomer, setShowAddCustomer] = useState(false);
+
+  // The demo video is for the FIRST LOGIN only. Save it on the account the moment
+  // it is displayed - not only when the green button is clicked - so it never
+  // comes back on the next login, even if the user leaves without clicking.
+  // (`show` is already decided above, so the panel stays on screen for now.)
+  const guideVisible =
+    show && Boolean(module) && Boolean(video) && !NO_GUIDE_MODULES.includes(moduleId);
+
+  useEffect(() => {
+    if (guideVisible) markGuideSeen();
+  }, [guideVisible]);
 
   if (NO_GUIDE_MODULES.includes(moduleId)) return children;
 
