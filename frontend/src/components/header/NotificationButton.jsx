@@ -260,9 +260,12 @@ function NotificationButton() {
     <div className="relative" ref={wrapperRef}>
       <button
         onClick={handleToggleDropdown}
-        className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white transition hover:border-[#25D366] hover:bg-[#DCF8C6]"
+        className="group relative flex h-11 w-11 items-center justify-center bg-transparent"
       >
-        <FaBell size={18} className="text-gray-700" />
+        <FaBell
+          size={20}
+          className="text-gray-700 transition group-hover:text-[#25D366]"
+        />
 
         {unreadCount > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
